@@ -40,7 +40,7 @@ class BunchCollider:
 
         self.bkg = 1e-20 * 0.  # Background density to add to the density product, interpret as air density
 
-        self.z_bounds = (-265. * 1e4, 265. * 1e4)
+        self.z_bounds = (-265. * 1e4, 265. * 1e4)  # um Bounds of z-axis to calculate density product over
 
         self.gaus_smearing_sigma = None
         self.gaus_z_efficiency_width = None
@@ -128,22 +128,17 @@ class BunchCollider:
         self.bunch1.set_longitudinal_beam_profile_scaling(scale1)
         self.bunch2.set_longitudinal_beam_profile_scaling(scale2)
 
-    def run_sim(self, print_params=False):
-        # Reset
-        self.set_bunch_rs(self.bunch1_r_original, self.bunch2_r_original)
-        self.bunch1.set_beta(*self.bunch1_beta_original)
-        self.bunch2.set_beta(*self.bunch2_beta_original)
-        self.bunch1.set_angles(self.bunch1.angle_x, self.bunch1.angle_y)
-        self.average_density_product_xyz = None
-
-        # Set timestep for propagation
+    def generate_grid(self):
+        # Set timestep for propagation in nano seconds
         dt = (self.bunch2.initial_z - self.bunch1.initial_z) / self.bunch1.c / self.n_points_t
         self.bunch1.dt = self.bunch2.dt = dt  # ns Timestep to propagate both bunches
 
-        # Create a grid of points for the x-z and y-z planes
-        self.x = np.linspace(-self.x_lim_sigma * self.bunch1.transverse_sigma[0], self.x_lim_sigma * self.bunch1.transverse_sigma[0],
+        # Create a grid of points for the x-z and y-z planes in microns
+        self.x = np.linspace(-self.x_lim_sigma * self.bunch1.transverse_sigma[0],
+                             self.x_lim_sigma * self.bunch1.transverse_sigma[0],
                              self.n_points_x)
-        self.y = np.linspace(-self.y_lim_sigma * self.bunch1.transverse_sigma[1], self.y_lim_sigma * self.bunch1.transverse_sigma[1],
+        self.y = np.linspace(-self.y_lim_sigma * self.bunch1.transverse_sigma[1],
+                             self.y_lim_sigma * self.bunch1.transverse_sigma[1],
                              self.n_points_y)
         if self.z_bounds is not None:
             self.z = np.linspace(self.z_bounds[0], self.z_bounds[1], self.n_points_z)
@@ -152,6 +147,17 @@ class BunchCollider:
             max_z = max(self.bunch1_r_original[2], self.bunch2_r_original[2])
             self.z = np.linspace(min_z - self.z_lim_sigma * self.bunch1.transverse_sigma[2],
                                  max_z + self.z_lim_sigma * self.bunch1.transverse_sigma[2], self.n_points_z)
+
+
+    def run_sim(self, print_params=False):
+        # Reset
+        self.set_bunch_rs(self.bunch1_r_original, self.bunch2_r_original)
+        self.bunch1.set_beta(*self.bunch1_beta_original)
+        self.bunch2.set_beta(*self.bunch2_beta_original)
+        self.bunch1.set_angles(self.bunch1.angle_x, self.bunch1.angle_y)
+        self.average_density_product_xyz = None
+
+        self.generate_grid()
 
         x_3d, y_3d, z_3d = np.meshgrid(self.x, self.y, self.z, indexing='ij')  # For 3D space
         self.bunch1.calculate_r_and_beta()
@@ -211,26 +217,8 @@ class BunchCollider:
         self.bunch1.set_angles(self.bunch1.angle_x, self.bunch1.angle_y)
         self.average_density_product_xyz = None
 
-        # Set timestep for propagation
-        dt = (self.bunch2.initial_z - self.bunch1.initial_z) / self.bunch1.c / self.n_points_t
-        self.bunch1.dt = self.bunch2.dt = dt  # ns Timestep to propagate both bunches
+        self.generate_grid()
 
-        # Create a grid of points for the x-z and y-z planes
-        self.x = np.linspace(-self.x_lim_sigma * self.bunch1.transverse_sigma[0],
-                             self.x_lim_sigma * self.bunch1.transverse_sigma[0],
-                             self.n_points_x)
-        self.y = np.linspace(-self.y_lim_sigma * self.bunch1.transverse_sigma[1],
-                             self.y_lim_sigma * self.bunch1.transverse_sigma[1],
-                             self.n_points_y)
-        if self.z_bounds is not None:
-            self.z = np.linspace(self.z_bounds[0], self.z_bounds[1], self.n_points_z)
-        else:
-            min_z = min(self.bunch1_r_original[2], self.bunch2_r_original[2])
-            max_z = max(self.bunch1_r_original[2], self.bunch2_r_original[2])
-            self.z = np.linspace(min_z - self.z_lim_sigma * self.bunch1.transverse_sigma[2],
-                                 max_z + self.z_lim_sigma * self.bunch1.transverse_sigma[2], self.n_points_z)
-
-        # x_3d, y_3d, z_3d = np.meshgrid(self.x, self.y, self.z, indexing='ij')  # For 3D space
         self.bunch1.calculate_r_and_beta()
         self.bunch2.calculate_r_and_beta()
         if print_params:
@@ -240,6 +228,20 @@ class BunchCollider:
         with Pool() as pool:
             density_products = pool.map(self.compute_time_step, range(self.n_points_t))
         self.average_density_product_xyz = np.mean([p for p in density_products], axis=0)
+
+    def get_grid_info(self):
+        """
+        Calculate grid info for the simulation necessary to compute the integrated density product.
+        :return:
+        """
+        grid_info = {
+            'dx': self.x[1] - self.x[0],
+            'dy': self.y[1] - self.y[0],
+            'dz': self.z[1] - self.z[0],
+            'dt': self.bunch1.dt,
+            'n_points_t': self.n_points_t
+        }
+        return grid_info
 
     def get_beam_sigmas(self):
         return self.bunch1.transverse_sigma, self.bunch2.transverse_sigma
@@ -253,6 +255,19 @@ class BunchCollider:
             z_spacing = z_vals[1] - z_vals[0]
             z_dist = gaussian_filter1d(z_dist, self.gaus_smearing_sigma / z_spacing)
         return z_vals, z_dist
+
+    def get_naked_luminosity(self):
+        """
+        Calculate the luminosity corresponding to a single particle in each bunch colliding at 1Hz.
+        Assuming head on so Moller factor is 2c.
+        :return:
+        """
+        integral = np.sum(self.average_density_product_xyz)
+        grid_info = self.get_grid_info()
+        luminosity = integral * grid_info['dx'] * grid_info['dy'] * grid_info['dz'] * grid_info['n_points_t'] * grid_info['dt']
+        luminosity = luminosity * 2 * self.bunch1.c  # 2c for head on
+        return luminosity
+
 
     def get_param_string(self):
         param_string = (f'Beta*s: {self.bunch1.beta_star:.1f}, {self.bunch2.beta_star:.1f} cm\n'

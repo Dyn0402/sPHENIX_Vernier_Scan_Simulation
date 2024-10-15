@@ -256,6 +256,20 @@ class BunchCollider:
             z_dist = gaussian_filter1d(z_dist, self.gaus_smearing_sigma / z_spacing)
         return z_vals, z_dist
 
+
+    def get_relativistic_moller_factor(self):
+        """
+        Calculate the relativistic Moller factor for the given bunches based on their relative velocities
+        :return:
+        """
+        # Calculate initial 3-velocities
+        v1 = self.bunch1.beta * self.bunch1.c
+        v2 = self.bunch2.beta * self.bunch2.c
+
+        # Calculate Moller factor
+        moller_factor = np.sqrt(np.linalg.norm(v1 - v2)**2 - np.linalg.norm(np.cross(v1, v2))**2 / self.bunch1.c**2)
+        return moller_factor
+
     def get_naked_luminosity(self):
         """
         Calculate the luminosity corresponding to a single particle in each bunch colliding at 1Hz.
@@ -265,7 +279,8 @@ class BunchCollider:
         integral = np.sum(self.average_density_product_xyz)
         grid_info = self.get_grid_info()
         luminosity = integral * grid_info['dx'] * grid_info['dy'] * grid_info['dz'] * grid_info['n_points_t'] * grid_info['dt']
-        luminosity = luminosity * 2 * self.bunch1.c  # 2c for head on
+        # luminosity = luminosity * 2 * self.bunch1.c  # 2c for head on
+        luminosity = luminosity * self.get_relativistic_moller_factor()
         return luminosity
 
 

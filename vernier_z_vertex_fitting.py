@@ -48,22 +48,215 @@ def main():
     # z_vertex_root_path = f'C:/Users/Dylan/Desktop/vernier_scan/vertex_data/{dist_root_file_name}'
     # fit_head_on(z_vertex_root_path)
     # fit_head_on_manual(z_vertex_root_path)
-    # plot_head_on(z_vertex_root_path, longitudinal_fit_path)
+    # plot_head_on(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
     # head_on_metric_sensitivity(base_path, z_vertex_root_path, longitudinal_fit_path)
     # plot_peripheral(z_vertex_root_path, longitudinal_fit_path)
     # fit_peripheral(z_vertex_root_path)
     # fit_peripheral_scipy(z_vertex_root_path, longitudinal_fit_path)
-    # plot_head_on_and_peripheral(z_vertex_root_path, longitudinal_fit_path)
     # peripheral_metric_test(z_vertex_root_path)
     # peripheral_metric_sensitivity(base_path, z_vertex_root_path)
     # check_head_on_dependences(z_vertex_root_path)
+    plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
     # plot_all_z_vertex_hists(z_vertex_root_path)
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # perform_and_compare_vernier_scan(z_vertex_root_path, longitudinal_fit_path)
-    calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
+    # calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
 
     print('donzo')
+
+
+def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path):
+    cad_data = read_cad_measurement_file(cad_measurement_path)
+    cw_rates = get_cw_rates(cad_data)
+
+    orientation = 'Vertical'
+    head_on_scan_step = 1
+    peripheral_scan_step = 6
+
+    ho_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == head_on_scan_step)].iloc[0]
+    pe_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == peripheral_scan_step)].iloc[0]
+
+    # Important parameters
+    bw_nom = 155
+    beta_star_nom = 85.
+    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level
+    bkg = 0.4e-17  # Background level
+    gaus_eff_width = None
+    ho_offsets = None
+    pe_offsets = None
+    ho_blue_angle_x, ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    ho_blue_angle_y, ho_yellow_angle_y = 0.0, 0.0
+    pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
+
+    new_bw = 155
+    new_beta_star = 85
+    new_mbd_res = 2.0
+    new_bkg = 0.1e-17
+    new_gaus_eff_width = 500  # cm
+    new_ho_offsets = None
+    new_pe_offsets = None
+    new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
+    new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3
+    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.01e-3, 0.0
+
+    z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
+    ho_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == head_on_scan_step][0]
+
+    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
+    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+
+    collider_sim = BunchCollider()
+    collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_bunch_crossing(ho_blue_angle_x, ho_blue_angle_y, ho_yellow_angle_x, ho_yellow_angle_y)
+    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gaus_eff_width)
+    collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+
+    blue_bunch_len_scaling = ho_step_cad_data['blue_bunch_length']
+    yellow_bunch_len_scaling = ho_step_cad_data['yellow_bunch_length']
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
+    if ho_offsets is not None:
+        collider_sim.set_bunch_offsets(ho_offsets[0], ho_offsets[1])
+    else:
+        offset = ho_step_cad_data['offset_set_val'] * 1e3  # mm to um
+        if orientation == 'Horizontal':
+            collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+        elif orientation == 'Vertical':
+            collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+
+    collider_sim.run_sim_parallel()
+    zs_og, z_dist_og = collider_sim.get_z_density_dist()
+
+    scale = max(ho_hist_data['counts']) / max(z_dist_og)
+    z_max_sim_og = zs_og[np.argmax(z_dist_og)]
+    z_max_hist_og = ho_hist_data['centers'][np.argmax(ho_hist_data['counts'])]
+    print(f'z_max_sim: {z_max_sim_og}, z_max_hist: {z_max_hist_og}')
+    shift = z_max_sim_og - z_max_hist_og  # cm
+    shift *= 1e4  # microns
+    print(f'scale: {scale}, shift: {shift}')
+
+    res = minimize(amp_shift_residual, np.array([1.0, 0.0]),
+                   args=(collider_sim, scale, shift, ho_hist_data['counts'], ho_hist_data['centers']),
+                   bounds=((0.0, 2.0), (-10e4, 10e4)))
+    scale = res.x[0] * scale
+    shift = res.x[1] + shift
+
+    collider_sim.set_amplitude(scale)
+    collider_sim.set_z_shift(shift)
+    ho_zs_og, ho_z_dist_og = collider_sim.get_z_density_dist()
+
+    # Set and run new head on collider sim
+    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+    collider_sim.set_bkg(new_bkg)
+    collider_sim.set_bunch_crossing(new_ho_blue_angle_x, new_ho_blue_angle_y, new_ho_yellow_angle_x, new_ho_yellow_angle_y)
+    collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+
+    if new_ho_offsets is not None:
+        collider_sim.set_bunch_offsets(new_ho_offsets[0], new_ho_offsets[1])
+
+    collider_sim.set_amplitude(1.0)
+    collider_sim.set_z_shift(0.0)
+
+    collider_sim.run_sim_parallel()
+    zs_new, z_dist_new = collider_sim.get_z_density_dist()
+
+    scale = max(ho_hist_data['counts']) / max(z_dist_new)
+    z_max_sim_new = zs_new[np.argmax(z_dist_new)]
+    z_max_hist_new = ho_hist_data['centers'][np.argmax(ho_hist_data['counts'])]
+    print(f'z_max_sim: {z_max_sim_new}, z_max_hist: {z_max_hist_new}')
+    shift = z_max_sim_new - z_max_hist_new  # cm
+    shift *= 1e4  # microns
+    print(f'scale: {scale}, shift: {shift}')
+
+    res = minimize(amp_shift_residual, np.array([1.0, 0.0]),
+                     args=(collider_sim, scale, shift, ho_hist_data['counts'], ho_hist_data['centers']),
+                     bounds=((0.0, 2.0), (-10e4, 10e4)))
+    scale = res.x[0] * scale
+    shift = res.x[1] + shift
+
+    collider_sim.set_amplitude(scale)
+    collider_sim.set_z_shift(shift)
+    ho_zs_new, ho_z_dist_new = collider_sim.get_z_density_dist()
+
+    collider_params = collider_sim.get_param_string()
+
+    fig_ho, ax_ho = plt.subplots()
+    ax_ho.bar(ho_hist_data['centers'], ho_hist_data['counts'],
+                width=ho_hist_data['centers'][1] - ho_hist_data['centers'][0], label='MBD Vertex')
+    ax_ho.plot(ho_zs_og, ho_z_dist_og, color='gray', alpha=0.8, label='Simulation Guess')
+    ax_ho.plot(ho_zs_new, ho_z_dist_new, color='red', label='Simulation Fit')
+    ax_ho.annotate(collider_params, xy=(0.05, 0.95), xycoords='axes fraction', fontsize=8, va='top', ha='left',
+                   bbox=dict(facecolor='white', alpha=0.8))
+    ax_ho.set_title(f'Head On bw {bw_nom:.0f} {orientation} Scan Step {head_on_scan_step}')
+    ax_ho.set_xlabel('z Vertex Position (cm)')
+    ax_ho.legend(loc='upper right')
+    fig_ho.tight_layout()
+
+    pe_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == peripheral_scan_step][0]
+
+    collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_bunch_crossing(pe_blue_angle_x, pe_blue_angle_y, pe_yellow_angle_x, pe_yellow_angle_y)
+    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gaus_eff_width)
+
+    blue_bunch_len_scaling = pe_step_cad_data['blue_bunch_length']
+    yellow_bunch_len_scaling = pe_step_cad_data['yellow_bunch_length']
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
+    if pe_offsets is not None:
+        collider_sim.set_bunch_offsets(pe_offsets[0], pe_offsets[1])
+    else:
+        offset = pe_step_cad_data['offset_set_val'] * 1e3
+        if orientation == 'Horizontal':
+            collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+        elif orientation == 'Vertical':
+            collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+
+    collider_sim.run_sim_parallel()
+    pe_zs_og, pe_z_dist_og = collider_sim.get_z_density_dist()
+
+    # Set and run new peripheral collider sim
+    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+    collider_sim.set_bkg(new_bkg)
+    collider_sim.set_bunch_crossing(new_pe_blue_angle_x, new_pe_blue_angle_y, new_pe_yellow_angle_x, new_pe_yellow_angle_y)
+    collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+
+    if new_pe_offsets is not None:
+        collider_sim.set_bunch_offsets(new_pe_offsets[0], new_pe_offsets[1])
+
+    collider_sim.run_sim_parallel()
+    pe_zs_new, pe_z_dist_new = collider_sim.get_z_density_dist()
+
+    pe_params = collider_sim.get_param_string()
+
+    fig_pe, ax_pe = plt.subplots()
+    ax_pe.bar(pe_hist_data['centers'], pe_hist_data['counts'],
+                width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
+    ax_pe.plot(pe_zs_og, pe_z_dist_og, color='gray', alpha=0.8, label='Simulation Guess')
+    ax_pe.plot(pe_zs_new, pe_z_dist_new, color='red', label='Simulation Fit')
+    ax_pe.annotate(pe_params, xy=(0.05, 0.95), xycoords='axes fraction', fontsize=8, va='top', ha='left',
+                   bbox=dict(facecolor='white', alpha=0.8))
+    ax_pe.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_pe.set_xlabel('z Vertex Position (cm)')
+    ax_pe.legend(loc='upper right')
+    fig_pe.tight_layout()
+
+    plt.show()
+
 
 
 def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path):
@@ -75,9 +268,6 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
     Plot the residuals values vs the step transverse offset for each beam width.
     Plot the sum of the residuals values vs the beam width.
     """
-
-    # Clearly run without angle fitting first. But need to normalize the mbd z-verted distributions first. Currently
-    # totally different run times between each.
 
     beam_widths = np.arange(145, 195, 5)
     # beam_widths = np.arange(145, 185, 1)
@@ -788,8 +978,11 @@ def fit_head_on_manual(z_vertex_root_path):
     plt.show()
 
 
-def plot_head_on(z_vertex_root_path, longitudinal_fit_path):
-    z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, False)
+def plot_head_on(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path):
+    cad_data = read_cad_measurement_file(cad_measurement_path)
+    cw_rates = get_cw_rates(cad_data)
+
+    z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, False, norms=cw_rates, abs_norm=True)
 
     # step_to_use = 'vertical_0'
     step_to_use = 'vertical_6'
@@ -797,54 +990,65 @@ def plot_head_on(z_vertex_root_path, longitudinal_fit_path):
     all_params_dict = {
         'vertical_0': {
             'hist_num': 0,
-            'angle_y_blue': -0.071e-3,
-            'angle_y_yellow': -0.113e-3,
-            'blue_len_scaling': 1.001144,
-            'yellow_len_scaling': 1.00105,
-            'rate': 845710.0067
         },
         'vertical_6': {
             'hist_num': 6,
-            'angle_y_blue': -0.074e-3,
-            'angle_y_yellow': -0.110e-3,
-            'blue_len_scaling': 1.003789,
-            'yellow_len_scaling': 1.004832,
-            'rate': 843673.7041
         },
     }
     params = all_params_dict[step_to_use]
 
     hist = z_vertex_hists[params['hist_num']]
-    # print(f'Time / scale_factor * correction factor: {np.sum(hist["counts"]) / params["rate"]}')
-    time_per_step = 45  # seconds nominal time to spend per step
-    # Adjust hist['counts'] to match rate for time_per_step
-    hist['counts'] = hist['counts'] * params['rate'] / np.sum(hist['counts']) * time_per_step
+
+    scan_orientation = hist['scan_axis']
+    step_cad_data = cad_data[(cad_data['orientation'] == scan_orientation) &
+                             (cad_data['step'] == hist['scan_step'])].iloc[0]
 
     bin_width = hist['centers'][1] - hist['centers'][0]
 
     # Important parameters
     bw_nom = 160
     beta_star_nom = 85.
-    mbd_online_resolution_nom = 5  # cm MBD resolution on trigger level
-    # mbd_online_resolution_nom = 25.0  # cm MBD resolution on trigger level
-    z_eff_width = 500.  # cm
-    y_offset_nom = -0.
-    x_offset_nom = 0.
-    yellow_length_scaling, blue_length_scaling = params['yellow_len_scaling'], params['blue_len_scaling']
-    angle_y_blue, angle_y_yellow = params['angle_y_blue'], params['angle_y_yellow']
-    angle_x_blue, angle_x_yellow = 0., 0.
+    mbd_resolution = 2.0  # cm MBD resolution
+    bkg = 0.4e-17  # Background level
+    n_points_xy, n_points_z, n_points_t = 61, 151, 61
 
-    collider_sim = BunchCollider()
-    collider_sim.set_bunch_rs(np.array([x_offset_nom, y_offset_nom, -6.e6]), np.array([0., 0., +6.e6]))
-    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
-    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
-    collider_sim.set_bunch_crossing(angle_x_blue, angle_y_blue, angle_x_yellow, angle_y_yellow)
-    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution_nom)
-    collider_sim.set_gaus_z_efficiency_width(z_eff_width)
-    collider_sim.set_longitudinal_fit_scaling(blue_length_scaling, yellow_length_scaling)
     blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
     yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+
+    collider_sim = BunchCollider()
+    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_grid_size(n_points_xy, n_points_xy, n_points_z, n_points_t)
+    collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+    collider_sim.set_bkg(bkg)
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+
+    yellow_bunch_len_scaling = step_cad_data['yellow_bunch_length']
+    blue_bunch_len_scaling = step_cad_data['blue_bunch_length']
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
+    offset = step_cad_data['offset_set_val'] * 1e3  # mm to um
+    if scan_orientation == 'Horizontal':
+        collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+    elif scan_orientation == 'Vertical':
+        collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+
+    blue_angle, yellow_angle = -step_cad_data['bh8_avg'] / 1e3, -step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    collider_sim.set_bunch_crossing(blue_angle, 0, yellow_angle, 0)
+
+    # collider_sim = BunchCollider()
+    # collider_sim.set_bunch_rs(np.array([x_offset_nom, y_offset_nom, -6.e6]), np.array([0., 0., +6.e6]))
+    # collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    # collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    # collider_sim.set_bunch_crossing(angle_x_blue, angle_y_blue, angle_x_yellow, angle_y_yellow)
+    # collider_sim.set_gaus_smearing_sigma(mbd_online_resolution_nom)
+    # collider_sim.set_gaus_z_efficiency_width(z_eff_width)
+    # collider_sim.set_longitudinal_fit_scaling(blue_length_scaling, yellow_length_scaling)
+    # blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
+    # yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+    # collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+
 
     collider_sim.run_sim_parallel()
     zs_og, z_dist_og = collider_sim.get_z_density_dist()
@@ -870,13 +1074,15 @@ def plot_head_on(z_vertex_root_path, longitudinal_fit_path):
     new_y_offset = 0.
     new_x_offset = 0.
     new_bw = 160
+    new_bkg = 0.4e-17
     beta_star = 110
-    new_angle_y_blue, new_angle_y_yellow = params['angle_y_blue'], params['angle_y_yellow']
+    new_angle_y_blue, new_angle_y_yellow = collider_sim.bunch1.angle_y, collider_sim.bunch2.angle_y
     # new_angle_y_blue, new_angle_y_yellow = -0.0e-3, -0.0e-3
     # new_angle_y_blue, new_angle_y_yellow = -0.07e-3, -0.114e-3
     # new_angle_x_blue, new_angle_x_yellow = 0.05e-3, -0.02e-3
     # new_angle_x_blue, new_angle_x_yellow = -0.05e-3, 0.05e-3
-    new_angle_x_blue, new_angle_x_yellow = -0.0e-3, 0.0e-3
+    # new_angle_x_blue, new_angle_x_yellow = -0.0e-3, 0.0e-3
+    new_angle_x_blue, new_angle_x_yellow = collider_sim.bunch1.angle_x, collider_sim.bunch2.angle_x
     # new_mbd_online_resolution_nom = None  # cm MBD resolution on trigger level
     new_mbd_online_resolution_nom = 5.0  # cm MBD resolution on trigger level
     new_z_eff_width = 500.  # cm
@@ -887,10 +1093,13 @@ def plot_head_on(z_vertex_root_path, longitudinal_fit_path):
     collider_sim.set_bunch_crossing(new_angle_x_blue, new_angle_y_blue, new_angle_x_yellow, new_angle_y_yellow)
     collider_sim.set_gaus_smearing_sigma(new_mbd_online_resolution_nom)
     collider_sim.set_gaus_z_efficiency_width(new_z_eff_width)
-    collider_sim.set_bkg(0.2e-17)
-    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
-    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+    collider_sim.set_bkg(new_bkg)
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+
+    blue_bunch_len_scaling = step_cad_data['blue_bunch_length']
+    yellow_bunch_len_scaling = step_cad_data['yellow_bunch_length']
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
     collider_sim.set_amplitude(1.0)
     collider_sim.set_z_shift(0.0)
 
@@ -1058,150 +1267,6 @@ def plot_peripheral(z_vertex_root_path, longitudinal_fit_path):
     ax.plot(zs, z_dist, color='r', label='Simulation Fit')
     ax.set_xlim(-399, 399)
     ax.set_title(f'{hist["scan_axis"]} Scan Step {hist["scan_step"]}')
-    ax.set_xlabel('z Vertex Position (cm)')
-    ax.annotate(f'{collider_param}', (0.01, 0.99), xycoords='axes fraction', verticalalignment='top',
-                bbox=dict(facecolor='wheat', alpha=0.5))
-    ax.legend(loc='upper right')
-    fig.tight_layout()
-
-    plt.show()
-
-
-def plot_head_on_and_peripheral(z_vertex_root_path, longitudinal_fit_path):
-    z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, False)
-
-    # step_to_use = 'vertical_0'
-    head_on_step_to_use = 'vertical_6'
-
-    all_params_dict = {
-        'vertical_0': {
-            'hist_num': 0,
-            'angle_y_blue': -0.071e-3,
-            'angle_y_yellow': -0.113e-3,
-            'blue_len_scaling': 1.001144,
-            'yellow_len_scaling': 1.00105,
-            'rate': 845710.0067
-        },
-        'vertical_6': {
-            'hist_num': 6,
-            'angle_y_blue': -0.074e-3,
-            'angle_y_yellow': -0.110e-3,
-            'blue_len_scaling': 1.003789,
-            'yellow_len_scaling': 1.004832,
-            'rate': 843673.7041
-        },
-        'horizontal_11': {
-            'hist_num': -1,
-
-        }
-    }
-    head_on_params = all_params_dict[head_on_step_to_use]
-
-    head_on_hist = z_vertex_hists[head_on_params['hist_num']]
-    # print(f'Time / scale_factor * correction factor: {np.sum(hist["counts"]) / params["rate"]}')
-    time_per_step = 45  # seconds nominal time to spend per step
-    # Adjust hist['counts'] to match rate for time_per_step
-    head_on_hist['counts'] = head_on_hist['counts'] * head_on_params['rate'] / np.sum(head_on_hist['counts']) * time_per_step
-
-    bin_width = head_on_hist['centers'][1] - head_on_hist['centers'][0]
-
-    # Important parameters
-    bw_nom = 160
-    beta_star_nom = 85.
-    mbd_online_resolution_nom = 25.0  # cm MBD resolution on trigger level
-    y_offset_nom = -0.
-    x_offset_nom = 0.
-    yellow_length_scaling, blue_length_scaling = head_on_params['yellow_len_scaling'], head_on_params['blue_len_scaling']
-    angle_y_blue, angle_y_yellow = head_on_params['angle_y_blue'], head_on_params['angle_y_yellow']
-    angle_x_blue, angle_x_yellow = 0., 0.
-
-    collider_sim = BunchCollider()
-    collider_sim.set_bunch_rs(np.array([x_offset_nom, y_offset_nom, -6.e6]), np.array([0., 0., +6.e6]))
-    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
-    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
-    collider_sim.set_bunch_crossing(angle_x_blue, angle_y_blue, angle_x_yellow, angle_y_yellow)
-    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution_nom)
-    collider_sim.set_longitudinal_fit_scaling(blue_length_scaling, yellow_length_scaling)
-    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
-    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
-    collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
-
-    collider_sim.run_sim_parallel()
-    zs_og, z_dist_og = collider_sim.get_z_density_dist()
-    # collider_param_str_og = collider_sim.get_param_string()
-
-    scale = max(head_on_hist['counts']) / max(z_dist_og)
-    z_max_sim_og = zs_og[np.argmax(z_dist_og)]
-    z_max_hist_og = head_on_hist['centers'][np.argmax(head_on_hist['counts'])]
-    print(f'z_max_sim: {z_max_sim_og}, z_max_hist: {z_max_hist_og}')
-    shift = z_max_sim_og - z_max_hist_og  # cm
-    shift *= 1e4  # microns
-    print(f'scale: {scale}, shift: {shift}')
-
-    res = minimize(amp_shift_residual, np.array([1.0, 0.0]), args=(collider_sim, scale, shift, head_on_hist['counts'], head_on_hist['centers']),
-                   bounds=((0.0, 2.0), (-10e4, 10e4)))
-    scale = res.x[0] * scale
-    shift = res.x[1] + shift
-
-    collider_sim.set_amplitude(scale)
-    collider_sim.set_z_shift(shift)
-    zs_og, z_dist_og = collider_sim.get_z_density_dist()
-
-    new_y_offset = 0.
-    new_x_offset = 0.
-    new_bw = 160
-    beta_star = 85
-    new_angle_y_blue, new_angle_y_yellow = -0.07e-3, -0.114e-3
-    # new_angle_x_blue, new_angle_x_yellow = 0.05e-3, -0.02e-3
-    new_angle_x_blue, new_angle_x_yellow = -0.05e-3, 0.05e-3
-    new_mbd_online_resolution_nom = 25.0  # cm MBD resolution on trigger level
-
-    collider_sim.set_bunch_rs(np.array([new_x_offset, new_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
-    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
-    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
-    collider_sim.set_bunch_crossing(new_angle_x_blue, new_angle_y_blue, new_angle_x_yellow, new_angle_y_yellow)
-    collider_sim.set_gaus_smearing_sigma(new_mbd_online_resolution_nom)
-    collider_sim.set_bkg(0.2e-17)
-    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
-    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
-    collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
-    collider_sim.set_amplitude(1.0)
-    collider_sim.set_z_shift(0.0)
-
-    collider_sim.run_sim_parallel()
-    zs, z_dist = collider_sim.get_z_density_dist()
-    # collider_param_str_og = collider_sim.get_param_string()
-
-    scale = max(head_on_hist['counts']) / max(z_dist)
-    z_max_sim = zs[np.argmax(z_dist)]
-    z_max_hist = head_on_hist['centers'][np.argmax(head_on_hist['counts'])]
-    print(f'z_max_sim: {z_max_sim}, z_max_hist: {z_max_hist}')
-    shift = z_max_sim - z_max_hist  # cm
-    shift *= 1e4  # microns
-    print(f'scale: {scale}, shift: {shift}')
-
-    res = minimize(amp_shift_residual, np.array([1.0, 0.0]),
-                   args=(collider_sim, scale, shift, head_on_hist['counts'], head_on_hist['centers']),
-                   bounds=((0.0, 2.0), (-10e4, 10e4)))
-    scale = res.x[0] * scale
-    shift = res.x[1] + shift
-    print(f'scale: {scale}, shift: {shift}')
-
-    collider_sim.set_amplitude(scale)
-    collider_sim.set_z_shift(shift)
-    zs, z_dist = collider_sim.get_z_density_dist()
-
-    residual = np.sum((head_on_hist['counts'] - interp1d(zs, z_dist)(head_on_hist['centers']))**2)
-    print(f'Opt_shift_residual: {residual}')
-
-    collider_param = collider_sim.get_param_string()
-
-    fig, ax = plt.subplots()
-    ax.bar(head_on_hist['centers'], head_on_hist['counts'], width=bin_width, label='MBD Vertex')
-    ax.plot(zs_og, z_dist_og, color='gray', ls='--', alpha=0.6, label='Simulation Guess')
-    ax.plot(zs, z_dist, color='r', label='Simulation Fit')
-    ax.set_xlim(-399, 399)
-    ax.set_title(f'{head_on_hist["scan_axis"]} Scan Step {head_on_hist["scan_step"]}')
     ax.set_xlabel('z Vertex Position (cm)')
     ax.annotate(f'{collider_param}', (0.01, 0.99), xycoords='axes fraction', verticalalignment='top',
                 bbox=dict(facecolor='wheat', alpha=0.5))

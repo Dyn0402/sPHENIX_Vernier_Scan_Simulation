@@ -128,6 +128,16 @@ class BunchCollider:
         self.bunch1.set_longitudinal_beam_profile_scaling(scale1)
         self.bunch2.set_longitudinal_beam_profile_scaling(scale2)
 
+    def set_grid_size(self, n_points_x=None, n_points_y=None, n_points_z=None, n_points_t=None):
+        if n_points_x is not None:
+            self.n_points_x = n_points_x
+        if n_points_y is not None:
+            self.n_points_y = n_points_y
+        if n_points_z is not None:
+            self.n_points_z = n_points_z
+        if n_points_t is not None:
+            self.n_points_t = n_points_t
+
     def generate_grid(self):
         # Set timestep for propagation in nano seconds
         dt = (self.bunch2.initial_z - self.bunch1.initial_z) / self.bunch1.c / self.n_points_t

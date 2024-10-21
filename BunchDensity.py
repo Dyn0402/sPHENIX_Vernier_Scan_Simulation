@@ -35,6 +35,7 @@ class BunchDensity:
 
         self.longitudinal_params = {'mu1': 0., 'sigma1': 1., 'a2': 0., 'mu2': 0., 'sigma2': 1.,
                                     'a3': 0., 'mu3': 0., 'sigma3': 1., 'a4': 0., 'mu4': 0., 'sigma4': 1.}
+        self.effective_longitudinal_params = self.longitudinal_params.copy()  # Effective params after scaling
         self.longitudinal_width_scaling = 1.  # Scaling factor for the longitudinal beam profile
 
         self.initial_z = 0.  # Initial z distance in um
@@ -89,6 +90,7 @@ class BunchDensity:
         self.transverse_sigma = np.array([x, y], dtype=np.float64)
         if z is not None:
             self.longitudinal_params['sigma1'] = z
+            self.effective_longitudinal_params['sigma1'] = z
         self.reset = True
 
     def set_angles(self, angle_x, angle_y):
@@ -116,6 +118,7 @@ class BunchDensity:
         """
         fit_params = read_longitudinal_beam_profile_fit_parameters(fit_out_path)
         self.longitudinal_params = fit_params
+        self.effective_longitudinal_params = fit_params.copy()
         self.reset = True
 
     def set_longitudinal_beam_profile_scaling(self, scaling):
@@ -124,10 +127,10 @@ class BunchDensity:
         :param scaling: float Scaling factor for the longitudinal beam profile
         """
         self.longitudinal_width_scaling = scaling
-        self.longitudinal_params['sigma1'] *= scaling
-        self.longitudinal_params['sigma2'] *= scaling
-        self.longitudinal_params['sigma3'] *= scaling
-        self.longitudinal_params['sigma4'] *= scaling
+        self.effective_longitudinal_params['sigma1'] = self.longitudinal_params['sigma1'] * scaling
+        self.effective_longitudinal_params['sigma2'] = self.longitudinal_params['sigma2'] * scaling
+        self.effective_longitudinal_params['sigma3'] = self.longitudinal_params['sigma3'] * scaling
+        self.effective_longitudinal_params['sigma4'] = self.longitudinal_params['sigma4'] * scaling
         self.reset = True
 
     def get_beam_length(self):
@@ -135,17 +138,17 @@ class BunchDensity:
         Calculate the length of the bunch based on a single gaus fit of the quad_gaus function with
         the longitudinal fit parameters.
         """
-        mu1 = self.longitudinal_params['mu1']
-        sigma1 = self.longitudinal_params['sigma1']
-        a2 = self.longitudinal_params['a2']
-        mu2 = self.longitudinal_params['mu2']
-        sigma2 = self.longitudinal_params['sigma2']
-        a3 = self.longitudinal_params['a3']
-        mu3 = self.longitudinal_params['mu3']
-        sigma3 = self.longitudinal_params['sigma3']
-        a4 = self.longitudinal_params['a4']
-        mu4 = self.longitudinal_params['mu4']
-        sigma4 = self.longitudinal_params['sigma4']
+        mu1 = self.effective_longitudinal_params['mu1']
+        sigma1 = self.effective_longitudinal_params['sigma1']
+        a2 = self.effective_longitudinal_params['a2']
+        mu2 = self.effective_longitudinal_params['mu2']
+        sigma2 = self.effective_longitudinal_params['sigma2']
+        a3 = self.effective_longitudinal_params['a3']
+        mu3 = self.effective_longitudinal_params['mu3']
+        sigma3 = self.effective_longitudinal_params['sigma3']
+        a4 = self.effective_longitudinal_params['a4']
+        mu4 = self.effective_longitudinal_params['mu4']
+        sigma4 = self.effective_longitudinal_params['sigma4']
 
         x = np.linspace(-abs(self.initial_z), abs(self.initial_z), 1000)
         y = quad_gaus_pdf(x, mu1, sigma1, a2, mu2, sigma2, a3, mu3, sigma3, a4, mu4, sigma4)
@@ -192,7 +195,7 @@ class BunchDensity:
         return bdcpp.density(x, y, z, self.r[0], self.r[1], self.r[2],
                              self.transverse_sigma[0], self.transverse_sigma[1],
                              self.angle_x, self.angle_y, self.beta_star if self.beta_star is not None else 0,
-                             *self.longitudinal_params.values())
+                             * self.effective_longitudinal_params.values())
 
     def density_py(self, x, y, z):
         """

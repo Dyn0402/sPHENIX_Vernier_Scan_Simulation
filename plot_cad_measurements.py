@@ -23,13 +23,14 @@ def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
     cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
+    cw_rate_path = 'cw_rates.txt'
     # cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
     # crossing_angle(cad_measurements_path, vernier_scan_date)
     # bunch_length(cad_measurements_path, vernier_scan_date)
     # beam_offset_and_intensity(cad_measurements_path, vernier_scan_date)
-    plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, False)
+    # plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, False)
     # plot_beam_longitudinal_measurements(cad_measurements_path, 'Aug12', False)
-    combine_cad_measurements(cad_measurements_path, vernier_scan_date)
+    combine_cad_measurements(cad_measurements_path, vernier_scan_date, cw_rate_path)
     plt.show()
     print('donzo')
 
@@ -225,7 +226,7 @@ def plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date
     fig2.tight_layout()
 
 
-def combine_cad_measurements(cad_measurements_path, vernier_scan_date):
+def combine_cad_measurements(cad_measurements_path, vernier_scan_date, cw_rate_path):
     crossing_angle_path = f'{cad_measurements_path}VernierScan_{vernier_scan_date}_crossing_angle.dat'
     bunch_length_path = f'{cad_measurements_path}VernierScan_{vernier_scan_date}_bunch_length.dat'
     beam_offset_intensity_x_path = f'{cad_measurements_path}VernierScan_{vernier_scan_date}_intensity_position_x.dat'
@@ -235,14 +236,19 @@ def combine_cad_measurements(cad_measurements_path, vernier_scan_date):
     convert_bunch_length_to_distance(bunch_length_data)
     calculate_bunch_length_scaling(bunch_length_data, vernier_scan_date)
 
+    vertical_cw_rates, horizontal_cw_rates = read_cw_rates_from_file(cw_rate_path)
+
     beam_offset_intensity_x_data = read_beam_offset_and_intensity(beam_offset_intensity_x_path)
     beam_offset_intensity_x_data['orientation'] = 'Horizontal'
     beam_offset_intensity_x_data = append_relative_and_set_offsets(beam_offset_intensity_x_data)
     beam_offset_intensity_x_data = calculate_relative_intensity(beam_offset_intensity_x_data)
+    beam_offset_intensity_x_data = append_cw_rates(beam_offset_intensity_x_data, horizontal_cw_rates)
+
     beam_offset_intensity_y_data = read_beam_offset_and_intensity(beam_offset_intensity_y_path)
     beam_offset_intensity_y_data['orientation'] = 'Vertical'
     beam_offset_intensity_y_data = append_relative_and_set_offsets(beam_offset_intensity_y_data)
     beam_offset_intensity_y_data = calculate_relative_intensity(beam_offset_intensity_y_data)
+    beam_offset_intensity_y_data = append_cw_rates(beam_offset_intensity_y_data, vertical_cw_rates)
 
     boi_data = pd.concat([beam_offset_intensity_x_data, beam_offset_intensity_y_data], axis=0, ignore_index=True)
 
@@ -429,6 +435,8 @@ def read_bunch_length(file_path):
 
 
 def read_beam_offset_and_intensity(file_path):
+    durations = [40, 40, 45, 45, 60, 120, 40, 40, 45, 45, 60, 120, 40]
+
     # Read the file into a DataFrame
     df = pd.read_csv(file_path, sep='\t', header=0)
 
@@ -454,7 +462,14 @@ def read_beam_offset_and_intensity(file_path):
     bnl_tz = pytz.timezone('America/New_York')
     df['time'] = df['time'].dt.tz_convert(bnl_tz)
 
+    # Add step number starting from 1
+    df['step'] = range(1, len(df) + 1)
+
+    # Add duration of each step
+    df['duration'] = durations[:len(df)]
+
     return df
+
 
 
 def average_crossing_angles(crossing_angle_data, times):
@@ -469,6 +484,7 @@ def average_crossing_angles(crossing_angle_data, times):
     time_ends = times + (times - times.shift()) / 2
     time_starts.iloc[0] = times.iloc[0] - (times.iloc[1] - times.iloc[0]) / 2
     time_ends.iloc[0] = times.iloc[0] + (times.iloc[1] - times.iloc[0]) / 2
+    durations = (time_ends - time_starts).dt.total_seconds()
 
     # Initialize lists to store averages, standard deviations, mins, and maxes
     avg_bh8, avg_yh8, avg_gh8, std_bh8, std_yh8, std_gh8 = [], [], [], [], [], []
@@ -495,6 +511,7 @@ def average_crossing_angles(crossing_angle_data, times):
         'time': times,
         'time_start': time_starts,
         'time_end': time_ends,
+        'duration_2': durations,
         'bh8_avg': avg_bh8,
         'yh8_avg': avg_yh8,
         'gh8_avg': avg_gh8,
@@ -617,6 +634,65 @@ def write_longitudinal_beam_profile_fit_parameters(fit_out_path, beam_color, fit
             if 'mu' in param or 'sigma' in param:  # Convert from ns to um with speed of light
                 meas = meas * c
             file.write(f'{param}: {meas.val}\n')
+
+
+def read_cw_rates_from_file(file_path):
+    vertical_pos = []
+    vertical_values = []
+    horizontal_pos = []
+    horizontal_values = []
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+        # Determine if we are in the vertical or horizontal section
+        current_section = None
+
+        for line in lines:
+            line = line.strip()
+            if "Vertical pos" in line:
+                current_section = "vertical"
+                continue
+            elif "Horizontal pos" in line:
+                current_section = "horizontal"
+                continue
+
+            # Extracting values if in the correct section
+            if current_section == "vertical":
+                if line:
+                    parts = line.split()
+                    vertical_pos.append(float(parts[0]))
+                    vertical_values.append(float(parts[1]))
+            elif current_section == "horizontal":
+                if line:
+                    parts = line.split()
+                    horizontal_pos.append(float(parts[0]))
+                    horizontal_values.append(float(parts[1]))
+
+    return (vertical_pos, vertical_values), (horizontal_pos, horizontal_values)
+
+
+def append_cw_rates(data, cw_rates):
+    """
+    Append cw_rates to data based on set position. cw_rates is a tuple of two lists: set_pos and rates.
+    data is a DataFrame with a 'set_pos' column.
+    :param data:
+    :param cw_rates:
+    :return:
+    """
+    set_pos, rates = cw_rates
+    set_pos.append(0.0)
+    rates.append(np.nan)
+
+    if not np.all(data['offset_set_val'] == set_pos):
+        print(f'Set positions do not match!\n{data["offset_set_val"]}\n{set_pos}')
+        return
+
+    new_data = data.copy()
+
+    new_data['cw_rate'] = rates
+
+    return new_data
 
 
 def gaus(x, a, b, c):

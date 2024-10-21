@@ -26,9 +26,9 @@ def main():
     # head_on_luminosity(longitudinal_fit_path)
     # head_on_luminosity_simple_gaus()
     # head_on_luminosity_plot()
-    # angle_luminosity_plot()
+    angle_luminosity_plot()
     # moller_factor_test()
-    cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
+    # cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
     print('donzo')
 
 
@@ -181,7 +181,7 @@ def head_on_luminosity_plot():
     fig, ax = plt.subplots(figsize=(8, 4))
 
     # Stacking position for annotations
-    annotation_offset = 0.2
+    annotation_offset = 0.24
     y_offset = 0.88  # Start at 100% of the plot height
 
     for bw in beam_widths:
@@ -239,7 +239,7 @@ def angle_luminosity_plot():
     fig, ax = plt.subplots(figsize=(8, 4))
 
     # Stacking position for annotations
-    annotation_offset = 0.2
+    annotation_offset = 0.18
     y_offset = 0.88  # Start at 100% of the plot height
 
     for angle in bunch_1_y_angles:

@@ -249,7 +249,13 @@ class BunchCollider:
             'dy': self.y[1] - self.y[0],
             'dz': self.z[1] - self.z[0],
             'dt': self.bunch1.dt,
-            'n_points_t': self.n_points_t
+            'n_points_t': self.n_points_t,
+            'x_range': (self.x[0], self.x[-1]),
+            'y_range': (self.y[0], self.y[-1]),
+            'z_range': (self.z[0], self.z[-1]),
+            'n_points_x': self.n_points_x,
+            'n_points_y': self.n_points_y,
+            'n_points_z': self.n_points_z
         }
         return grid_info
 

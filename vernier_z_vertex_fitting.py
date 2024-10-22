@@ -148,6 +148,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     scale = res.x[0] * scale
     shift = res.x[1] + shift
 
+    print(f'scale: {scale}, shift: {shift}')
+
     collider_sim.set_amplitude(scale)
     collider_sim.set_z_shift(shift)
     ho_zs_og, ho_z_dist_og = collider_sim.get_z_density_dist()

@@ -82,8 +82,10 @@ def main():
         else:
             df.to_csv(training_csv_path, mode='w', header=True, index=False)
 
+        sys.stdout.flush()
         print(f'Batch {batch_i} saved to file')
         batch_i += 1
+        sys.stdout.flush()
 
     print('donzo')
 

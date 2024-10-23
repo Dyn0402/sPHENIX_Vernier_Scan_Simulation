@@ -19,8 +19,9 @@ from BunchCollider import BunchCollider
 
 
 def main():
-    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
-    training_set_name = 'training_set_1'
+    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    training_set_name = 'simple_par_training_set_1'
     training_set_dir = os.path.join(base_path + 'training_data/', training_set_name)
     if not os.path.exists(training_set_dir):
         os.mkdir(training_set_dir)
@@ -38,22 +39,9 @@ def main():
     amplitude = 1.2048100105307071e+27
     shift = -14507.674093844653
 
-    parameter_ranges = {
-        'beta_star': [60, 100],
-        'beam_width_x': [130, 190],
-        'beam_width_y': [130, 190],
-        'beam_length_scale_1': [0.8, 1.2],
-        'beam_length_scale_2': [0.8, 1.2],
-        'crossing_angle_1x': [-3e-3, 3e-3],
-        'crossing_angle_1y': [-1e-3, 1e-3],
-        'crossing_angle_2x': [-3e-3, 3e-3],
-        'crossing_angle_2y': [-1e-3, 1e-3],
-        'offset_1x': [-1000, 1000],
-        'offset_1y': [-1000, 1000],
-        'bkg': [0, 1e-16],
-        'mbd_resolution': [0.01, 10],
-        'mbd_z_eff_width': [50, 5000]
-    }
+    # parameter_ranges = get_full_parameters()
+    parameter_ranges = get_simple_parameters()
+    default_parameters = get_default_parameters()
 
     collider_sim = BunchCollider()
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
@@ -70,8 +58,12 @@ def main():
         sys.stdout.flush()
 
         for i in tqdm(range(n_sims_to_save), desc='Simulations'):
-            random_parameters = generate_random_parameters(parameter_ranges)
-            df_i = run_sim_get_df(collider_sim, random_parameters)
+            random_parameters = generate_random_parameters(parameter_ranges, default_parameters)
+            zdict_i = run_sim_get_df(collider_sim, random_parameters)
+            # Get parameters where parameter_ranges is not None
+            params_i = {param: val for param, val in random_parameters.items() if parameter_ranges[param] is not None}
+            # Combine parameters and z_dict into one dictionary
+            df_i = {**params_i, **zdict_i}
             df.append(df_i)
 
         df = pd.DataFrame(df)
@@ -88,6 +80,66 @@ def main():
         sys.stdout.flush()
 
     print('donzo')
+
+
+def get_default_parameters():
+    default_parameters = {
+        'beta_star': 80,
+        'beam_width_x': 160,
+        'beam_width_y': 160,
+        'beam_length_scale_1': 1,
+        'beam_length_scale_2': 1,
+        'crossing_angle_1x': 0,
+        'crossing_angle_1y': 0,
+        'crossing_angle_2x': 0,
+        'crossing_angle_2y': 0,
+        'offset_1x': 0,
+        'offset_1y': 0,
+        'bkg': 0,
+        'mbd_resolution': None,
+        'mbd_z_eff_width': None
+    }
+    return default_parameters
+
+
+def get_full_parameters():
+    parameter_ranges = {
+        'beta_star': [60, 100],
+        'beam_width_x': [130, 190],
+        'beam_width_y': [130, 190],
+        'beam_length_scale_1': [0.8, 1.2],
+        'beam_length_scale_2': [0.8, 1.2],
+        'crossing_angle_1x': [-3e-3, 3e-3],
+        'crossing_angle_1y': [-1e-3, 1e-3],
+        'crossing_angle_2x': [-3e-3, 3e-3],
+        'crossing_angle_2y': [-1e-3, 1e-3],
+        'offset_1x': [-1000, 1000],
+        'offset_1y': [-1000, 1000],
+        'bkg': [0, 1e-16],
+        'mbd_resolution': [0.01, 10],
+        'mbd_z_eff_width': [50, 5000]
+    }
+    return parameter_ranges
+
+
+def get_simple_parameters():
+    parameter_ranges = {
+        'beta_star': None,
+        'beam_width_x': None,
+        'beam_width_y': None,
+        'beam_length_scale_1': None,
+        'beam_length_scale_2': None,
+        'crossing_angle_1x': [-3e-3, 3e-3],
+        'crossing_angle_1y': None,
+        'crossing_angle_2x': None,
+        'crossing_angle_2y': None,
+        'offset_1x': [-1000, 1000],
+        'offset_1y': None,
+        'bkg': None,
+        'mbd_resolution': None,
+        'mbd_z_eff_width': None
+    }
+    return parameter_ranges
 
 
 def run_sim_get_df(collider_sim, parameters):
@@ -112,15 +164,18 @@ def run_sim_get_df(collider_sim, parameters):
     zs, z_dist = collider_sim.get_z_density_dist()
     z_dict = dict(zip(zs, z_dist))
 
+    return z_dict
+
     # Combine parameters and z_dict into one dictionary
-    df = {**parameters, **z_dict}
+    # df = {**parameters, **z_dict}
+    #
+    # return df
 
-    return df
-
-def generate_random_parameters(parameter_ranges):
+def generate_random_parameters(parameter_ranges, default_parameters):
     """
     With the input parameter_ranges dictionary, generate a random set of parameters within the ranges.
     :param parameter_ranges:
+    :param default_parameters:
     :return:
     """
     random_parameters = {}
@@ -128,7 +183,7 @@ def generate_random_parameters(parameter_ranges):
         if range_vals is not None:
             random_parameters[param] = np.random.uniform(low=range_vals[0], high=range_vals[1])
         else:
-            random_parameters[param] = None
+            random_parameters[param] = default_parameters[param]
     return random_parameters
 
 

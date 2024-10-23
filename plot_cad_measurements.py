@@ -22,9 +22,9 @@ from Measure import Measure
 def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
-    cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
+    # cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
+    cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
     cw_rate_path = 'cw_rates.txt'
-    # cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
     # crossing_angle(cad_measurements_path, vernier_scan_date)
     # bunch_length(cad_measurements_path, vernier_scan_date)
     # beam_offset_and_intensity(cad_measurements_path, vernier_scan_date)

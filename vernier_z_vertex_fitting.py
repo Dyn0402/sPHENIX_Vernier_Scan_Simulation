@@ -37,13 +37,15 @@ from Measure import Measure
 def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    # orientation = 'Horizontal'  # 'Vertical'
+    orientation = 'Vertical'  # 'Vertical'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
     # pdf_out_path = f'{base_path}/Analysis/sim_vs_mbd_cad_params_{vernier_scan_date}.pdf'
-    pdf_out_path = f'{base_path}/Analysis/vertical/simple_bw_fitting_{vernier_scan_date}.pdf'
+    pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/simple_bw_fitting_{vernier_scan_date}.pdf'
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
     # z_vertex_root_path = f'C:/Users/Dylan/Desktop/vernier_scan/vertex_data/{dist_root_file_name}'
     # fit_head_on(z_vertex_root_path)
@@ -61,7 +63,8 @@ def main():
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # perform_and_compare_vernier_scan(z_vertex_root_path, longitudinal_fit_path)
-    # calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
+    # calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+    #                                orientation)
 
     print('donzo')
 
@@ -93,8 +96,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     new_bw = 155
     new_beta_star = 85
     new_mbd_res = 2.0
-    new_bkg = 0.1e-17
-    new_gaus_eff_width = 500  # cm
+    new_bkg = 0.4e-17
+    new_gaus_eff_width = 100  # cm
     new_ho_offsets = None
     new_pe_offsets = None
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
@@ -261,7 +264,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
 
 
 
-def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path):
+def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+                                   orientation):
     """
     Run simulation with a range of beam widths that are equal in the x and y directions.
     For each mbd z_vertex distribution, fit the simulation z-distribution varying only the crossing angles.
@@ -271,10 +275,13 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
     Plot the sum of the residuals values vs the beam width.
     """
 
-    beam_widths = np.arange(145, 195, 5)
+    # Calc residual also of just the sum of the counts. Plot all residuals vs step on same plot for all bw.
+    # Plot sum residual vs bw. Plot lumi sums vs step for each bw compared to CW rates.
+
+    beam_widths = np.arange(137.5, 170, 2.5)
     # beam_widths = np.arange(145, 185, 1)
     # beam_widths = np.arange(160, 165, 5)
-    orientation = 'Vertical'
+    # orientation = 'Vertical'
     # orientation = 'Horizontal'
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
@@ -299,15 +306,18 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
 
     z_vertex_hists_orient = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation]
 
-    residuals_sums = []
+    residuals_sums, sum_residual_sums, all_residual_sums, all_sum_residual_sums = [], [], [], []
+    all_total_rates = []
     start_time = datetime.now()
     n_fits = 0
     for bw in beam_widths:
         # Fit the first step, which is head on
+        # first_orient_head_on =
         collider_sim = fit_sim_to_mbd_step(collider_sim, z_vertex_hists_orient[0], cad_data, bw, True)
         n_fits += 1
 
-        step_nums, residuals_steps, blue_opt_angles, yellow_opt_angles = [], [], [], []
+        step_nums, residuals_steps, sum_residual_steps, blue_opt_angles, yellow_opt_angles = [], [], [], [], []
+        total_rates_steps = []
         for hist_data in z_vertex_hists_orient:
             # if hist_data['scan_step'] not in [6, 12]:
             #     continue
@@ -331,6 +341,7 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
 
             sim_interp_vals = interp1d(zs_opt, z_dist_opt)(hist_data['centers'])
             residual = np.sum(((hist_data['counts'] - sim_interp_vals) / np.mean(hist_data['counts'])) ** 2)
+            sum_residual = (np.sum(hist_data['counts']) - np.sum(sim_interp_vals)) ** 2 / np.mean(hist_data['counts'])
 
             # Run with +- 10 micron offset
             scan_orientation = hist_data['scan_axis']
@@ -359,8 +370,14 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
 
             step_nums.append(hist_data['scan_step'])
             residuals_steps.append(residual)
-            blue_opt_angles.append(collider_sim.bunch1.angle_x)
-            yellow_opt_angles.append(collider_sim.bunch2.angle_x)
+            sum_residual_steps.append(sum_residual)
+            total_rates_steps.append(np.sum(z_dist_opt) * (zs_opt[1] - zs_opt[0]))
+            if orientation == 'Horizontal':
+                blue_opt_angles.append(collider_sim.bunch1.angle_x)
+                yellow_opt_angles.append(collider_sim.bunch2.angle_x)
+            elif orientation == 'Vertical':
+                blue_opt_angles.append(collider_sim.bunch1.angle_y)
+                yellow_opt_angles.append(collider_sim.bunch2.angle_y)
 
             ax_step_z_dists.set_title(f'bw {bw:.0f} {hist_data["scan_axis"]} Scan Step {hist_data["scan_step"]}')
             ax_step_z_dists.set_xlabel('z Vertex Position (cm)')
@@ -370,12 +387,20 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
             n_fits += 1
 
         residuals_sums.append(np.sum(residuals_steps))
+        sum_residual_sums.append(np.sum(sum_residual_steps))
+        all_residual_sums.append(residuals_steps)
+        all_sum_residual_sums.append(sum_residual_steps)
+        all_total_rates.append(total_rates_steps)
 
         fig_resid_vs_step, ax_resid_vs_step = plt.subplots()
-        ax_resid_vs_step.plot(step_nums, residuals_steps, marker='o')
+        ax_resid_vs_step_sum = ax_resid_vs_step.twinx()
+        ax_resid_vs_step.plot(step_nums, residuals_steps, marker='o', label='z Residuals')
+        ax_resid_vs_step_sum.plot(step_nums, sum_residual_steps, marker='o', c='g', label='Sum Residuals')
         ax_resid_vs_step.set_title(f'bw {bw:.0f} Residuals vs Step')
         ax_resid_vs_step.set_xlabel('Step')
         ax_resid_vs_step.set_ylabel('Residual')
+        ax_resid_vs_step.legend(loc='upper right')
+        ax_resid_vs_step_sum.legend(loc='upper left')
         fig_resid_vs_step.tight_layout()
 
         fig_angles_vs_step, ax_angles_vs_step = plt.subplots()
@@ -388,10 +413,15 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
         fig_angles_vs_step.tight_layout()
 
     fig_resid_vs_bw, ax_resid_vs_bw = plt.subplots()
-    ax_resid_vs_bw.plot(beam_widths, residuals_sums, marker='o')
+    # Twin axis for sum residuals
+    ax_resid_vs_bw_sum = ax_resid_vs_bw.twinx()
+    ax_resid_vs_bw.plot(beam_widths, residuals_sums, marker='o', label='z Residuals')
+    ax_resid_vs_bw_sum.plot(beam_widths, sum_residual_sums, marker='o', c='g', label='Sum Residuals')
     ax_resid_vs_bw.set_title('Sum of Residuals vs Beam Width')
     ax_resid_vs_bw.set_xlabel('Beam Width (microns)')
     ax_resid_vs_bw.set_ylabel('Sum of Residuals')
+    ax_resid_vs_bw.legend(loc='upper right')
+    ax_resid_vs_bw_sum.legend(loc='upper left')
     fig_resid_vs_bw.tight_layout()
 
     offsets, total_rates = [], []
@@ -399,16 +429,22 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
         step_cad_data = cad_data[(cad_data['orientation'] == hist_data['scan_axis']) &
                                  (cad_data['step'] == int(hist_data['scan_step']))]
         offsets.append(step_cad_data['offset_set_val'].values[0])
-        total_rates.append(hist_data['counts'].sum())
+        total_rates.append(hist_data['counts'].sum() * (hist_data['centers'][1] - hist_data['centers'][0]))
 
-    # Sort rates and offsets toghether by offset
+    offsets_sim = offsets.copy()
+
+    # Sort rates and offsets together by offset
     offsets, total_rates = zip(*sorted(zip(offsets, total_rates)))
     fig_rate_vs_offset, ax_rate_vs_offset = plt.subplots()
-    ax_rate_vs_offset.plot(offsets, total_rates, marker='o')
+    ax_rate_vs_offset.plot(offsets, total_rates, marker='o', label='Total Rate CW', zorder=10)
+    for bw_i, total_rates_sim in enumerate(all_total_rates):
+        total_rates_sim = [total_rates_sim[i] for i in np.argsort(offsets_sim)]
+        ax_rate_vs_offset.plot(offsets, total_rates_sim, label=f'Sim bw {beam_widths[bw_i]:.0f}', zorder=1)
     ax_rate_vs_offset.set_ylim(bottom=0)
     ax_rate_vs_offset.set_title('Total Rate vs Offset')
     ax_rate_vs_offset.set_xlabel('Offset (um)')
     ax_rate_vs_offset.set_ylabel('Total Rate')
+    ax_rate_vs_offset.legend()
     fig_rate_vs_offset.tight_layout()
 
     with PdfPages(pdf_out_path) as pdf:
@@ -441,7 +477,10 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, bw, fit_amp_shift_fla
         collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
 
     blue_angle, yellow_angle = -step_cad_data['bh8_avg'] / 1e3, -step_cad_data['yh8_avg'] / 1e3  # mrad to rad
-    collider_sim.set_bunch_crossing(blue_angle, 0, yellow_angle, 0)
+    if scan_orientation == 'Horizontal':
+        collider_sim.set_bunch_crossing(blue_angle, 0, yellow_angle, 0)
+    elif scan_orientation == 'Vertical':
+        collider_sim.set_bunch_crossing(0, blue_angle, 0, yellow_angle)
 
     print(f'Offset: {offset}, blue_len_scale: {blue_bunch_len_scaling}, yellow_len_scale: {yellow_bunch_len_scaling}')
     print(f'Blue Angle: {blue_angle * 1e3:.3f} mrad, Yellow Angle: {yellow_angle * 1e3:.3f} mrad')
@@ -494,10 +533,13 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, bw, fit_amp_shift_fla
     # plt.show()
 
     res = minimize(fit_beam_pars1, np.array([1.0]),
-                   args=(collider_sim, blue_angle, yellow_angle, hist_data['counts'], hist_data['centers']),
+                   args=(collider_sim, blue_angle, yellow_angle, hist_data['counts'], hist_data['centers'], scan_orientation),
                    bounds=((-4.0, 5.0),))
     yellow_angle_opt = res.x[0] * yellow_angle
-    collider_sim.set_bunch_crossing(blue_angle, 0., yellow_angle_opt, 0.)
+    if scan_orientation == 'Horizontal':
+        collider_sim.set_bunch_crossing(blue_angle, 0., yellow_angle_opt, 0.)
+    elif scan_orientation == 'Vertical':
+        collider_sim.set_bunch_crossing(0., blue_angle, 0., yellow_angle_opt)
 
     # res = minimize(fit_beam_pars2, np.array([1.0, 1.0]),  # Figure out angle orientation!!!
     #                args=(collider_sim, blue_angle, yellow_angle, hist_data['counts'], hist_data['centers']))  #,
@@ -2032,7 +2074,7 @@ def fit_beam_pars(x, collider_sim, angle1_y_0, offset1_y_0, beam_width_0, beta_s
 
 
 def fit_beam_pars1(x, collider_sim, angle1_x_0,
-                   angle2_x_0, z_dist_data, zs_data):
+                   angle2_x_0, z_dist_data, zs_data, scan_orientation='Horizontal'):
     """
     Fit beam parameters
     :param x:
@@ -2041,12 +2083,17 @@ def fit_beam_pars1(x, collider_sim, angle1_x_0,
     :param angle2_x_0:
     :param z_dist_data:
     :param zs_data:
+    :param scan_orientation: 'Horizontal' or 'Vertical'
     :return:
     """
     angle2_x = x[0] * angle2_x_0
-    collider_sim.set_bunch_crossing(angle1_x_0, 0.0, angle2_x, 0.0)
+    if scan_orientation == 'Horizontal':
+        collider_sim.set_bunch_crossing(angle1_x_0, 0.0, angle2_x, 0.0)
+    elif scan_orientation == 'Vertical':
+        collider_sim.set_bunch_crossing(0.0, angle1_x_0, 0.0, angle2_x)
     collider_sim.run_sim_parallel()
 
+    # fit_shift(collider_sim, z_dist_data, zs_data)
     zs, z_dist = collider_sim.get_z_density_dist()
     sim_interp_vals = interp1d(zs, z_dist)(zs_data)
     residual = np.sum(((z_dist_data - sim_interp_vals) / np.sum(z_dist_data)) ** 2)
@@ -2194,9 +2241,30 @@ def fit_amp_shift(collider_sim, z_dist_data, zs_data):
     collider_sim.set_z_shift(shift)
 
 
+def fit_shift(collider_sim, z_dist_data, zs_data):
+    zs, z_dist = collider_sim.get_z_density_dist()
+    z_max_sim = zs[np.argmax(z_dist)]
+    z_max_hist = zs_data[np.argmax(z_dist_data)]
+    shift = z_max_sim - z_max_hist  # microns
+
+    res = minimize(shift_residual, np.array([0.0]),
+                   args=(collider_sim, shift, z_dist_data, zs_data),
+                   bounds=((-10e4, 10e4)))
+    shift = res.x[0] + shift
+
+    collider_sim.set_z_shift(shift)
+
+
 def amp_shift_residual(x, collider_sim, scale_0, shift_0, z_dist_data, zs_data):
     collider_sim.set_amplitude(x[0] * scale_0)
     collider_sim.set_z_shift(x[1] + shift_0)
+    sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
+    sim_interp = interp1d(sim_zs, sim_z_dist)
+    return np.sum((z_dist_data - sim_interp(zs_data)) ** 2)
+
+
+def shift_residual(x, collider_sim, shift_0, z_dist_data, zs_data):
+    collider_sim.set_z_shift(x[0] + shift_0)
     sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
     sim_interp = interp1d(sim_zs, sim_z_dist)
     return np.sum((z_dist_data - sim_interp(zs_data)) ** 2)

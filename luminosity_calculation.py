@@ -26,9 +26,9 @@ def main():
     # head_on_luminosity(longitudinal_fit_path)
     # head_on_luminosity_simple_gaus()
     # head_on_luminosity_plot()
-    angle_luminosity_plot()
+    # angle_luminosity_plot()
     # moller_factor_test()
-    # cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
+    cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
     print('donzo')
 
 
@@ -294,9 +294,9 @@ def cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path):
     head_on_cad_data = cad_data[cad_data['orientation'] == scan_orientation].iloc[0]
 
     # Important parameters
-    bw_nom = 180.  # um Width of bunch
+    bw_nom = 160.  # um Width of bunch
     beta_star_nom = 85.
-    mbd_online_resolution = None  # cm MBD resolution on trigger level
+    mbd_online_resolution = 2  # cm MBD resolution on trigger level
     yellow_length_scaling, blue_length_scaling = head_on_cad_data['yellow_bunch_length_scaling'], head_on_cad_data['blue_bunch_length_scaling']
 
     # Will be overwritten by CAD values
@@ -330,7 +330,8 @@ def cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path):
     luminosity = collider_sim.get_naked_luminosity()
     print(f'Luminosity: {luminosity:.2e}')
 
-    analytic_lumi = analytical_luminosity(bw_nom)
+    # analytic_lumi = analytical_luminosity(bw_nom)
+    analytic_lumi = 2.25534e-6
     print(f'Analytical luminosity: {analytic_lumi:.2e}')
 
     percent_differs = 100 * (luminosity - analytic_lumi) / analytic_lumi

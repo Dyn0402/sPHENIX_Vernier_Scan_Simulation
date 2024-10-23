@@ -22,15 +22,15 @@ from Measure import Measure
 def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
-    # cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
-    cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
+    cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
+    # cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
     cw_rate_path = 'cw_rates.txt'
     # crossing_angle(cad_measurements_path, vernier_scan_date)
     # bunch_length(cad_measurements_path, vernier_scan_date)
     # beam_offset_and_intensity(cad_measurements_path, vernier_scan_date)
     # plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, False)
-    # plot_beam_longitudinal_measurements(cad_measurements_path, 'Aug12', False)
-    combine_cad_measurements(cad_measurements_path, vernier_scan_date, cw_rate_path)
+    plot_individual_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, True)
+    # combine_cad_measurements(cad_measurements_path, vernier_scan_date, cw_rate_path)
     plt.show()
     print('donzo')
 
@@ -39,11 +39,8 @@ def plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date
     beam_colors = ['blue', 'yellow']
     plot_colors = ['blue', 'orange']
 
-    p0s = {'blue': [52.3, 1.16, 2.07, 48.8, 2.5, 3.6, 54.5, 3.5],
-           'yellow': [51.7, 2, 0.235, 47.335, 1.18, 0.235, 56.15, 1.25]}
     p0s_quad = {'blue': [52.3, 1.16, 2.07, 48.8, 2.5, 3.6, 54.5, 3.5, 0.3, 52.3, 20],
                 'yellow': [51.7, 2, 0.235, 47.335, 1.18, 0.235, 56.15, 1.25, 0.1, 51.7, 20]}
-    bnds = ([0, 0, 0, 0, 0, 0, 0, 0], [100, 10, 10, 100, 10, 10, 100, 10])
     bnds_quad = ([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [100, 10, 10, 100, 10, 10, 100, 10, 100, 100, 100])
 
     min_time, max_time = 30, 75
@@ -109,14 +106,6 @@ def plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date
 
         print(f'{beam_color} {weird_ones} weird ones of {len(times)} bunches')
 
-        # popt_3, pcov_3 = cf(triple_gaus_pdf, plot_times, plot_vals, p0=p0s[beam_color], bounds=bnds)
-        # perr_3 = np.sqrt(np.diag(pcov_3))
-        # pmeas_3 = [Measure(p, e) for p, e in zip(popt_3, perr_3)]
-        # fit_str = [rf'$\mu_1$ = {pmeas[0]}', rf'$\sigma_1$ = {pmeas[1]}',
-        #            rf'$\mu_2$ = {pmeas[3]}', rf'$\sigma_2$ = {pmeas[4]}', rf'$a_2$ = {pmeas[2]}',
-        #            rf'$\mu_3$ = {pmeas[6]}', rf'$\sigma_3$ = {pmeas[7]}', rf'$a_3$ = {pmeas[5]}']
-        # fit_str = '\n'.join(fit_str)
-
         popt, pcov = cf(quad_gaus_pdf, fit_times, fit_vals, p0=p0s_quad[beam_color], bounds=bnds_quad)
         perr = np.sqrt(np.diag(pcov))
         pmeas = [Measure(p, e) for p, e in zip(popt, perr)]
@@ -138,9 +127,6 @@ def plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date
         ax_all.plot(fit_times, fit_vals, color=plot_color, alpha=0.7, label='CAD Profiles')
         if len(weird_one_times) > 0 and plot_weird_ones:
             ax_all.plot(weird_one_times, weird_one_vals, color='purple', alpha=0.7, label='Weird Ones')
-        # ax_all.plot(x_plot, triple_gaus_pdf(x_plot, *p0s[beam_color]), color='gray', alpha=0.3, ls='--', label='Guess')
-        # ax_all.plot(x_plot, triple_gaus_pdf(x_plot, *popt), color='red', alpha=0.9, label='Triple Fit')
-        # ax_all.plot(x_plot, quad_gaus_pdf(x_plot, *p0s_quad[beam_color]), color='gray', alpha=0.3, ls='--', label='Guess')
         ax_all.plot(x_plot, quad_gaus_pdf(x_plot, *popt), color='red', ls='-', label='Fit')
         ax_all.axvline(popt[0], color='green', ls='--', alpha=0.5, zorder=0)
         ax_all.set_xlabel('Time (ns)')
@@ -160,57 +146,124 @@ def plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date
             fig_all.savefig(fit_plots_out_path)
             write_longitudinal_beam_profile_fit_parameters(fit_out_path, beam_color, fit_eq, pmeas)
 
-        # fits, fit_vals = [], []
-        # for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-        #     if np.max(bunch_vals) < 1.5:
-        #         continue
-        #     bin_size = bunch_times[1] - bunch_times[0]
-        #     pdf_vals = np.array(bunch_vals) / np.sum(bunch_vals) / bin_size
-        #     popt, pcov = cf(triple_gaus_pdf, bunch_times, pdf_vals, p0=p0s[beam_color], bounds=bnds)
-        #     perr = np.sqrt(np.diag(pcov))
-        #     pmeas = [Measure(p, e) for p, e in zip(popt, perr)]
-        #     fits.append(pmeas)
-        #     fit_vals.append(popt)
-        #
-        # # Make histograms for each fit parameter
-        # param_names = ['mu1', 'sigma1', 'a2', 'mu2', 'sigma2', 'a3', 'mu3', 'sigma3']
-        # fig_hist, ax_hist = plt.subplots(3, 3, figsize=(12, 12))
-        # for i in range(3):
-        #     for j in range(3):
-        #         if i == 2 and j == 2:
-        #             ax_hist[i, j].axis('off')
-        #             continue
-        #         param_vals = [fit[i * 3 + j].val for fit in fits]
-        #         ax_hist[i, j].hist(param_vals, bins=10, color=plot_color, alpha=0.7)
-        #         ax_hist[i, j].set_title(param_names[i * 3 + j])
-        # fig_hist.tight_layout()
-        #
-        # plt.show()
-        #
-        # # Iterate through the fits and plot
-        # for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-        #     if np.max(bunch_vals) < 1.5:
-        #         continue
-        #     x_plot = np.linspace(bunch_times[0], bunch_times[-1], 1000)
-        #     fig_fit, ax_fit = plt.subplots(figsize=(8, 6))
-        #     bin_size = bunch_times[1] - bunch_times[0]
-        #     pdf_vals = np.array(bunch_vals) / np.sum(bunch_vals) / bin_size
-        #     ax_fit.plot(bunch_times, pdf_vals, color=plot_color)
-        #     ax_fit.plot(x_plot, triple_gaus_pdf(x_plot, *p0s[beam_color]), color='gray', alpha=0.3, ls='--', label='Guess')
-        #     ax_fit.plot(x_plot, triple_gaus_pdf(x_plot, *fit_vals[bunch_i]), color='red', label='Fit')
-        #     ax_fit.set_xlabel('Time (ns)')
-        #     ax_fit.set_ylabel('Value')
-        #     ax_fit.set_title(f'{beam_color.capitalize()} Beam Longitudinal Fit')
-        #     fit_str = [rf'$\mu_1$ = {fits[bunch_i][0]}, $\sigma_1$ = {fits[bunch_i][1]}',
-        #                 rf'$\mu_2$ = {fits[bunch_i][3]}, $\sigma_2$ = {fits[bunch_i][4]}, $a_2$ = {fits[bunch_i][2]}',
-        #                 rf'$\mu_3$ = {fits[bunch_i][6]}, $\sigma_3$ = {fits[bunch_i][7]}, $a_3$ = {fits[bunch_i][5]}']
-        #     fit_str = '\n'.join(fit_str)
-        #     ax_fit.annotate(fit_str, (0.02, 0.98), xycoords='axes fraction', ha='left', va='top',
-        #                     bbox=dict(boxstyle='round', fc='salmon', alpha=0.5))
-        #     ax_fit.legend()
-        #     ax_fit.grid(True)
-        #     fig_fit.tight_layout()
-        #     plt.show()
+    ax.set_xlabel('Time (ns)')
+    ax.set_ylabel('Value')
+    ax.set_title('Longitudinal Beam Measurements vs Time')
+    ax.grid(True)
+
+    ax2.set_xlabel('Time (ns)')
+    ax2.set_ylabel('Value')
+    ax2.set_title('Longitudinal Beam Measurements vs Index')
+    ax2.grid(True)
+
+    fig.tight_layout()
+    fig2.tight_layout()
+
+
+def plot_individual_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, write_out=False):
+    beam_colors = ['blue', 'yellow']
+    plot_colors = ['blue', 'orange']
+
+    p0s_quad = {'blue': [52.3, 1.16, 2.07, 48.8, 2.5, 3.6, 54.5, 3.5, 0.3, 52.3, 20],
+                'yellow': [51.7, 2, 0.235, 47.335, 1.18, 0.235, 56.15, 1.25, 0.1, 51.7, 20]}
+    bnds_quad = ([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [100, 10, 10, 100, 10, 10, 100, 10, 100, 100, 100])
+
+    min_time, max_time = 30, 75
+    min_val = 1.5
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig2, ax2 = plt.subplots(figsize=(12, 6))
+
+    for beam_color, plot_color in zip(beam_colors, plot_colors):
+        file_path = f'{cad_measurements_path}VernierScan_{vernier_scan_date}_{beam_color}_longitudinal.dat.gz'
+        with gzip.open(file_path, 'rt') as file:
+            file_content = file.read()
+        lines = file_content.split('\n')
+        times, values = [[]], [[]]
+        for line in lines[1:]:
+            if line == '':
+                continue
+            columns = line.split('\t')
+            time, value = float(columns[0]), float(columns[1])
+            if len(times[-1]) > 0 and time < times[-1][-1]:
+                times.append([])
+                values.append([])
+            times[-1].append(time)
+            values[-1].append(value)
+
+        # For times less than 30 ns and greater than 75 ns set to 0
+        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
+            bunch_vals = np.array(bunch_vals)
+            bunch_vals[(np.array(bunch_times) < min_time) | (np.array(bunch_times) > max_time)] = 0
+            values[bunch_i] = bunch_vals
+
+        full_time = 0
+        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
+            bunch_vals = np.array(bunch_vals)
+            max_bunch_val = np.max(bunch_vals)
+            times_increasing = np.array(bunch_times)
+            times_increasing += full_time
+            full_time += bunch_times[-1]
+            if max_bunch_val > min_val:
+                ax.plot(bunch_times, bunch_vals / np.max(bunch_vals), color=plot_color)
+            ax2.plot(times_increasing, bunch_vals, color=plot_color)
+
+            # Fit the individual bunch
+            if np.max(bunch_vals) >= min_val:
+                bin_width = bunch_times[1] - bunch_times[0]
+                vals = list(np.array(bunch_vals) / np.sum(bunch_vals) / bin_width)
+
+                try:
+                    popt, pcov = cf(quad_gaus_pdf, bunch_times, vals, p0=p0s_quad[beam_color], bounds=bnds_quad)
+                    perr = np.sqrt(np.diag(pcov))
+                    pmeas = [Measure(p, e) for p, e in zip(popt, perr)]
+                except RuntimeError:
+                    print(f"Fit failed for bunch {bunch_i} of {beam_color} beam.")
+                    continue
+
+                # Create the fit string for annotation
+                fit_str = [rf'$\mu_1$ = {pmeas[0]} ns', rf'$\sigma_1$ = {pmeas[1]} ns',
+                           rf'$\mu_2$ = {pmeas[3]} ns', rf'$\sigma_2$ = {pmeas[4]} ns', rf'$a_2$ = {pmeas[2]}',
+                           rf'$\mu_3$ = {pmeas[6]} ns', rf'$\sigma_3$ = {pmeas[7]} ns', rf'$a_3$ = {pmeas[5]}',
+                           rf'$\mu_4$ = {pmeas[9]} ns', rf'$\sigma_4$ = {pmeas[10]} ns', rf'$a_4$ = {pmeas[8]}']
+                fit_str = '\n'.join(fit_str)
+
+                # Fit equation for annotation
+                fit_eq = (
+                    r'$p(t) = \frac{\frac{1}{\sigma_1 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_1)^2}{2\sigma_1^2}\right)'
+                    r'+ \frac{a_2}{\sigma_2 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_2)^2}{2\sigma_2^2}\right)'
+                    r'+ \frac{a_3}{\sigma_3 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_3)^2}{2\sigma_3^2}\right)'
+                    r'+ \frac{a_4}{\sigma_4 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_4)^2}{2\sigma_4^2}\right)}'
+                    r'{1 + a_2 + a_3 + a_4}$')
+
+                # Plot individual fit
+                fig_bunch, ax_bunch = plt.subplots(figsize=(8, 6))
+                x_plot = np.linspace(bunch_times[0], bunch_times[-1], 1000)
+                ax_bunch.plot(bunch_times, vals, color=plot_color, alpha=0.7, label='CAD Profile')
+                ax_bunch.plot(x_plot, quad_gaus_pdf(x_plot, *popt), color='red', ls='-', label='Fit')
+                ax_bunch.axvline(popt[0], color='green', ls='--', alpha=0.5, zorder=0)
+                ax_bunch.set_ylim(-0.024, 0.143)
+                ax_bunch.set_xlim(21, 79)
+                ax_bunch.set_xlabel('Time (ns)')
+                ax_bunch.set_ylabel('Probability Density')
+                ax_bunch.set_title(f'{vernier_scan_date} Vernier Scan {beam_color.capitalize()} Beam Bunch {bunch_i}')
+                ax_bunch.annotate(fit_str, (0.01, 0.98), xycoords='axes fraction', ha='left', va='top',
+                                  bbox=dict(boxstyle='round', fc='white', alpha=0.8), fontsize=12)
+                ax_bunch.annotate(fit_eq, (0.02, 0.02), xycoords='axes fraction', ha='left', va='bottom',
+                                  bbox=dict(boxstyle='round', fc='white', alpha=1.0), fontsize=14.5)
+                ax_bunch.legend(loc='upper right', fontsize=14)
+                ax_bunch.grid(True)
+                fig_bunch.tight_layout()
+
+                # Save individual plot and parameters
+                if write_out:
+                    plot_out_path = (f'{cad_measurements_path}Individual_Longitudinal_Bunch_Profile_Fits/'
+                                     f'{vernier_scan_date}_{beam_color}_bunch_{bunch_i}_fit_plot.png')
+                    fit_out_path = (f'{cad_measurements_path}Individual_Longitudinal_Bunch_Profile_Fits/'
+                                    f'VernierScan_{vernier_scan_date}_{beam_color}_bunch_{bunch_i}_longitudinal_fit.dat')
+                    fig_bunch.savefig(plot_out_path)
+                    write_longitudinal_beam_profile_fit_parameters(fit_out_path, beam_color, fit_eq, pmeas)
+                    plt.close(fig_bunch)
 
     ax.set_xlabel('Time (ns)')
     ax.set_ylabel('Value')

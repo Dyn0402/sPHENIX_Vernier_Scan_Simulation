@@ -18,7 +18,7 @@ from scipy.optimize import curve_fit as cf
 from scipy.interpolate import interp1d
 import pandas as pd
 from datetime import datetime, timedelta
-import tensorflow as tf
+# import tensorflow as tf
 
 try:
     import winsound
@@ -40,8 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
@@ -64,9 +64,9 @@ def main():
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # perform_and_compare_vernier_scan(z_vertex_root_path, longitudinal_fit_path)
-    calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-                                   orientation)
-    # avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    # calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+    #                                orientation)
+    avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
     # fit_peripheral_with_neural_net(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
 
     print('donzo')
@@ -182,6 +182,13 @@ def avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_f
         blue_fit_path_i = blue_fit_path.replace('BUNCHNUM', str(bunch_num))
         yellow_fit_path_i = yellow_fit_path.replace('BUNCHNUM', str(bunch_num))
         collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path_i, yellow_fit_path_i)
+        # collider_sim.bunch1.set_delay(0.02 * ((bunch_num % 2) - 0.5) * 2)
+        blue_angle_xi, blue_angle_yi = np.random.normal(blue_angle_x, 0.05e-3), np.random.normal(blue_angle_y, 0.05e-3)
+        yellow_angle_xi, yellow_angle_yi = np.random.normal(yellow_angle_x, 0.05e-3), np.random.normal(yellow_angle_y, 0.05e-3)
+        collider_sim.set_bunch_crossing(blue_angle_xi, blue_angle_yi, yellow_angle_xi, yellow_angle_yi)
+        blue_offset_x, blue_offset_y = np.random.normal(0., 10), np.random.normal(0., 10)
+        yellow_offset_x, yellow_offset_y = np.random.normal(0., 10), np.random.normal(0., 10)
+        collider_sim.set_bunch_offsets(np.array([blue_offset_x, blue_offset_y]), np.array([yellow_offset_x, yellow_offset_y]))
 
         collider_sim.run_sim_parallel()
         zs, z_dist = collider_sim.get_z_density_dist()
@@ -206,15 +213,15 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
 
-    orientation = 'Vertical'
+    orientation = 'Horizontal'
     head_on_scan_step = 1
-    peripheral_scan_step = 6
+    peripheral_scan_step = 12
 
     ho_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == head_on_scan_step)].iloc[0]
     pe_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == peripheral_scan_step)].iloc[0]
 
     # Important parameters
-    bw_nom = 155
+    bw_nom = 151
     beta_star_nom = 85.
     mbd_online_resolution = 2.0  # cm MBD resolution on trigger level
     bkg = 0.4e-17  # Background level
@@ -226,17 +233,17 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
 
-    new_bw = 155
+    new_bw = 149
     new_beta_star = 85
     new_mbd_res = 2.0
-    new_bkg = 0.4e-17
-    new_gaus_eff_width = 100  # cm
+    new_bkg = 0.0e-17
+    new_gaus_eff_width = 500  # cm
     new_ho_offsets = None
     new_pe_offsets = None
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
     new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
-    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3
-    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.01e-3, 0.0
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.05e-3
+    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0, 0.0
 
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
     ho_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == head_on_scan_step][0]
@@ -394,7 +401,6 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     fig_pe.tight_layout()
 
     plt.show()
-
 
 
 def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,

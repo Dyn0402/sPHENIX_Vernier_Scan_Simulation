@@ -25,10 +25,10 @@ def main():
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
     # head_on_luminosity(longitudinal_fit_path)
     # head_on_luminosity_simple_gaus()
-    head_on_luminosity_plot()
-    angle_luminosity_plot()
+    # head_on_luminosity_plot()
+    # angle_luminosity_plot()
     # moller_factor_test()
-    # cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
+    cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
     print('donzo')
 
 
@@ -294,7 +294,10 @@ def cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path):
     head_on_cad_data = cad_data[cad_data['orientation'] == scan_orientation].iloc[0]
 
     # Important parameters
-    bw_nom = 160.  # um Width of bunch
+    bw_x_nom = 151.5  # um Width of bunch
+    # bw_x_nom = 155  # um Width of bunch
+    bw_y_nom = 149.  # um Width of bunch
+    # bw_y_nom = 155.  # um Width of bunch
     beta_star_nom = 85.
     mbd_online_resolution = 2  # cm MBD resolution on trigger level
     yellow_length_scaling, blue_length_scaling = head_on_cad_data['yellow_bunch_length_scaling'], head_on_cad_data['blue_bunch_length_scaling']
@@ -306,7 +309,7 @@ def cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path):
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([0., y_offset_nom, -6.e6]), np.array([0., 0., +6.e6]))
     collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
-    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_bunch_sigmas(np.array([bw_x_nom, bw_y_nom]), np.array([bw_x_nom, bw_y_nom]))
     collider_sim.set_bunch_crossing(0, angle_nom, 0, 0)
     collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
     blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
@@ -329,9 +332,11 @@ def cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path):
 
     luminosity = collider_sim.get_naked_luminosity()
     print(f'Luminosity: {luminosity:.2e}')
+    # print(f'Luminosity: {luminosity * 1e12:.2e}')
 
     # analytic_lumi = analytical_luminosity(bw_nom)
-    analytic_lumi = 2.25534e-6
+    # analytic_lumi = 2.25534e-6
+    analytic_lumi = 2.24789e-6
     print(f'Analytical luminosity: {analytic_lumi:.2e}')
 
     percent_differs = 100 * (luminosity - analytic_lumi) / analytic_lumi

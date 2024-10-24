@@ -25,10 +25,10 @@ def main():
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
     # head_on_luminosity(longitudinal_fit_path)
     # head_on_luminosity_simple_gaus()
-    # head_on_luminosity_plot()
-    # angle_luminosity_plot()
+    head_on_luminosity_plot()
+    angle_luminosity_plot()
     # moller_factor_test()
-    cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
+    # cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
     print('donzo')
 
 

@@ -84,7 +84,7 @@ def main():
 
 def get_default_parameters():
     default_parameters = {
-        'beta_star': 80,
+        'beta_star': 85,
         'beam_width_x': 160,
         'beam_width_y': 160,
         'beam_length_scale_1': 1,
@@ -136,6 +136,26 @@ def get_simple_parameters():
         'offset_1x': [-1000, 1000],
         'offset_1y': None,
         'bkg': None,
+        'mbd_resolution': None,
+        'mbd_z_eff_width': None
+    }
+    return parameter_ranges
+
+
+def get_essential_1d_parameters():
+    parameter_ranges = {
+        'beta_star': [60, 100],
+        'beam_width_x': [130, 190],
+        'beam_width_y': [130, 190],
+        'beam_length_scale_1': [0.8, 1.2],
+        'beam_length_scale_2': [0.8, 1.2],
+        'crossing_angle_1x': [-3e-3, 3e-3],
+        'crossing_angle_1y': [-1e-3, 1e-3],
+        'crossing_angle_2x': [-3e-3, 3e-3],
+        'crossing_angle_2y': [-1e-3, 1e-3],
+        'offset_1x': [-1000, 1000],
+        'offset_1y': [-1000, 1000],
+        'bkg': [0, 1e-16],
         'mbd_resolution': None,
         'mbd_z_eff_width': None
     }

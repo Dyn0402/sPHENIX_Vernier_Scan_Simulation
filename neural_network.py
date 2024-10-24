@@ -23,11 +23,16 @@ from sklearn.preprocessing import StandardScaler
 
 
 def main():
+    train_neural_network()
+    print('donzo')
+
+
+def train_neural_network():
     base_path = '/local/home/dn277127/Bureau/vernier_scan/training_data/'
     # training_set = 'training_set_1'
     training_set = 'simple_par_training_set_1'
     training_csv_name = 'training_data.csv'
-    retrain = False
+    retrain = True
 
     # Load data
     df = pd.read_csv(f'{base_path}{training_set}/{training_csv_name}')
@@ -59,7 +64,7 @@ def main():
         # model.compile(optimizer='adam', loss=smoothness_freq_loss)
 
         # Train the model and store the training history
-        history = model.fit(X_train_scaled, y_train, epochs=1000, batch_size=32, validation_split=0.2)
+        history = model.fit(X_train_scaled, y_train, epochs=10000, batch_size=32, validation_split=0.2)
 
         # Evaluate the model
         loss = model.evaluate(X_test_scaled, y_test)
@@ -97,6 +102,7 @@ def main():
         fft_magnitudes = K.abs(fft_pred)
         plt.figure(figsize=(10, 6))
         plt.plot(fft_magnitudes)
+        plt.plot(fft_magnitudes[:-1] - fft_magnitudes[1:])
         plt.title('Fourier Transform of Predicted Z-Distribution')
         plt.xlabel('Frequency')
         plt.ylabel('Magnitude')
@@ -105,7 +111,6 @@ def main():
 
     # Save the model
     model.save(f'{base_path}{training_set}/neural_network_model.keras')
-    print('donzo')
 
 
 def smoothness_loss(y_true, y_pred):
@@ -128,13 +133,16 @@ def smoothness_freq_loss(y_true, y_pred):
     fft_pred = tf.signal.fft(y_pred_complex)
 
     # Take absolute values to get magnitudes of the frequencies
-    fft_magnitudes = K.abs(fft_pred[])
+    fft_magnitudes = K.abs(fft_pred)
+    fft_derivatives = fft_magnitudes[:-1] - fft_magnitudes[1:]
+    fft_diff = K.abs(fft_derivatives)
 
     # Penalize frequencies higher than the second harmonic (e.g., from index 3 onwards)
-    high_freq_penalty = K.sum(fft_magnitudes[:, 3:])
+    # high_freq_penalty = K.sum(fft_magnitudes[:, 3:])
 
     # Combine loss terms
-    return K.mean(diff) + mse + high_freq_penalty * 0.01  # Adjust penalty weight as needed
+    # return K.mean(diff) + mse + high_freq_penalty * 0.01  # Adjust penalty weight as needed
+    return K.mean(diff) + mse + K.mean(fft_diff)  # Adjust penalty weight as needed
 
 
 if __name__ == '__main__':

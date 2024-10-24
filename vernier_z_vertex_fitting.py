@@ -18,6 +18,7 @@ from scipy.optimize import curve_fit as cf
 from scipy.interpolate import interp1d
 import pandas as pd
 from datetime import datetime, timedelta
+import tensorflow as tf
 
 try:
     import winsound
@@ -37,10 +38,10 @@ from Measure import Measure
 def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
-    # orientation = 'Horizontal'
-    orientation = 'Vertical'
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    orientation = 'Horizontal'
+    # orientation = 'Vertical'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
@@ -63,11 +64,77 @@ def main():
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # perform_and_compare_vernier_scan(z_vertex_root_path, longitudinal_fit_path)
-    # calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-    #                                orientation)
-    avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+                                   orientation)
+    # avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    # fit_peripheral_with_neural_net(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
 
     print('donzo')
+
+
+def fit_peripheral_with_neural_net(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path):
+    """
+    Use neural network to fit the peripheral z-vertex distributions.
+    """
+    cad_data = read_cad_measurement_file(cad_measurement_path)
+    cw_rates = get_cw_rates(cad_data)
+
+    orientation = 'Horizontal'
+    peripheral_scan_step = 6
+
+    pe_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == peripheral_scan_step)].iloc[0]
+
+    model = tf.keras.models.load_model(f'/local/home/dn277127/Bureau/vernier_scan/training_data/'
+                                       f'simple_par_training_set_1/neural_network_model.keras')
+
+    # Important parameters
+    bw_nom = 155
+    beta_star_nom = 85.
+    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level
+    bkg = 0.4e-17  # Background level
+    gaus_eff_width = None
+    pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
+
+    z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
+    pe_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == peripheral_scan_step][0]
+
+    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
+    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+
+    collider_sim = BunchCollider()
+    collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_bunch_crossing(pe_blue_angle_x, pe_blue_angle_y, pe_yellow_angle_x, pe_yellow_angle_y)
+    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gaus_eff_width)
+    collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+    collider_sim.set_amplitude(1.2048100105307071e+27)
+
+    offset = pe_step_cad_data['offset_set_val'] * 1e3  # mm to um
+    if orientation == 'Horizontal':
+        collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+    elif orientation == 'Vertical':
+        collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+
+    collider_sim.run_sim_parallel()
+    fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+    pe_zs_shifted, pe_z_dist_shifted = collider_sim.get_z_density_dist()
+
+    fig_pe, ax_pe = plt.subplots()
+    ax_pe.bar(pe_hist_data['centers'], pe_hist_data['counts'],
+                width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
+    ax_pe.plot(pe_zs_shifted, pe_z_dist_shifted, color='red', alpha=1.0, label='Simulation Shifted')
+
+    ax_pe.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_pe.set_xlabel('z Vertex Position (cm)')
+    ax_pe.legend(loc='upper right')
+    fig_pe.tight_layout()
+
+    plt.show()
+
 
 
 def avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path):
@@ -111,6 +178,7 @@ def avg_over_bunch_test(z_vertex_root_path, cad_measurement_path, longitudinal_f
 
     z_dists = []
     for bunch_num in range(1, 110):
+        print(f'Fitting Bunch {bunch_num}')
         blue_fit_path_i = blue_fit_path.replace('BUNCHNUM', str(bunch_num))
         yellow_fit_path_i = yellow_fit_path.replace('BUNCHNUM', str(bunch_num))
         collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path_i, yellow_fit_path_i)
@@ -343,8 +411,8 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
     # Calc residual also of just the sum of the counts. Plot all residuals vs step on same plot for all bw.
     # Plot sum residual vs bw. Plot lumi sums vs step for each bw compared to CW rates.
 
-    # beam_widths = np.arange(137.5, 170, 2.5)
-    beam_widths = np.arange(145, 170, 5)
+    beam_widths = np.arange(135, 170, 1)
+    # beam_widths = np.arange(145, 170, 5)
     # beam_widths = np.arange(145, 185, 1)
     # beam_widths = np.arange(160, 165, 5)
     # orientation = 'Vertical'
@@ -2308,10 +2376,14 @@ def fit_amp_shift(collider_sim, z_dist_data, zs_data):
 
 
 def fit_shift(collider_sim, z_dist_data, zs_data):
+    sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
+    sim_interp = interp1d(sim_zs, sim_z_dist)
+    upper_bound = min(zs_data) - min(sim_zs) - 0.1
+    lower_bound = max(zs_data) - max(sim_zs) + 0.1
     res = minimize(shift_residual, np.array([collider_sim.z_shift]),
-                   args=(collider_sim, z_dist_data, zs_data),
-                   bounds=((-10e4, 10e4),))
-    collider_sim.set_z_shift(res.x[0])
+                   args=(sim_interp, z_dist_data, zs_data),
+                   bounds=((lower_bound, upper_bound),))
+    collider_sim.set_z_shift(collider_sim.z_shift - res.x[0] * 1e4)
 
 
 def amp_shift_residual(x, collider_sim, scale_0, shift_0, z_dist_data, zs_data):
@@ -2322,11 +2394,8 @@ def amp_shift_residual(x, collider_sim, scale_0, shift_0, z_dist_data, zs_data):
     return np.sum((z_dist_data - sim_interp(zs_data)) ** 2)
 
 
-def shift_residual(x, collider_sim, z_dist_data, zs_data):
-    collider_sim.set_z_shift(x[0])
-    sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
-    sim_interp = interp1d(sim_zs, sim_z_dist)
-    return np.sum((z_dist_data - sim_interp(zs_data)) ** 2)
+def shift_residual(x, sim_interp, z_dist_data, zs_data):
+    return np.sum((z_dist_data - sim_interp(zs_data - x)) ** 2)
 
 
 def get_mbd_step_times(cad_data):

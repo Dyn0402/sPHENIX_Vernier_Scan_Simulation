@@ -40,7 +40,8 @@ def main():
     shift = -14507.674093844653
 
     # parameter_ranges = get_full_parameters()
-    parameter_ranges = get_simple_parameters()
+    # parameter_ranges = get_simple_parameters()
+    parameter_ranges = get_essential_1d_parameters()
     default_parameters = get_default_parameters()
 
     collider_sim = BunchCollider()
@@ -144,18 +145,18 @@ def get_simple_parameters():
 
 def get_essential_1d_parameters():
     parameter_ranges = {
-        'beta_star': [60, 100],
-        'beam_width_x': [130, 190],
-        'beam_width_y': [130, 190],
+        'beta_star': [75, 95],
+        'beam_width_x': [140, 170],
+        'beam_width_y': [140, 170],
         'beam_length_scale_1': [0.8, 1.2],
         'beam_length_scale_2': [0.8, 1.2],
-        'crossing_angle_1x': [-3e-3, 3e-3],
-        'crossing_angle_1y': [-1e-3, 1e-3],
-        'crossing_angle_2x': [-3e-3, 3e-3],
-        'crossing_angle_2y': [-1e-3, 1e-3],
+        'crossing_angle_1x': [-0.3e-3, 0.3e-3],
+        'crossing_angle_1y': [-0.1e-3, 0.1e-3],
+        'crossing_angle_2x': [-0.3e-3, 0.3e-3],
+        'crossing_angle_2y': [-0.1e-3, 0.1e-3],
         'offset_1x': [-1000, 1000],
         'offset_1y': [-1000, 1000],
-        'bkg': [0, 1e-16],
+        'bkg': None,
         'mbd_resolution': None,
         'mbd_z_eff_width': None
     }

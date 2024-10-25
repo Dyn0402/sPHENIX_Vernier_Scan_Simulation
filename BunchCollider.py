@@ -9,6 +9,7 @@ Created as sphenix_polarimetry/BunchCollider.py
 """
 
 import numpy as np
+import h5py
 from concurrent.futures import ProcessPoolExecutor as Pool
 from scipy.ndimage import gaussian_filter1d
 
@@ -61,6 +62,7 @@ class BunchCollider:
 
         self.x, self.y, self.z = None, None, None
         self.average_density_product_xyz = None
+        self.z_dist = None
 
     def set_bunch_sigmas(self, sigma1, sigma2):
         self.bunch1.set_sigma(*sigma1)
@@ -165,7 +167,7 @@ class BunchCollider:
         self.bunch1.set_beta(*self.bunch1_beta_original)
         self.bunch2.set_beta(*self.bunch2_beta_original)
         self.bunch1.set_angles(self.bunch1.angle_x, self.bunch1.angle_y)
-        self.average_density_product_xyz = None
+        self.average_density_product_xyz, self.z_dist = None, None
 
         self.generate_grid()
 
@@ -193,6 +195,7 @@ class BunchCollider:
             self.bunch1.propagate()
             self.bunch2.propagate()
         self.average_density_product_xyz /= self.n_points_t
+        self.z_dist = np.sum(self.average_density_product_xyz, axis=(0, 1))
 
     def compute_time_step(self, time_step_index):
         """
@@ -225,7 +228,7 @@ class BunchCollider:
         self.bunch1.set_beta(*self.bunch1_beta_original)
         self.bunch2.set_beta(*self.bunch2_beta_original)
         self.bunch1.set_angles(self.bunch1.angle_x, self.bunch1.angle_y)
-        self.average_density_product_xyz = None
+        self.average_density_product_xyz, self.z_dist = None, None
 
         self.generate_grid()
 
@@ -238,6 +241,7 @@ class BunchCollider:
         with Pool() as pool:
             density_products = pool.map(self.compute_time_step, range(self.n_points_t))
         self.average_density_product_xyz = np.mean([p for p in density_products], axis=0)
+        self.z_dist = np.sum(self.average_density_product_xyz, axis=(0, 1))
 
     def get_grid_info(self):
         """
@@ -264,9 +268,11 @@ class BunchCollider:
 
     def get_z_density_dist(self):
         z_vals = (self.z - self.z_shift) / 1e4  # um to cm
-        z_dist = self.amplitude * np.sum(self.average_density_product_xyz, axis=(0, 1))
+        # z_dist = self.amplitude * np.sum(self.average_density_product_xyz, axis=(0, 1))
+        z_dist = self.amplitude * self.z_dist
         if self.gaus_z_efficiency_width is not None:
-            z_dist = z_dist * gaus(z_vals, 1, 0, self.gaus_z_efficiency_width)
+            # z_dist = z_dist * gaus(z_vals, 1, 0, self.gaus_z_efficiency_width)
+            z_dist = z_dist * efficiency(z_vals, z_quad=self.gaus_z_efficiency_width, z_switch=200, steepness=-0.2)
         if self.gaus_smearing_sigma is not None:
             z_spacing = z_vals[1] - z_vals[0]
             z_dist = gaussian_filter1d(z_dist, self.gaus_smearing_sigma / z_spacing)
@@ -292,12 +298,97 @@ class BunchCollider:
         Assuming head on so Moller factor is 2c.
         :return:
         """
-        integral = np.sum(self.average_density_product_xyz)
+        # integral = np.sum(self.average_density_product_xyz)
+        integral = np.sum(self.z_dist)
         grid_info = self.get_grid_info()
         luminosity = integral * grid_info['dx'] * grid_info['dy'] * grid_info['dz'] * grid_info['n_points_t'] * grid_info['dt']
         # luminosity = luminosity * 2 * self.bunch1.c  # 2c for head on
         luminosity = luminosity * self.get_relativistic_moller_factor()
         return luminosity
+
+    # def get_params(self):
+    #     """
+    #     Generate a unique hash based on the current simulation parameters.
+    #     """
+    #     # Collect relevant parameters
+    #     params = {
+    #         'bunch1_sigma': self.bunch1.transverse_sigma.tolist(),
+    #         'bunch2_sigma': self.bunch2.transverse_sigma.tolist(),
+    #         'bunch1_longitudinal_scaling': self.bunch1.longitudinal_width_scaling,
+    #         'bunch2_longitudinal_scaling': self.bunch2.longitudinal_width_scaling,
+    #         'bunch1_initial_z': self.bunch1.initial_z,
+    #         'bunch2_initial_z': self.bunch2.initial_z,
+    #         'bunch1_offset_x': self.bunch1.offset_x,
+    #         'bunch1_offset_y': self.bunch1.offset_y,
+    #         'bunch2_offset_x': self.bunch2.offset_x,
+    #         'bunch2_offset_y': self.bunch2.offset_y,
+    #         'bunch1_angle_x': self.bunch1.angle_x,
+    #         'bunch1_angle_y': self.bunch1.angle_y,
+    #         'bunch2_angle_x': self.bunch2.angle_x,
+    #         'bunch2_angle_y': self.bunch2.angle_y,
+    #         'bunch1_beta_star': self.bunch1.beta_star,
+    #         'bunch2_beta_star': self.bunch2.beta_star,
+    #         'bkg': self.bkg,
+    #         'z_bounds': list(self.z_bounds),
+    #         'x_lim_sigma': self.x_lim_sigma,
+    #         'y_lim_sigma': self.y_lim_sigma,
+    #         'z_lim_sigma': self.z_lim_sigma,
+    #         'n_points_x': self.n_points_x,
+    #         'n_points_y': self.n_points_y,
+    #         'n_points_z': self.n_points_z,
+    #         'n_points_t': self.n_points_t,
+    #     }
+    #     return params
+    #
+    # def save_simulation(self):
+    #     """
+    #     Saves the simulation parameters and luminosity density data to an HDF5 file.
+    #     """
+    #     with h5py.File(self.file_path, 'a') as f:
+    #         params_group = f.create_group('params')  # Create a group for parameters and save each as an attribute
+    #         for key, value in self.get_params().items():
+    #             if isinstance(value, list):  # Handle lists (like sigma values) by saving them as numpy arrays
+    #                 params_group.attrs[key] = np.array(value)
+    #             else:
+    #                 params_group.attrs[key] = value
+    #
+    #         # Save the luminosity density as a compressed dataset
+    #         f.create_dataset('luminosity_density', data=self.z_dist, compression='gzip')
+    #
+    # def load_simulation(self):
+    #     """
+    #     Loads and returns the simulation parameters and luminosity density data from the HDF5 file.
+    #     """
+    #     with h5py.File(self.file_path, 'r') as f:
+    #         # Retrieve parameters and convert numpy arrays back to lists where needed
+    #         params = {key: (
+    #             list(f['params'].attrs[key]) if isinstance(f['params'].attrs[key], np.ndarray) else f['params'].attrs[
+    #                 key])
+    #                   for key in f['params'].attrs}
+    #
+    #         # Load the luminosity density data
+    #         luminosity_density = f['luminosity_density'][:]
+    #
+    #     return params, luminosity_density
+    #
+    # def get_params(self):
+    #     """
+    #     Retrieves only the simulation parameters from the HDF5 file without loading the full luminosity density.
+    #     """
+    #     with h5py.File(self.file_path, 'r') as f:
+    #         params = {key: (
+    #             list(f['params'].attrs[key]) if isinstance(f['params'].attrs[key], np.ndarray) else f['params'].attrs[
+    #                 key])
+    #                   for key in f['params'].attrs}
+    #     return params
+    #
+    # def get_luminosity_density(self):
+    #     """
+    #     Retrieves only the luminosity density data from the HDF5 file without loading parameters.
+    #     """
+    #     with h5py.File(self.file_path, 'r') as f:
+    #         luminosity_density = f['luminosity_density'][:]
+    #     return luminosity_density
 
 
     def get_param_string(self):
@@ -323,3 +414,30 @@ class BunchCollider:
 
 def gaus(x, a, b, c):
     return a * np.exp(-(x - b) ** 2 / (2 * c ** 2))
+
+
+def efficiency(z, z_quad=700, z_switch=200, steepness=-0.1):
+    # Quadratic part
+    quadratic_part = np.where(np.abs(z) <= z_switch, 1 - (z / z_quad) ** 2, 0)
+
+    # Calculate the value and derivative of the quadratic part at z_switch
+    q_sw = 1 - (z_switch / z_quad) ** 2
+    dq_sw = -2 * z_switch / z_quad ** 2
+
+    if not 0 < q_sw < 1:
+        raise ValueError('Quadratic part must be between 0 and 1 at z_switch.')
+
+    # Sigmoid parameters
+    sigmoid_z0 = z_switch - np.log(steepness * q_sw / dq_sw - 1) / steepness
+    sigmoid_a = q_sw * (1 + np.exp(-steepness * (z_switch - sigmoid_z0)))
+
+    # Sigmoid part
+    sigmoid_part = np.where(np.abs(z) > z_switch,
+                            sigmoid_a / (1 + np.exp(-steepness * (np.abs(z) - sigmoid_z0))),
+                            0)
+
+    # Combine both parts
+    efficiency_value = quadratic_part + sigmoid_part
+
+    # Clip the values to ensure they stay within [0, 1]
+    return np.clip(efficiency_value, 0, 1)

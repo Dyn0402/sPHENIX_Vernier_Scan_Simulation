@@ -4,25 +4,25 @@ void vernier_mc()
 {
   // 1st beam shift
   const float DX1 = 0.0; // mm
-  const float DY1 = 0.750; // mm
+  const float DY1 = 0.0; // mm
   const float DAX1 = 0.0e-3; // angle (rad)
-  const float DAY1 = 0.5e-3; // angle (rad)
+  const float DAY1 = 0.0e-3; // angle (rad)
   // Beam sizes
-  const float SX1 = 0.22; // mm
-  const float SY1 = 0.22; // mm
-  const float SZ1 = 1300; // mm, for beta*=1.0m
+  const float SX1 = 0.139; // mm
+  const float SY1 = 0.143; // mm
+  const float SZ1 = 1250; // mm, for beta*=1.0m
   //  const float SZ1 = 1150; // mm, for beta*=1.2m
   //  const float SZ1 = 1050; // mm, for beta*=1.5m
-  const float SX2 = 0.22; // mm
-  const float SY2 = 0.22; // mm
-  const float SZ2 = 1300; // mm
+  const float SX2 = 0.139; // mm
+  const float SY2 = 0.143; // mm
+  const float SZ2 = 1250; // mm
   // beta*
   //  const float BETA = 1000; // mm
-    const float BETA = 850; // mm
+    const float BETA = 700; // mm
   //  const float BETA = 3000; // mm
 //  const float BETA = 999999999; // mm
 
-  const float Zoff = 1000;      // mm, offset of the collision vertex
+  const float Zoff = 0;      // mm, offset of the collision vertex
 
   const float zBBC = 10440;    // mm, BBC position
   const float szBBC = 30;     // mm, BBC resolution
@@ -37,7 +37,7 @@ void vernier_mc()
   const float ZMAX = 4000; // mm
   const float XYMAX = 3;   // mm
   const int NstepZ = 4000; // N of steps when moving in time
-  const int NN = 1000; // N of points to calculate 3-dim integral (luminosity)
+  const int NN = 100000; // N of points to calculate 3-dim integral (luminosity)
 
   float x01, y01, z01;
   float x02, y02, z02;

@@ -279,6 +279,17 @@ class BunchCollider:
         return z_vals, z_dist
 
 
+    def get_x_density_dist(self):
+        x_vals = self.x
+        x_dist = np.sum(self.average_density_product_xyz, axis=(1, 2))
+        return x_vals, x_dist
+
+    def get_y_density_dist(self):
+        y_vals = self.y
+        y_dist = np.sum(self.average_density_product_xyz, axis=(0, 2))
+        return y_vals, y_dist
+
+
     def get_relativistic_moller_factor(self):
         """
         Calculate the relativistic Moller factor for the given bunches based on their relative velocities

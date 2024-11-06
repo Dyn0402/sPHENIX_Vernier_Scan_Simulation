@@ -40,8 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
@@ -233,11 +233,12 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
 
-    new_bw = 149
+    new_bw = 151
     new_beta_star = 85
-    new_mbd_res = 20.0
+    new_mbd_res = 2.0
     new_bkg = 0.4e-17
-    new_gaus_eff_width = 700  # cm
+    new_additional_length_scaling = 1.5
+    new_gaus_eff_width = None  # cm
     new_ho_offsets = None
     new_pe_offsets = None
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
@@ -313,6 +314,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     collider_sim.set_bkg(new_bkg)
     collider_sim.set_bunch_crossing(new_ho_blue_angle_x, new_ho_blue_angle_y, new_ho_yellow_angle_x, new_ho_yellow_angle_y)
     collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling * new_additional_length_scaling,
+                                              yellow_bunch_len_scaling * new_additional_length_scaling)
 
     if new_ho_offsets is not None:
         collider_sim.set_bunch_offsets(new_ho_offsets[0], new_ho_offsets[1])
@@ -354,6 +357,25 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     ax_ho.set_xlabel('z Vertex Position (cm)')
     ax_ho.legend(loc='upper right')
     fig_ho.tight_layout()
+
+    # # Plot x and y density distributions
+    # x_vals, x_dist = collider_sim.get_x_density_dist()
+    # fig_x_dist, ax_x_dist = plt.subplots()
+    # ax_x_dist.plot(x_vals, x_dist, label='x Density')
+    # ax_x_dist.set_title('x Density Distribution')
+    # ax_x_dist.set_xlabel('x Position (um)')
+    # ax_x_dist.axhline(0, color='black', linewidth=0.5)
+    # ax_x_dist.set_ylim(bottom=0)
+    # fig_x_dist.tight_layout()
+    #
+    # y_vals, y_dist = collider_sim.get_y_density_dist()
+    # fig_y_dist, ax_y_dist = plt.subplots()
+    # ax_y_dist.plot(y_vals, y_dist, label='y Density')
+    # ax_y_dist.set_title('y Density Distribution')
+    # ax_y_dist.set_xlabel('y Position (um)')
+    # ax_y_dist.axhline(0, color='black', linewidth=0.5)
+    # ax_y_dist.set_ylim(bottom=0)
+    # fig_y_dist.tight_layout()
 
     pe_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == peripheral_scan_step][0]
 

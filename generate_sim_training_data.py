@@ -19,9 +19,10 @@ from BunchCollider import BunchCollider
 
 
 def main():
-    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    training_set_name = 'simple_par_training_set_1'
+    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # training_set_name = 'simple_par_training_set_1'
+    training_set_name = 'essential_par_training_set_1'
     training_set_dir = os.path.join(base_path + 'training_data/', training_set_name)
     if not os.path.exists(training_set_dir):
         os.mkdir(training_set_dir)
@@ -29,6 +30,8 @@ def main():
     training_csv_path = os.path.join(training_set_dir, 'training_data.csv')
 
     n_sims_to_save = 100
+    threads = os.cpu_count()
+    # threads = os.cpu_count() - 4
 
     vernier_scan_date = 'Aug12'
 
@@ -48,6 +51,7 @@ def main():
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
     collider_sim.set_amplitude(amplitude)
     collider_sim.set_z_shift(shift)
+    collider_sim.parallel_threads = threads
 
     write_info_file(collider_sim, info_file_path)
 

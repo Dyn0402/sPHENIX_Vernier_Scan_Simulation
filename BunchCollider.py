@@ -9,7 +9,8 @@ Created as sphenix_polarimetry/BunchCollider.py
 """
 
 import numpy as np
-import h5py
+import os
+# import h5py
 from concurrent.futures import ProcessPoolExecutor as Pool
 from scipy.ndimage import gaussian_filter1d
 
@@ -63,6 +64,8 @@ class BunchCollider:
         self.x, self.y, self.z = None, None, None
         self.average_density_product_xyz = None
         self.z_dist = None
+
+        self.parallel_threads = os.cpu_count()
 
     def set_bunch_sigmas(self, sigma1, sigma2):
         self.bunch1.set_sigma(*sigma1)
@@ -238,7 +241,7 @@ class BunchCollider:
             print(self)
 
         self.average_density_product_xyz = 0
-        with Pool() as pool:
+        with Pool(max_workers=self.parallel_threads) as pool:
             density_products = pool.map(self.compute_time_step, range(self.n_points_t))
         self.average_density_product_xyz = np.mean([p for p in density_products], axis=0)
         self.z_dist = np.sum(self.average_density_product_xyz, axis=(0, 1))

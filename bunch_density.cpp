@@ -45,7 +45,7 @@ py::array_t<double> density(
     auto buf_z = z.unchecked<3>();
 
     // Create an array to store the result, using the same shape as the input arrays
-    std::vector<ssize_t> shape = { buf_x.shape(0), buf_x.shape(1), buf_x.shape(2) };
+    std::vector<py::ssize_t> shape = { buf_x.shape(0), buf_x.shape(1), buf_x.shape(2) };
     py::array_t<double> result(shape);
     auto buf_result = result.mutable_unchecked<3>();
 
@@ -56,9 +56,9 @@ py::array_t<double> density(
     double sin_angle_yz = std::sin(angle_y);
 
     // Iterate over the grid points
-    for (ssize_t i = 0; i < buf_x.shape(0); i++) {
-        for (ssize_t j = 0; j < buf_x.shape(1); j++) {
-            for (ssize_t k = 0; k < buf_x.shape(2); k++) {
+    for (py::ssize_t i = 0; i < buf_x.shape(0); i++) {
+        for (py::ssize_t j = 0; j < buf_x.shape(1); j++) {
+            for (py::ssize_t k = 0; k < buf_x.shape(2); k++) {
                 // Calculate the relative position vector
                 double x_rel = buf_x(i, j, k) - r_x;
                 double y_rel = buf_y(i, j, k) - r_y;

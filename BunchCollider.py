@@ -411,8 +411,10 @@ class BunchCollider:
                         f'Beam Lengths: {self.bunch1.get_beam_length() / 1e4:.1f}, {self.bunch2.get_beam_length() / 1e4:.1f} cm\n'
                         f'Crossing Angles y: {self.bunch1.angle_y * 1e3:.2f}, {self.bunch2.angle_y * 1e3:.2f} mrad\n'
                         f'Crossing Angles x: {self.bunch1.angle_x * 1e3:.2f}, {self.bunch2.angle_x * 1e3:.2f} mrad\n'
-                        f'Beam Offsets: {np.sqrt(np.sum(self.bunch1_r_original[:2] ** 2)):.0f}, '
-                        f'{np.sqrt(np.sum(self.bunch2_r_original[:2] ** 2)):.0f} um')
+                        f'Beam Offsets: {self.bunch1_r_original[0]:.0f}, '
+                        f'{self.bunch1_r_original[1]:.0f} um')
+                        # f'Beam Offsets: {np.sqrt(np.sum(self.bunch1_r_original[:2] ** 2)):.0f}, '
+                        # f'{np.sqrt(np.sum(self.bunch2_r_original[:2] ** 2)):.0f} um')
         return param_string
 
     def __str__(self):

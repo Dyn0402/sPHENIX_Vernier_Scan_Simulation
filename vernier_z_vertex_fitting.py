@@ -40,8 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
@@ -233,17 +233,17 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
 
-    new_bw = 151
+    new_bw = 150
     new_beta_star = 85
     new_mbd_res = 2.0
     new_bkg = 0.4e-17
-    new_additional_length_scaling = 1.5
+    new_additional_length_scaling = 1.0
     new_gaus_eff_width = None  # cm
-    new_ho_offsets = None
-    new_pe_offsets = None
+    new_ho_offsets = [[0.0, 150.0], [0.0, 0.0]]
+    new_pe_offsets = [[-900.0, 150.0], [0.0, 0.0]]
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
     new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
-    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.04e-3
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
     new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0, 0.0

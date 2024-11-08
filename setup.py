@@ -8,7 +8,7 @@ Created as sphenix_polarimetry/setup.py
 @author: Dylan Neff, Dylan
 """
 
-from setuptools import setup, Extension
+from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
 ext_modules = [

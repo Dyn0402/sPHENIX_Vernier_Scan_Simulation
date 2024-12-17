@@ -23,11 +23,10 @@ def main():
     # animate_bunch_density_propagation()
     # animate_bunch_collision()
     # simulate_vernier_scan()
-    hourglass_head_on_z_dist_comparison()
+    hourglass_z_dist_comparison()
     print('donzo')
 
-
-def hourglass_head_on_z_dist_comparison():
+def hourglass_z_dist_comparison():
     """
     Plot the z-vertex distribution for head-on collisions with and without the hourglass effect.
     """

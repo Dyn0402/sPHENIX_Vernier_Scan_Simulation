@@ -62,7 +62,8 @@ def visualize_two_beams():
     y_offset_blue = 500  # um, vertical offset
     y_offset_yellow = 0  # um, vertical offset
     theta_yellow = np.deg2rad(0)  # rotation angle in degrees
-    theta_blue = np.deg2rad(0)  # rotation angle in degrees
+    # theta_blue = np.deg2rad(0)  # rotation angle in degrees
+    theta_blue = np.deg2rad(45)  # rotation angle in degrees
 
     # Blue beam parameters
     y1_blue = sigma * f(z, beta_star, 0)  # um
@@ -116,6 +117,26 @@ def visualize_two_beams():
     ax_sim.set_ylabel('Naked Luminosity Density')
 
     fig.tight_layout()
+
+    fig_top, ax_top = plt.subplots(figsize=(7, 3), dpi=144)
+    # Plot blue beam
+    ax_top.plot(z, y1_blue_rot, color='blue', label='Blue Beam')
+    ax_top.plot(z, y2_blue_rot, color='blue')
+    ax_top.fill_between(z, y1_blue_rot, y2_blue_rot, color='blue', alpha=0.1)
+
+    # Plot yellow beam
+    ax_top.plot(z, y1_yellow_rot, color='orange', label='Yellow Beam')
+    ax_top.plot(z, y2_yellow_rot, color='orange')
+    ax_top.fill_between(z, y1_yellow_rot, y2_yellow_rot, color='orange', alpha=0.3)
+
+    ax_top.axhline(0, color='gray', linestyle='-', alpha=0.5)
+    ax_top.axvline(0, color='gray', linestyle='-', alpha=0.5)
+    # ax.set_xlabel('z (cm)')
+    ax_top.set_ylabel(f'y ({mu}m)')
+    ax_top.set_xlabel('z (cm)')
+    ax_top.legend()
+    fig_top.tight_layout()
+
     # fig.subplots_adjust(left=0.1, right=0.995, top=0.98, bottom=0.14)
 
     # Calculate and plot overlap region

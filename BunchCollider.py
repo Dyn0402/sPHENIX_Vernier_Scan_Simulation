@@ -274,8 +274,8 @@ class BunchCollider:
         # z_dist = self.amplitude * np.sum(self.average_density_product_xyz, axis=(0, 1))
         z_dist = self.amplitude * self.z_dist
         if self.gaus_z_efficiency_width is not None:
-            # z_dist = z_dist * gaus(z_vals, 1, 0, self.gaus_z_efficiency_width)
-            z_dist = z_dist * efficiency(z_vals, z_quad=self.gaus_z_efficiency_width, z_switch=200, steepness=-0.2)
+            z_dist = z_dist * gaus(z_vals, 1, 0, self.gaus_z_efficiency_width)
+            # z_dist = z_dist * efficiency(z_vals, z_quad=self.gaus_z_efficiency_width, z_switch=200, steepness=-0.2)
         if self.gaus_smearing_sigma is not None:
             z_spacing = z_vals[1] - z_vals[0]
             z_dist = gaussian_filter1d(z_dist, self.gaus_smearing_sigma / z_spacing)

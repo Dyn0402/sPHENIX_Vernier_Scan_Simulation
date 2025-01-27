@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from matplotlib.backends.backend_pdf import PdfPages
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
 from scipy.optimize import curve_fit as cf
 from scipy.interpolate import interp1d
 import pandas as pd
@@ -40,8 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
@@ -59,7 +59,8 @@ def main():
     # peripheral_metric_test(z_vertex_root_path)
     # peripheral_metric_sensitivity(base_path, z_vertex_root_path)
     # check_head_on_dependences(z_vertex_root_path)
-    plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    # plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
     # plot_all_z_vertex_hists(z_vertex_root_path)
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
@@ -236,17 +237,17 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     new_bw = 150
     new_beta_star = 85
     new_mbd_res = 2.0
-    new_bkg = 0.4e-17
+    new_bkg = 0.4e-17 * 0
     new_additional_length_scaling = 1.0
-    new_gaus_eff_width = None  # cm
+    new_gaus_eff_width = 200  # cm
     new_ho_offsets = [[0.0, 150.0], [0.0, 0.0]]
-    new_pe_offsets = [[-900.0, 150.0], [0.0, 0.0]]
+    new_pe_offsets = [[-900.0, 150.0 * 0], [0.0, 0.0]]
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
     new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
-    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.0233e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
-    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0, 0.0
+    new_pe_blue_angle_y, new_pe_yellow_angle_y = -0.1e-3, +0.1e-3
 
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
     ho_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == head_on_scan_step][0]
@@ -432,6 +433,344 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     ax_pe.set_xlabel('z Vertex Position (cm)')
     ax_pe.legend(loc='upper right')
     fig_pe.tight_layout()
+
+    plt.show()
+
+
+def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path):
+    cad_data = read_cad_measurement_file(cad_measurement_path)
+    cw_rates = get_cw_rates(cad_data)
+
+    orientation = 'Horizontal'
+    head_on_scan_step = 1
+    peripheral_scan_step = 12
+
+    ho_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == head_on_scan_step)].iloc[0]
+    pe_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == peripheral_scan_step)].iloc[0]
+
+    # Important parameters
+    bw_nom = 151
+    beta_star_nom = 85.
+    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level
+    bkg = 0.4e-17  # Background level
+    gaus_eff_width = None
+    ho_offsets = None
+    pe_offsets = None
+    ho_blue_angle_x, ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    ho_blue_angle_y, ho_yellow_angle_y = 0.0, 0.0
+    pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
+
+    new_bw = 150
+    new_beta_star = 85
+    new_mbd_res = 2.0
+    new_bkg = 0.4e-17
+    new_additional_length_scaling = 1.0
+    new_gaus_eff_width = 500  # cm
+    new_ho_offsets = [[0.0, 0.0], [0.0, 0.0]]
+    new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
+    new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
+    new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
+    # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
+    # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
+    new_pe_blue_angle_y, new_pe_yellow_angle_y = -0.4e-3, +0.4e-3
+
+    z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
+    ho_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == head_on_scan_step][0]
+
+    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
+    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+
+    collider_sim = BunchCollider()
+    collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_bunch_crossing(ho_blue_angle_x, ho_blue_angle_y, ho_yellow_angle_x, ho_yellow_angle_y)
+    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gaus_eff_width)
+    collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+
+    blue_bunch_len_scaling = ho_step_cad_data['blue_bunch_length']
+    yellow_bunch_len_scaling = ho_step_cad_data['yellow_bunch_length']
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
+    if ho_offsets is not None:
+        collider_sim.set_bunch_offsets(ho_offsets[0], ho_offsets[1])
+    else:
+        offset = ho_step_cad_data['offset_set_val'] * 1e3  # mm to um
+        if orientation == 'Horizontal':
+            collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+        elif orientation == 'Vertical':
+            collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+
+    collider_sim.run_sim_parallel()
+    zs_og, z_dist_og = collider_sim.get_z_density_dist()
+
+    scale = max(ho_hist_data['counts']) / max(z_dist_og)
+    z_max_sim_og = zs_og[np.argmax(z_dist_og)]
+    z_max_hist_og = ho_hist_data['centers'][np.argmax(ho_hist_data['counts'])]
+    print(f'z_max_sim: {z_max_sim_og}, z_max_hist: {z_max_hist_og}')
+    shift = z_max_sim_og - z_max_hist_og  # cm
+    shift *= 1e4  # microns
+    print(f'scale: {scale}, shift: {shift}')
+
+    res = minimize(amp_shift_residual, np.array([1.0, 0.0]),
+                   args=(collider_sim, scale, shift, ho_hist_data['counts'], ho_hist_data['centers']),
+                   bounds=((0.0, 2.0), (-10e4, 10e4)))
+    scale = res.x[0] * scale
+    shift = res.x[1] + shift
+
+    print(f'scale: {scale}, shift: {shift}')
+
+    collider_sim.set_amplitude(scale)
+    collider_sim.set_z_shift(shift)
+    ho_zs_og, ho_z_dist_og = collider_sim.get_z_density_dist()
+
+    # Calculate area under mbd distribution and simulation distribution
+    mbd_area = np.sum(ho_hist_data['counts'])
+    sim_interp = interp1d(ho_zs_og, ho_z_dist_og)
+    sim_area = np.sum(sim_interp(ho_hist_data['centers']))
+    print(f'MBD Area: {mbd_area}, Sim Area: {sim_area}')
+    print(f'Area Ratio: {mbd_area / sim_area}')
+
+    # Set and run new head on collider sim
+    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+    collider_sim.set_bkg(new_bkg)
+    collider_sim.set_bunch_crossing(new_ho_blue_angle_x, new_ho_blue_angle_y, new_ho_yellow_angle_x, new_ho_yellow_angle_y)
+    collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling * new_additional_length_scaling,
+                                              yellow_bunch_len_scaling * new_additional_length_scaling)
+
+    if new_ho_offsets is not None:
+        collider_sim.set_bunch_offsets(new_ho_offsets[0], new_ho_offsets[1])
+
+    collider_sim.set_amplitude(1.0)
+    collider_sim.set_z_shift(0.0)
+
+    collider_sim.run_sim_parallel()
+    zs_new, z_dist_new = collider_sim.get_z_density_dist()
+
+    scale = max(ho_hist_data['counts']) / max(z_dist_new)
+    z_max_sim_new = zs_new[np.argmax(z_dist_new)]
+    z_max_hist_new = ho_hist_data['centers'][np.argmax(ho_hist_data['counts'])]
+    print(f'z_max_sim: {z_max_sim_new}, z_max_hist: {z_max_hist_new}')
+    shift = z_max_sim_new - z_max_hist_new  # cm
+    shift *= 1e4  # microns
+    print(f'scale: {scale}, shift: {shift}')
+
+    res = minimize(amp_shift_residual, np.array([1.0, 0.0]),
+                     args=(collider_sim, scale, shift, ho_hist_data['counts'], ho_hist_data['centers']),
+                     bounds=((0.0, 2.0), (-10e4, 10e4)))
+    scale = res.x[0] * scale
+    shift = res.x[1] + shift
+
+    collider_sim.set_amplitude(scale)
+    collider_sim.set_z_shift(shift)
+    ho_zs_new, ho_z_dist_new = collider_sim.get_z_density_dist()
+
+    collider_params = collider_sim.get_param_string()
+
+    fig_ho, ax_ho = plt.subplots()
+    ax_ho.bar(ho_hist_data['centers'], ho_hist_data['counts'],
+                width=ho_hist_data['centers'][1] - ho_hist_data['centers'][0], label='MBD Vertex')
+    ax_ho.plot(ho_zs_og, ho_z_dist_og, color='gray', alpha=0.8, label='Simulation Guess')
+    ax_ho.plot(ho_zs_new, ho_z_dist_new, color='red', label='Simulation Fit')
+    ax_ho.annotate(collider_params, xy=(0.05, 0.95), xycoords='axes fraction', fontsize=8, va='top', ha='left',
+                   bbox=dict(facecolor='white', alpha=0.8))
+    ax_ho.set_title(f'Head On bw {bw_nom:.0f} {orientation} Scan Step {head_on_scan_step}')
+    ax_ho.set_xlabel('z Vertex Position (cm)')
+    ax_ho.legend(loc='upper right')
+    fig_ho.tight_layout()
+
+    # # Plot x and y density distributions
+    # x_vals, x_dist = collider_sim.get_x_density_dist()
+    # fig_x_dist, ax_x_dist = plt.subplots()
+    # ax_x_dist.plot(x_vals, x_dist, label='x Density')
+    # ax_x_dist.set_title('x Density Distribution')
+    # ax_x_dist.set_xlabel('x Position (um)')
+    # ax_x_dist.axhline(0, color='black', linewidth=0.5)
+    # ax_x_dist.set_ylim(bottom=0)
+    # fig_x_dist.tight_layout()
+    #
+    # y_vals, y_dist = collider_sim.get_y_density_dist()
+    # fig_y_dist, ax_y_dist = plt.subplots()
+    # ax_y_dist.plot(y_vals, y_dist, label='y Density')
+    # ax_y_dist.set_title('y Density Distribution')
+    # ax_y_dist.set_xlabel('y Position (um)')
+    # ax_y_dist.axhline(0, color='black', linewidth=0.5)
+    # ax_y_dist.set_ylim(bottom=0)
+    # fig_y_dist.tight_layout()
+
+    pe_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == peripheral_scan_step][0]
+
+    collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_sigmas(np.array([bw_nom, bw_nom]), np.array([bw_nom, bw_nom]))
+    collider_sim.set_bunch_crossing(pe_blue_angle_x, pe_blue_angle_y, pe_yellow_angle_x, pe_yellow_angle_y)
+    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gaus_eff_width)
+
+    blue_bunch_len_scaling = pe_step_cad_data['blue_bunch_length']
+    yellow_bunch_len_scaling = pe_step_cad_data['yellow_bunch_length']
+    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
+    if pe_offsets is not None:
+        collider_sim.set_bunch_offsets(pe_offsets[0], pe_offsets[1])
+    else:
+        offset = pe_step_cad_data['offset_set_val'] * 1e3
+        if orientation == 'Horizontal':
+            collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+        elif orientation == 'Vertical':
+            collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+
+    collider_sim.run_sim_parallel()
+    fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+    pe_zs_og, pe_z_dist_og = collider_sim.get_z_density_dist()
+
+    # Use minimizer
+    def objective_function_angle_y(angle_y, angle_yellow_x):
+        """Objective function for a fixed angle_yellow_x, minimizing over angle_y."""
+        # Set and run new peripheral collider sim
+        collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+        collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+        collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+        collider_sim.set_bkg(new_bkg)
+        collider_sim.set_bunch_crossing(new_pe_blue_angle_x, -angle_y, angle_yellow_x, angle_y)
+        collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+
+        if new_pe_offsets is not None:
+            collider_sim.set_bunch_offsets(new_pe_offsets[0], new_pe_offsets[1])
+
+        collider_sim.run_sim_parallel()
+        fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+        pe_zs_new, pe_z_dist_new = collider_sim.get_z_density_dist()
+        sim_interp_vals = interp1d(pe_zs_new, pe_z_dist_new)(pe_hist_data['centers'])
+        residual = np.sqrt(np.sum((pe_hist_data['counts'] - sim_interp_vals) ** 2)) / np.mean(pe_hist_data['counts'])
+        return residual
+
+    def objective_function_angle_yellow_x(angle_yellow_x):
+        """Objective function for angle_yellow_x, minimizing over angle_y."""
+        bounds_y = (0.0, 0.4e-3)
+        result_y = minimize_scalar(objective_function_angle_y, bounds=bounds_y, args=(angle_yellow_x,),
+                                   method='bounded')
+        print(f'Angle Yellow X: {angle_yellow_x}, Optimal Angle Y: {result_y.x}, Residual: {result_y.fun}')
+        return result_y.fun
+
+    def minimize_residual():
+        """Minimizes residual over angle_yellow_x and angle_y."""
+        bounds_yellow_x = (-2 * abs(new_pe_yellow_angle_x), 2 * abs(new_pe_yellow_angle_x))
+        result_x = minimize_scalar(objective_function_angle_yellow_x, bounds=bounds_yellow_x, method='bounded')
+
+        best_angle_yellow_x = result_x.x
+        min_residual = result_x.fun
+
+        # Perform a final minimization for angle_y with the optimized angle_yellow_x
+        bounds_y = (0.0, 0.4e-3)
+        result_y = minimize_scalar(objective_function_angle_y, bounds=bounds_y, args=(best_angle_yellow_x,),
+                                   method='bounded')
+        best_angle_y = result_y.x
+
+        print(f"Optimized Angle Yellow X: {best_angle_yellow_x}")
+        print(f"Optimized Angle Y: {best_angle_y}")
+        print(f"Minimum Residual: {min_residual}")
+
+        # Plot the final result
+        collider_sim.set_bunch_crossing(new_pe_blue_angle_x, -best_angle_y, best_angle_yellow_x, best_angle_y)
+        collider_sim.run_sim_parallel()
+        fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+        pe_zs_new, pe_z_dist_new = collider_sim.get_z_density_dist()
+
+        fig_pe, ax_pe = plt.subplots()
+        ax_pe.bar(pe_hist_data['centers'], pe_hist_data['counts'],
+                  width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
+        ax_pe.plot(pe_zs_new, pe_z_dist_new, label='Optimized Fit', color='red')
+        ax_pe.legend()
+        plt.show()
+
+    # Run the minimization
+    minimize_residual()
+
+    # Here
+    angles_yellow_x = np.linspace(-new_pe_yellow_angle_x, 2 * new_pe_yellow_angle_x, 10)
+    angles_y = [0.4e-3, 0.35e-3, 0.3e-3, 0.25e-3, 0.2e-3, 0.15e-3, 0.1e-3, 0.05e-3, 0.0]
+
+    fig_pe, ax_pe = plt.subplots()
+    ax_pe.bar(pe_hist_data['centers'], pe_hist_data['counts'],
+              width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
+    ax_pe.plot(pe_zs_og, pe_z_dist_og, color='gray', alpha=0.8, label='Simulation Guess')
+    fig_resids, ax_resids = plt.subplots()
+    min_angles, min_reid, min_zs, min_dist, min_interp_vals = None, None, None, None, None
+    for angle_yellow_x in angles_yellow_x:
+        new_resids = []
+        print(f'Angle Yellow X: {angle_yellow_x}')
+        for angle_y in angles_y:
+            # Set and run new peripheral collider sim
+            print(f'Angle: {angle_y}')
+            collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+            collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+            collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+            collider_sim.set_bkg(new_bkg)
+            collider_sim.set_bunch_crossing(new_pe_blue_angle_x, -angle_y, angle_yellow_x, angle_y)
+            collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+
+            if new_pe_offsets is not None:
+                collider_sim.set_bunch_offsets(new_pe_offsets[0], new_pe_offsets[1])
+
+            collider_sim.run_sim_parallel()
+            fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+            pe_zs_new, pe_z_dist_new = collider_sim.get_z_density_dist()
+            sim_interp_vals = interp1d(pe_zs_new, pe_z_dist_new)(pe_hist_data['centers'])
+            residual = np.sqrt(np.sum((pe_hist_data['counts'] - sim_interp_vals)**2)) / np.mean(pe_hist_data['counts'])
+            ax_pe.plot(pe_zs_new, pe_z_dist_new, label=f'{angle_y:.2e}: {residual:.2e}')
+            new_resids.append(residual)
+            if min_reid is None or residual < min_reid:
+                min_reid = residual
+                min_angles = [angle_yellow_x, angle_y]
+                min_zs, min_dist = pe_zs_new, pe_z_dist_new
+                min_interp_vals = sim_interp_vals
+        ax_resids.plot(angles_y, new_resids, label=f'{angle_yellow_x:.2e}')
+
+    ax_pe.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_pe.set_xlabel('z Vertex Position (cm)')
+    ax_pe.legend()
+    fig_pe.tight_layout()
+
+    ax_resids.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_resids.set_xlabel('Angle Y (rad)')
+    ax_resids.set_ylabel('Sum Residual')
+    ax_resids.legend()
+    fig_resids.tight_layout()
+
+    # Rerun with the min residuals angles and plot just this
+    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+    collider_sim.set_bkg(new_bkg)
+    collider_sim.set_bunch_crossing(new_pe_blue_angle_x, -min_angles[1], min_angles[0], min_angles[1])
+    collider_sim.set_gaus_z_efficiency_width(new_gaus_eff_width)
+
+    if new_pe_offsets is not None:
+        collider_sim.set_bunch_offsets(new_pe_offsets[0], new_pe_offsets[1])
+
+    collider_sim.run_sim_parallel()
+    fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+    pe_zs_new, pe_z_dist_new = collider_sim.get_z_density_dist()
+
+    fig_pe_min, ax_pe_min = plt.subplots()
+    ax_pe_min.bar(pe_hist_data['centers'], pe_hist_data['counts'],
+                    width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
+    ax_pe_min.plot(pe_zs_new, pe_z_dist_new, color='red', label='Simulation Fit')
+    ax_pe_min.plot(min_zs, min_dist, color='green', ls='--', label='Min Residual Fit')
+    ax_pe_min.plot(pe_hist_data['centers'], min_interp_vals, color='purple', ls=':', label='Min Residual Interp')
+    ax_pe_min.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_pe_min.set_xlabel('z Vertex Position (cm)')
+    ax_pe_min.legend()
+    fig_pe_min.tight_layout()
 
     plt.show()
 

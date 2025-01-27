@@ -63,9 +63,9 @@ int main() {
 
     // Detector geometry parameters
     const double z_detector = 250.0;  // Distance along the beamline (cm)
-    const double z_thickness = 3.0;  // Thickness of the detector (cm)
-    const double r_inner = 5.0;     // Inner radius of annulus (cm)
-    const double r_outer = 15.0;     // Outer radius of annulus (cm)
+    const double z_thickness = 3.0;   // Thickness of the detector (cm)
+    const double r_inner = 5.0;       // Inner radius of annulus (cm)
+    const double r_outer = 15.0;      // Outer radius of annulus (cm)
     const double energy_threshold = 0.1;  // Minimum energy to count (GeV)
 
     // Z-vertex shift parameters
@@ -80,7 +80,7 @@ int main() {
                                           z_shift_min, z_shift_max);
 
     // Generate events
-    const int nEvents = 1000000;  // Number of events
+    const int nEvents = 10000;  // Number of events
     for (int iEvent = 0; iEvent < nEvents; ++iEvent) {
         if (!pythia.next()) continue;
 

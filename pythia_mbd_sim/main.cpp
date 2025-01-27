@@ -8,6 +8,48 @@
 #include <iostream>
 using namespace Pythia8;
 
+// Function to check if a particle hits a detector
+bool check_hit(double px, double py, double pz, double x, double y, double z,
+               double z_detector, double z_thickness, double r_inner, double r_outer) {
+    // Compute the z bounds of the detector. Assume center of detector is at z_detector.
+    double z_min = z_detector - z_thickness / 2.0;
+    double z_max = z_detector + z_thickness / 2.0;
+
+    if (pz == 0) {  // Avoid division by zero, particle is perpendicular to beamline
+        if (z < z_min || z > z_max) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    // Check if particle can reach the detector
+    double scale_min = (z_min - z) / pz;  // Scale factor to reach z_min
+    double scale_max = (z_max - z) / pz;  // Scale factor to reach z_max
+
+    if (scale_min > scale_max) {
+        std::swap(scale_min, scale_max);
+    }
+
+    double x_min = x + px * scale_min;
+    double y_min = y + py * scale_min;
+    double r_min = std::sqrt(x_min * x_min + y_min * y_min);
+
+    double x_max = x + px * scale_max;
+    double y_max = y + py * scale_max;
+    double r_max = std::sqrt(x_max * x_max + y_max * y_max);
+
+    // If r_min and r_max are both inside or outside the detector, the particle misses. Otherwise, it hits.
+    // Assuming straight-line trajectories.
+    if (r_min < r_inner && r_max < r_inner) {
+        return false;
+    }
+    if (r_min > r_outer && r_max > r_outer) {
+        return false;
+    }
+    return true;
+}
+
 int main() {
     // Initialize Pythia
     Pythia pythia;
@@ -21,9 +63,10 @@ int main() {
 
     // Detector geometry parameters
     const double z_detector = 250.0;  // Distance along the beamline (cm)
-    const double r_inner = 48.8;     // Inner radius of annulus (cm)
-    const double r_outer = 51.2;     // Outer radius of annulus (cm)
-    const double energy_threshold = 1.0;  // Minimum energy to count (GeV)
+    const double z_thickness = 3.0;  // Thickness of the detector (cm)
+    const double r_inner = 5.0;     // Inner radius of annulus (cm)
+    const double r_outer = 15.0;     // Outer radius of annulus (cm)
+    const double energy_threshold = 0.1;  // Minimum energy to count (GeV)
 
     // Z-vertex shift parameters
     const double z_shift_min = -250.0;  // Minimum z-vertex shift (cm)
@@ -62,32 +105,14 @@ int main() {
                 double y = p.yProd();  // Production vertex y (cm)
                 double z = p.zProd() + z_shift;  // Shifted z-vertex (cm)
 
-                // Compute particle trajectory
-                double z_target_1 = z_detector - z;  // z displacement to detector 1
-                double z_target_2 = -z_detector - z; // z displacement to detector 2
+                if (energy < energy_threshold) continue;  // Skip low-energy particles
 
-                // Check if particle intersects detector 1 (z = +250 cm)
-                if (pz > 0) {
-                    double scale = z_target_1 / pz;  // Scale factor to reach z_target_1
-                    double x_at_detector = x + px * scale;
-                    double y_at_detector = y + py * scale;
-                    double r_at_detector = std::sqrt(x_at_detector * x_at_detector + y_at_detector * y_at_detector);
-
-                    if (r_at_detector >= r_inner && r_at_detector <= r_outer && energy > energy_threshold) {
-                        hit_detector_1 = true;
-                    }
+                // Check hits for both detectors
+                if (!hit_detector_1) {
+                    hit_detector_1 = check_hit(px, py, pz, x, y, z, z_detector, z_thickness, r_inner, r_outer);
                 }
-
-                // Check if particle intersects detector 2 (z = -250 cm)
-                if (pz < 0) {
-                    double scale = z_target_2 / pz;  // Scale factor to reach z_target_2
-                    double x_at_detector = x + px * scale;
-                    double y_at_detector = y + py * scale;
-                    double r_at_detector = std::sqrt(x_at_detector * x_at_detector + y_at_detector * y_at_detector);
-
-                    if (r_at_detector >= r_inner && r_at_detector <= r_outer && energy > energy_threshold) {
-                        hit_detector_2 = true;
-                    }
+                if (!hit_detector_2) {
+                    hit_detector_2 = check_hit(px, py, pz, x, y, z, -z_detector, z_thickness, r_inner, r_outer);
                 }
 
                 if (hit_detector_1 && hit_detector_2) {

@@ -55,7 +55,7 @@ int main() {
     Pythia pythia;
     pythia.readString("Beams:idA = 2212");  // Beam A: Proton (PDG ID = 2212)
     pythia.readString("Beams:idB = 2212");  // Beam B: Proton (PDG ID = 2212)
-    pythia.readString("Beams:eCM = 510.");  // Center-of-mass energy
+    pythia.readString("Beams:eCM = 200.4");  // Center-of-mass energy
     pythia.readString("HardQCD:all = on");  // Enable QCD processes
 
     // Initialize Pythia
@@ -69,8 +69,8 @@ int main() {
     const double energy_threshold = 0.1;  // Minimum energy to count (GeV)
 
     // Z-vertex shift parameters
-    const double z_shift_min = -250.0;  // Minimum z-vertex shift (cm)
-    const double z_shift_max = 250.0;   // Maximum z-vertex shift (cm)
+    const double z_shift_min = -310.5;  // Minimum z-vertex shift (cm)
+    const double z_shift_max = 310.5;   // Maximum z-vertex shift (cm)
     const double z_shift_step = 1.0;    // Step size for z-vertex shift (cm)
 
     // Create ROOT file and histogram
@@ -80,12 +80,12 @@ int main() {
                                           z_shift_min, z_shift_max);
 
     // Generate events
-    const int nEvents = 100000;  // Number of events
+    const int nEvents = 1000000;  // Number of events
     for (int iEvent = 0; iEvent < nEvents; ++iEvent) {
         if (!pythia.next()) continue;
 
         // Loop over z-vertex shifts
-        for (double z_shift = z_shift_min; z_shift <= z_shift_max; z_shift += z_shift_step) {
+        for (double z_shift = z_shift_min; z_shift < z_shift_max + z_shift_step; z_shift += z_shift_step) {
             bool hit_detector_1 = false;
             bool hit_detector_2 = false;
 
@@ -97,15 +97,15 @@ int main() {
                 if (!p.isFinal()) continue;
 
                 // Get particle properties
+                double energy = p.e();
+                if (energy < energy_threshold) continue;  // Skip low-energy particles
+
                 double px = p.px();
                 double py = p.py();
                 double pz = p.pz();
-                double energy = p.e();
                 double x = p.xProd();  // Production vertex x (cm)
                 double y = p.yProd();  // Production vertex y (cm)
                 double z = p.zProd() + z_shift;  // Shifted z-vertex (cm)
-
-                if (energy < energy_threshold) continue;  // Skip low-energy particles
 
                 // Check hits for both detectors
                 if (!hit_detector_1) {

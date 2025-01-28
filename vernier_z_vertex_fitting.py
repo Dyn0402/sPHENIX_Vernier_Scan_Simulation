@@ -40,7 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
@@ -237,14 +238,15 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     new_bw = 150
     new_beta_star = 85
     new_mbd_res = 2.0
-    new_bkg = 0.4e-17 * 0
+    # new_bkg = 0.4e-17
+    new_bkg = 0.4e-16
     new_additional_length_scaling = 1.0
     new_gaus_eff_width = 200  # cm
-    new_ho_offsets = [[0.0, 150.0], [0.0, 0.0]]
-    new_pe_offsets = [[-900.0, 150.0 * 0], [0.0, 0.0]]
+    new_ho_offsets = [[0.0, 0.0], [0.0, 0.0]]
+    new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
     new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
-    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.0233e-3
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.063e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
     new_pe_blue_angle_y, new_pe_yellow_angle_y = -0.1e-3, +0.1e-3
@@ -464,9 +466,9 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     new_bw = 150
     new_beta_star = 85
     new_mbd_res = 2.0
-    new_bkg = 0.4e-17
+    new_bkg = 0.4e-16
     new_additional_length_scaling = 1.0
-    new_gaus_eff_width = 500  # cm
+    new_gaus_eff_width = 200  # cm
     new_ho_offsets = [[0.0, 0.0], [0.0, 0.0]]
     new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
@@ -690,10 +692,56 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
                   width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
         ax_pe.plot(pe_zs_new, pe_z_dist_new, label='Optimized Fit', color='red')
         ax_pe.legend()
-        plt.show()
+        plt.show(block=False)
+        return best_angle_y, best_angle_yellow_x
 
     # Run the minimization
-    minimize_residual()
+    best_angle_y, best_angle_yellow_x = minimize_residual()
+
+    # Run for a range of gaussian widths. Plot sims and residuals
+    gaus_eff_widths = [300, 400, 500, 600, 700, 800, 900, 1000]
+
+    fig_pe, ax_pe = plt.subplots()
+    ax_pe.bar(pe_hist_data['centers'], pe_hist_data['counts'],
+              width=pe_hist_data['centers'][1] - pe_hist_data['centers'][0], label='MBD Vertex')
+    min_gaus_eff_width, min_reid = None, None
+    residuals = []
+    for gaus_eff_width in gaus_eff_widths:
+        # Set and run new peripheral collider sim
+        collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+        collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+        collider_sim.set_gaus_smearing_sigma(new_mbd_res)
+        collider_sim.set_bkg(new_bkg)
+        collider_sim.set_bunch_crossing(new_pe_blue_angle_x, -best_angle_y, best_angle_yellow_x, best_angle_y)
+        collider_sim.set_gaus_z_efficiency_width(gaus_eff_width)
+
+        if new_pe_offsets is not None:
+            collider_sim.set_bunch_offsets(new_pe_offsets[0], new_pe_offsets[1])
+
+        collider_sim.run_sim_parallel()
+        fit_shift(collider_sim, pe_hist_data['counts'], pe_hist_data['centers'])
+        pe_zs_new, pe_z_dist_new = collider_sim.get_z_density_dist()
+        sim_interp_vals = interp1d(pe_zs_new, pe_z_dist_new)(pe_hist_data['centers'])
+        residual = np.sqrt(np.sum((pe_hist_data['counts'] - sim_interp_vals)**2) / np.mean(pe_hist_data['counts']))
+        ax_pe.plot(pe_zs_new, pe_z_dist_new, label=f'{gaus_eff_width}: {residual:.2e}')
+        if min_reid is None or residual < min_reid:
+            min_reid = residual
+            min_gaus_eff_width = gaus_eff_width
+        residuals.append(residual)
+
+    ax_pe.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_pe.set_xlabel('z Vertex Position (cm)')
+    ax_pe.legend()
+    fig_pe.tight_layout()
+
+    fig_resids, ax_resids = plt.subplots()
+    ax_resids.plot(gaus_eff_widths, residuals)
+    ax_resids.set_title(f'Peripheral bw {bw_nom:.0f} {orientation} Scan Step {peripheral_scan_step}')
+    ax_resids.set_xlabel('Gaussian Efficiency Width (cm)')
+    ax_resids.set_ylabel('Sum Residual')
+    fig_resids.tight_layout()
+
+    plt.show(block=True)
 
     # Here
     angles_yellow_x = np.linspace(-new_pe_yellow_angle_x, 2 * new_pe_yellow_angle_x, 10)
@@ -801,8 +849,8 @@ def calc_vernier_scan_bw_residuals(z_vertex_root_path, cad_measurement_path, lon
 
     # Important parameters
     beta_star_nom = 85.
-    # mbd_resolution = 2.0  # cm MBD resolution
-    mbd_resolution = 20.0 # cm MBD resolution
+    mbd_resolution = 2.0  # cm MBD resolution
+    # mbd_resolution = 20.0 # cm MBD resolution
     bkg = 0.4e-17  # Background level
     # n_points_xy, n_points_z, n_points_t = 31, 51, 30
     n_points_xy, n_points_z, n_points_t = 61, 151, 61

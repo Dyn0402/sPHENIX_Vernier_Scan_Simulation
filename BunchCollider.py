@@ -269,6 +269,9 @@ class BunchCollider:
     def get_beam_sigmas(self):
         return self.bunch1.transverse_sigma, self.bunch2.transverse_sigma
 
+    def get_bunch_crossing_angles(self):
+        return self.bunch1.angle_x, self.bunch1.angle_y, self.bunch2.angle_x, self.bunch2.angle_y
+
     def get_z_density_dist(self):
         z_vals = (self.z - self.z_shift) / 1e4  # um to cm
         # z_dist = self.amplitude * np.sum(self.average_density_product_xyz, axis=(0, 1))

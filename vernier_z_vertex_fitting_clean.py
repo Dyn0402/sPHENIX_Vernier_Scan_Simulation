@@ -41,18 +41,18 @@ def main():
 
     # Run horizontal
     orientation = 'Horizontal'
-    # beam_widths = np.arange(156, 167.5, 0.5)
-    beam_widths = None
+    beam_widths = np.arange(156, 167.5, 0.5)
+    # beam_widths = None
     pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
     fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
                                           orientation, vernier_scan_date, beam_widths)
 
     # Run vertical
-    # orientation = 'Vertical'
-    # beam_widths = np.arange(156, 167.5, 0.5)
-    # pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
-    # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-    #                                       orientation, vernier_scan_date, beam_widths)
+    orientation = 'Vertical'
+    beam_widths = np.arange(156, 167.5, 0.5)
+    pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
+    fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+                                          orientation, vernier_scan_date, beam_widths)
 
     print('donzo')
 
@@ -274,21 +274,20 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_amp_shift_flag=Fa
 
     offset = step_cad_data['offset_set_val'] * 1e3  # mm to um
     if scan_orientation == 'Horizontal':
-        # collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
-        collider_sim.set_bunch_offsets(np.array([offset, offset * 0.1]), np.array([0., 0.]))
+        collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
+        # collider_sim.set_bunch_offsets(np.array([offset, offset * 0.1]), np.array([0., 0.]))
     elif scan_orientation == 'Vertical':
-        # collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
-        collider_sim.set_bunch_offsets(np.array([offset * 0.1, offset]), np.array([0., 0.]))
+        collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
+        # collider_sim.set_bunch_offsets(np.array([offset * 0.1, offset]), np.array([0., 0.]))
 
     blue_angle_x, yellow_angle_x = -step_cad_data['bh8_avg'] / 1e3, -step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     if scan_orientation == 'Horizontal':
-        blue_angle, yellow_angle = -step_cad_data['bh8_avg'] / 1e3, -step_cad_data['yh8_avg'] / 1e3  # mrad to rad
-        # collider_sim.set_bunch_crossing(blue_angle, 0, yellow_angle, 0)
-        collider_sim.set_bunch_crossing(blue_angle_x, -0.01e-3, yellow_angle_x, -0.01e-3)
+        collider_sim.set_bunch_crossing(blue_angle_x, 0, yellow_angle_x, 0)
+        # collider_sim.set_bunch_crossing(blue_angle_x, -0.01e-3, yellow_angle_x, -0.01e-3)
     elif scan_orientation == 'Vertical':
         collider_sim.set_bunch_crossing(blue_angle_x, 0.0, yellow_angle_x, 0.0)
 
-    print(f'Offset: {offset}, Blue Angle: {blue_angle * 1e3:.3f} mrad, Yellow Angle: {yellow_angle * 1e3:.3f} mrad')
+    print(f'Offset: {offset}, Blue Angle X: {blue_angle_x * 1e3:.3f} mrad, Yellow Angle X: {yellow_angle_x * 1e3:.3f} mrad')
 
     if fit_amp_shift_flag:
         collider_sim.set_amplitude(1.0)
@@ -300,8 +299,8 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_amp_shift_flag=Fa
         fit_amp_shift(collider_sim, hist_data['counts'], hist_data['centers'])
 
     if fit_crossing_angles:  # Fit crossing angles in nested minimization.
-        # fit_crossing_angles_func(collider_sim, hist_data, scan_orientation)
-        fit_crossing_angle_single(collider_sim, hist_data, scan_orientation)
+        fit_crossing_angles_func(collider_sim, hist_data, scan_orientation)
+        # fit_crossing_angle_single(collider_sim, hist_data, scan_orientation)
 
     collider_sim.run_sim_parallel()  # Run simulation with optimized angles
     fit_shift(collider_sim, hist_data['counts'], hist_data['centers'])
@@ -475,7 +474,7 @@ def plot_mbd_and_sim_dist(collider_sim, hist_data, title=None, out_dir=None):
     fig.tight_layout()
 
     if out_dir is not None:
-        out_path = f'{out_dir}{title.replace(" ", "_").replace(":", "")}'
+        out_path = f'{out_dir}{title.replace(" ", "_").replace(":", "").replace(",", "").replace("__", "_")}'
         plt.savefig(f'{out_path}.pdf', format='pdf')
         plt.savefig(f'{out_path}.png', format='png')
         plt.close()

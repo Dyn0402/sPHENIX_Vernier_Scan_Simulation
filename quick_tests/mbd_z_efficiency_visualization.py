@@ -14,8 +14,8 @@ from scipy.constants import alpha
 
 
 def main():
-    # gaussian_model()
-    quadratic_exponential_model()
+    gaussian_model()
+    # quadratic_exponential_model()
     print('donzo')
 
 

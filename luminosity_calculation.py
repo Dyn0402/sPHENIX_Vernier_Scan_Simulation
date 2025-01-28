@@ -20,7 +20,8 @@ def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
     # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    base_path = '/home/dylan/Desktop/vernier_scan/'
+    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
     # head_on_luminosity(longitudinal_fit_path)
@@ -28,7 +29,8 @@ def main():
     # head_on_luminosity_plot()
     # angle_luminosity_plot()
     # moller_factor_test()
-    cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
+    # cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path)
+    estimate_final_luminosity(longitudinal_fit_path)
     print('donzo')
 
 
@@ -346,6 +348,87 @@ def cad_parameters_luminosity(cad_measurement_path, longitudinal_fit_path):
     ax.plot(zs, z_dist)
     ax.set_xlabel('z (cm)')
     ax.set_ylabel('Naked Luminosity z Density')
+    fig.tight_layout()
+
+    plt.show()
+
+
+def estimate_final_luminosity(longitudinal_fit_path):
+    """
+    Use extracted beam parameters along with their estimated uncertainties to estimate the final luminosity.
+    Repeatedly sample beam parameters according to their uncertainties and calculate the luminosity for each sample.
+    Generate a distribution of luminosities and calculate the mean and standard deviation.
+    :param longitudinal_fit_path:
+    :return:
+    """
+    samples = 100
+
+    # Important parameters
+    bw_x_nom, bw_y_nom, bw_err = 151.5, 149.0, 5.0  # um Width of bunch
+    beta_star_nom, beta_star_err = 85.0, 5.0  # cm
+    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level
+    blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 0.0  # um
+    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.0e-3
+
+    collider_sim = BunchCollider()
+    collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
+    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_sigmas(np.array([bw_x_nom, bw_y_nom]), np.array([bw_x_nom, bw_y_nom]))
+    collider_sim.set_bunch_crossing(blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle)
+    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
+    blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
+    yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
+    collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+
+    collider_sim.run_sim_parallel()
+    default_luminosity = collider_sim.get_naked_luminosity()
+    print(f'Luminosity: {default_luminosity:.2e}')
+    # print(f'Luminosity: {luminosity * 1e12:.2e}')
+
+    # analytic_lumi = analytical_luminosity(bw_nom)
+    # analytic_lumi = 2.25534e-6
+    analytic_lumi = 2.24789e-6
+    print(f'Analytical luminosity: {analytic_lumi:.2e}')
+
+    percent_differs = 100 * (default_luminosity - analytic_lumi) / analytic_lumi
+    print(f'Percent difference: {percent_differs:.2f}%')
+
+    # Sample beam parameters
+    luminosities = []
+    for i in range(samples):
+        bw_x_i = np.random.normal(bw_x_nom, bw_err)
+        bw_y_i = np.random.normal(bw_y_nom, bw_err)
+        beta_star_i = np.random.normal(beta_star_nom, beta_star_err)
+        blue_x_offset_i = np.random.normal(blue_x_offset, offset_err)
+        blue_y_offset_i = np.random.normal(blue_y_offset, offset_err)
+        blue_x_angle_i = np.random.normal(blue_x_angle, angle_err)
+        blue_y_angle_i = np.random.normal(blue_y_angle, angle_err)
+        yellow_x_angle_i = np.random.normal(yellow_x_angle, angle_err)
+        yellow_y_angle_i = np.random.normal(yellow_y_angle, angle_err)
+
+        collider_sim.set_bunch_rs(np.array([blue_x_offset_i, blue_y_offset_i, -6.e6]), np.array([0., 0., +6.e6]))
+        collider_sim.set_bunch_beta_stars(beta_star_i, beta_star_i)
+        collider_sim.set_bunch_sigmas(np.array([bw_x_i, bw_y_i]), np.array([bw_x_i, bw_y_i]))
+        collider_sim.set_bunch_crossing(blue_x_angle_i, blue_y_angle_i, yellow_x_angle_i, yellow_y_angle_i)
+
+        collider_sim.run_sim_parallel()
+        luminosity = collider_sim.get_naked_luminosity()
+        print(f'Sample {i + 1}/{samples} luminosity: {luminosity:.2e}')
+        print(bw_x_i, bw_y_i, beta_star_i, blue_x_offset_i, blue_y_offset_i, blue_x_angle_i, blue_y_angle_i, yellow_x_angle_i, yellow_y_angle_i)
+        luminosities.append(luminosity)
+
+    mean_luminosity = np.mean(luminosities)
+    std_luminosity = np.std(luminosities)
+    print(f'Mean luminosity: {mean_luminosity:.2e}')
+    print(f'Standard deviation of luminosity: {std_luminosity:.2e}')
+
+    fig, ax = plt.subplots()
+    ax.hist(luminosities, bins=20)
+    ax.axvline(mean_luminosity, color='r', linestyle='--', label=f'Mean: {mean_luminosity:.2e}')
+    ax.axvline(default_luminosity, color='b', linestyle='--', label=f'Default: {default_luminosity:.2e}')
+    ax.set_xlabel('Luminosity')
+    ax.set_ylabel('Counts')
+    ax.legend()
     fig.tight_layout()
 
     plt.show()

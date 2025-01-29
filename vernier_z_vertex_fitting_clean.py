@@ -40,16 +40,16 @@ def main():
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
 
     # Run horizontal
-    orientation = 'Horizontal'
-    beam_widths = np.arange(156, 167.5, 0.5)
-    # beam_widths = None
-    pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
-    fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-                                          orientation, vernier_scan_date, beam_widths)
+    # orientation = 'Horizontal'
+    # beam_widths = np.arange(156, 167.5, 0.5)
+    # # beam_widths = None
+    # pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
+    # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+    #                                       orientation, vernier_scan_date, beam_widths)
 
     # Run vertical
     orientation = 'Vertical'
-    beam_widths = np.arange(156, 167.5, 0.5)
+    beam_widths = np.arange(145, 156, 0.5)
     pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
     fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
                                           orientation, vernier_scan_date, beam_widths)
@@ -76,7 +76,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     # Important parameters
     beta_star_nom = 85.
     mbd_resolution = 2.0  # cm MBD resolution
-    gauss_eff_width = None  # cm Gaussian efficiency width
+    gauss_eff_width = 500  # cm Gaussian efficiency width
     # bkg = 0.4e-16  # Background level
     bkg = 0.0  # Background level
     n_points_xy, n_points_z, n_points_t = 61, 151, 61

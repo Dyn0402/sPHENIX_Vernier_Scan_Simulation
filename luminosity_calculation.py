@@ -19,8 +19,8 @@ from vernier_z_vertex_fitting import read_cad_measurement_file
 def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = '/home/dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
@@ -361,12 +361,12 @@ def estimate_final_luminosity(longitudinal_fit_path):
     :param longitudinal_fit_path:
     :return:
     """
-    samples = 100
+    samples = 1000
 
     # Important parameters
-    bw_x_nom, bw_y_nom, bw_err = 151.5, 149.0, 5.0  # um Width of bunch
-    beta_star_nom, beta_star_err = 85.0, 5.0  # cm
-    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level
+    bw_x_nom, bw_y_nom, bw_err = 162.0, 155.0, 2.0  # um Width of bunch
+    beta_star_nom, beta_star_err = 85.0, 2.0  # cm
+    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level -- Doesn't matter for lumi calc!
     blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 0.0  # um
     blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.0e-3
 

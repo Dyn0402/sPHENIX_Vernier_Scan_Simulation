@@ -11,54 +11,75 @@ Created as sPHENIX_Vernier_Scan_Simulation/vernier_z_vertex_fitting_clean.py
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter
-# from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import minimize, minimize_scalar
 from scipy.optimize import curve_fit as cf
 from scipy.interpolate import interp1d
 import pandas as pd
 from datetime import datetime, timedelta
 
-import uproot
-import awkward as ak
-import vector
-
 from vernier_z_vertex_fitting import read_cad_measurement_file, get_cw_rates, get_mbd_z_dists
 from BunchCollider import BunchCollider
 from Measure import Measure
 
+
 def main():
-    vernier_scan_date = 'Aug12'
-    # vernier_scan_date = 'Jul11'
-
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = '/home/dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
-    dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
-    z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
-    cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
-    longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
 
-    # Run horizontal
+    bw_fitting_path = f'{base_path}Analysis/bw_fitting/'
+    create_dir(bw_fitting_path)
+
+    default_bws = {'Horizontal': 162, 'Vertical': 151}
+    orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
+    # orientations_beam_widths = {'Horizontal': np.array([162])}
+
+    vernier_scan_dates = ['Aug12', 'Jul11']
+    # vernier_scan_dates = ['Aug12']
+    for vernier_scan_date in vernier_scan_dates:
+        dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
+        z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
+        cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
+        longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
+
+        vernier_date_path = f'{bw_fitting_path}{vernier_scan_date}/'
+        create_dir(vernier_date_path)
+
+        for orientation, beam_widths in orientations_beam_widths.items():
+            pdf_out_path = f'{vernier_date_path}{orientation.lower()}/'
+            create_dir(pdf_out_path)
+            fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
+                                                  pdf_out_path, orientation, vernier_scan_date, beam_widths, default_bws)
+
+        # # Run horizontal
+        # orientation = 'Horizontal'
+        # # beam_widths = np.arange(156, 167.5, 0.5)
+        # beam_widths = np.array([162])
+        # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
+        # create_dir(pdf_out_path)
+        # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+        #                                       orientation, vernier_scan_date, beam_widths, default_bws)
+        #
+        # # Run vertical
+        # orientation = 'Vertical'
+        # # beam_widths = np.arange(145, 156, 0.5)
+        # beam_widths = np.array([156])
+        # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
+        # create_dir(pdf_out_path)
+        # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+        #                                       orientation, vernier_scan_date, beam_widths, default_bws)
+
+    # Fit residual sum vs beam width to estimate minimum. Then run the minimum and make combined plot of distributions.
     # orientation = 'Horizontal'
-    # beam_widths = np.arange(156, 167.5, 0.5)
-    # # beam_widths = None
-    # pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
-    # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-    #                                       orientation, vernier_scan_date, beam_widths)
-
-    # Run vertical
-    orientation = 'Vertical'
-    beam_widths = np.arange(145, 156, 0.5)
-    pdf_out_path = f'{base_path}/Analysis/{orientation.lower()}/'
-    fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-                                          orientation, vernier_scan_date, beam_widths)
+    # pdf_out_path = f'{base_path}Analysis/new_bw_opt/{orientation.lower()}/'
+    # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path, orientation,
+    #                    vernier_scan_date)
 
     print('donzo')
 
 
 def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, out_path,
-                                          orientation, scan_date, beam_widths=None):
+                                          orientation, scan_date, beam_widths=None, default_bws=None):
     """
     For a list of bunch widths, fits the crossing angle to the z-vertex distributions for each bunch width.
     :param z_vertex_root_path: Path to root file with z-vertex distributions.
@@ -68,6 +89,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     :param orientation: 'Horizontal' or 'Vertical'.
     :param scan_date: Date of the scan.
     :param beam_widths: List of beam widths to fit.
+    :param default_bws: Default beam widths to use for the opposite orientation of the scan.
     """
 
     if beam_widths is None:
@@ -104,7 +126,13 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     for bw in beam_widths:
         title_bw = f'{title_base} Beam Width {bw} µm'
         bw_out_path = create_dir(f'{out_path}{bw}/')
-        collider_sim.set_bunch_sigmas(np.array([bw, bw]), np.array([bw, bw]))  # Set beam width for this iteration
+        bw_xy = [bw, bw]
+        if default_bws is not None:
+            if orientation == 'Horizontal':
+                bw_xy = [bw, default_bws['Vertical']]
+            elif orientation == 'Vertical':
+                bw_xy = [default_bws['Horizontal'], bw]
+        collider_sim.set_bunch_sigmas(np.array(bw_xy), np.array(bw_xy))  # Set beam width for this iteration
 
         # Fit the first step, which is head on
         first_step_hist = z_vertex_hists_orient[0]
@@ -112,19 +140,60 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
         title = f'{title_bw}, Step {first_step_hist["scan_step"]} Original'
         plot_mbd_and_sim_dist(collider_sim, first_step_hist, title=title, out_dir=bw_out_path)
 
-        bw_plot_dict = {'steps': [], 'angles': [[], [], [], []], 'residuals': []}
+        bw_plot_dict = {'steps': [], 'angles': [[], [], [], []], 'residuals': [], 'dist_plot_data': []}
         for hist_data in z_vertex_hists_orient:
+            if hist_data["scan_step"] != 12:
+                continue
             print(f'\nStarting Beam Width {bw} µm, Step {hist_data["scan_step"]}')
             fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_crossing_angles=True)
             title = f'{title_bw}, Step: {hist_data["scan_step"]}'
-            plot_mbd_and_sim_dist(collider_sim, hist_data, title=title, out_dir=bw_out_path)
+            plot_data_dict = plot_mbd_and_sim_dist(collider_sim, hist_data, title=title, out_dir=bw_out_path)
+            bw_plot_dict['dist_plot_data'].append(plot_data_dict)
             n_fits = print_status(bw, hist_data["scan_step"], start_time, n_fits, total_fits)
             update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim)  # Update dict for plotting
         plot_bw_dict(bw_plot_dict, title_bw, out_dir=bw_out_path)
         update_plot_dict(plot_dict, bw_plot_dict)  # Update dict for plotting
     plot_plot_dict(plot_dict, f'{title_base} Residuals', out_dir=out_path)
 
-    # plt.show()
+    plt.show()
+
+
+def get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, out_path, orientation, scan_date):
+    """
+    Get the residuals from file and fit to a polynomial to find the minimum. Then run the simulation with the minimum
+    beam width and plot the distributions.
+    """
+    resid_vs_bw_csv_path = f'{out_path}{scan_date}_{orientation}_Scan_Residuals_residual_means.csv'
+    resid_vs_bw_df = pd.read_csv(resid_vs_bw_csv_path)
+
+    # Plot
+    bws = np.array(resid_vs_bw_df['Beam Width'])
+    resids = np.array(resid_vs_bw_df['Mean Residual'])
+
+    min_res_bw, min_res = bws[resids.argmin()], resids.min()
+
+    print(f'Minimum Residual: {min_res_bw} µm at {min_res} µm')
+
+    fit_filter = abs(bws - min_res_bw) < 2.5
+    print(f'Fitting to {bws[fit_filter]} µm')
+    bws_fit, resids_fit = bws[fit_filter], resids[fit_filter]
+
+    popt, pcov = cf(poly2, bws_fit, resids_fit, p0=[1, 1, 1])
+    bws_plot = np.linspace(bws_fit.min(), bws_fit.max(), 500)
+
+    fig, ax = plt.subplots()
+    ax.plot(bws, resids, marker='o', ls='none')
+    ax.plot(bws_plot, poly2(bws_plot, *popt), color='red')
+    ax.set_xlabel('Beam Width [µm]')
+    ax.set_ylabel('Mean of Residuals for All Steps')
+    ax.set_title(f'{scan_date} {orientation} Scan Residuals vs Beam Width')
+    fig.tight_layout()
+
+    plt.show()
+
+
+def poly2(x, a, b, c):
+    return a * x ** 2 + b * x + c
 
 
 def update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim):
@@ -176,6 +245,36 @@ def plot_bw_dict(bw_plot_dict, title, out_dir=None):
     ax_res.set_ylim(bottom=0)
     fig_res.tight_layout()
 
+    # Combined dist plot
+    fig_dists, axs = plt.subplots(nrows=3, ncols=4, figsize=(22, 10), sharex='all')
+    axs = axs.flatten()
+    fig_dists.subplots_adjust(hspace=0.0, wspace=0.0, top=0.995, bottom=0.045, left=0.01, right=0.995)
+
+    for i, (ax, data_i) in enumerate(zip(axs, bw_plot_dict['dist_plot_data'])):
+        # data_i = bw_plot_dict['dist_plot_data'][i]
+        step = bw_plot_dict['steps'][i]
+        if i >= 8:
+            ax.set_xlabel('Z Vertex (cm)')
+        if i % 4 == 0:
+            ax.set_ylabel('Counts (scaled)')
+        ax.annotate(f'Step {step}', xy=(0.05, 0.75), xycoords='axes fraction', fontsize=15, va='top', ha='left')
+        max_y = int(max(max(data_i['mbd_dist']), max(data_i['sim_dist'])))
+        ax.axhline(max_y, color='black', alpha=0.3, zorder=0, linestyle='-')
+        ax.annotate(f'{max_y}', xy=(250, max_y * 0.995), xycoords='data', fontsize=10, alpha=0.5,
+                    va='top', ha='right')
+        ax.set_yticks([])  # Removes both the tick labels and the ticks
+        width = data_i['mbd_zs'][1] - data_i['mbd_zs'][0]
+        ax.bar(data_i['mbd_zs'], data_i['mbd_dist'], width=width, label='MBD')
+        ax.plot(data_i['sim_zs'], data_i['sim_dist'], label='Simulation', color='red')
+        collider_params = data_i['collider_params']
+
+        if i > 0:  # Remove first two lines of collider_params string
+            collider_params = '\n'.join(collider_params.split('\n')[2:])
+        ax.annotate(collider_params, xy=(0.02, 0.98), xycoords='axes fraction', fontsize=8, va='top', ha='left',
+                    bbox=dict(facecolor='white', alpha=0.1))
+    axs[0].legend()
+
+
     if out_dir is not None:
         out_path = f'{out_dir}{title.replace(" ","_").replace(":","").replace(",","").replace("__","_")}'
         fig_angles_horiz.savefig(f'{out_path}_horizontal_angles.pdf', format='pdf')
@@ -184,9 +283,12 @@ def plot_bw_dict(bw_plot_dict, title, out_dir=None):
         fig_angles_vert.savefig(f'{out_path}_vertical_angles.png', format='png')
         fig_res.savefig(f'{out_path}_residuals.pdf', format='pdf')
         fig_res.savefig(f'{out_path}_residuals.png', format='png')
+        fig_dists.savefig(f'{out_path}_dists.pdf', format='pdf')
+        fig_dists.savefig(f'{out_path}_dists.png', format='png')
         plt.close(fig_angles_horiz)
         plt.close(fig_angles_vert)
         plt.close(fig_res)
+        plt.close(fig_dists)
 
 
 def update_plot_dict(plot_dict, bw_plot_dict):
@@ -275,17 +377,14 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_amp_shift_flag=Fa
     offset = step_cad_data['offset_set_val'] * 1e3  # mm to um
     if scan_orientation == 'Horizontal':
         collider_sim.set_bunch_offsets(np.array([offset, 0.]), np.array([0., 0.]))
-        # collider_sim.set_bunch_offsets(np.array([offset, offset * 0.1]), np.array([0., 0.]))
     elif scan_orientation == 'Vertical':
         collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
-        # collider_sim.set_bunch_offsets(np.array([offset * 0.1, offset]), np.array([0., 0.]))
 
     blue_angle_x, yellow_angle_x = -step_cad_data['bh8_avg'] / 1e3, -step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     if scan_orientation == 'Horizontal':
-        collider_sim.set_bunch_crossing(blue_angle_x, 0, yellow_angle_x, 0)
-        # collider_sim.set_bunch_crossing(blue_angle_x, -0.01e-3, yellow_angle_x, -0.01e-3)
+        collider_sim.set_bunch_crossing(blue_angle_x, 0., yellow_angle_x, 0.1e-3)
     elif scan_orientation == 'Vertical':
-        collider_sim.set_bunch_crossing(blue_angle_x, 0.0, yellow_angle_x, 0.0)
+        collider_sim.set_bunch_crossing(blue_angle_x, 0., yellow_angle_x, 0.)
 
     print(f'Offset: {offset}, Blue Angle X: {blue_angle_x * 1e3:.3f} mrad, Yellow Angle X: {yellow_angle_x * 1e3:.3f} mrad')
 
@@ -300,6 +399,7 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_amp_shift_flag=Fa
 
     if fit_crossing_angles:  # Fit crossing angles in nested minimization.
         fit_crossing_angles_func(collider_sim, hist_data, scan_orientation)
+        # fit_crossing_angles_2var(collider_sim, hist_data, scan_orientation)  # Do 2 var min after --> didn't change
         # fit_crossing_angle_single(collider_sim, hist_data, scan_orientation)
 
     collider_sim.run_sim_parallel()  # Run simulation with optimized angles
@@ -315,7 +415,7 @@ def fit_crossing_angles_func(collider_sim, hist_data, scan_orientation):
     :param hist_data: Dictionary of histogram data.
     :param scan_orientation: 'Horizontal' or 'Vertical'.
     """
-    xing_bounds = (-0.5e-3, 0.5e-3)
+    xing_bounds = (-1.0e-3, 1.0e-3)
     res = minimize_scalar(fit_perp_crossing_angle, args=(collider_sim, hist_data, scan_orientation, xing_bounds),
                           bounds=xing_bounds, method='bounded')
 
@@ -329,11 +429,11 @@ def fit_crossing_angles_func(collider_sim, hist_data, scan_orientation):
                           args=(collider_sim, hist_data, scan_orientation),
                           bounds=xing_bounds, method='bounded')
 
-    best_perp_angle = res.x
+    best_perp_yellow_angle = res.x
     min_residual2 = res.fun
-    get_res_perp_xing(best_perp_angle, collider_sim, hist_data, scan_orientation)  # Final time to set
+    get_res_perp_xing(best_perp_yellow_angle, collider_sim, hist_data, scan_orientation)  # Final time to set
 
-    print(f'Best Parallel Yellow Angle: {best_parallel_yellow_angle * 1e3:.3f} mrad, Best Perpendicular Angle: {best_perp_angle * 1e3:.3f} mrad')
+    print(f'Best Parallel Yellow Angle: {best_parallel_yellow_angle * 1e3:.3f} mrad, Best Perpendicular Yellow Angle: {best_perp_yellow_angle * 1e3:.3f} mrad')
     print(f'Min Residual: {min_residual:.3f} ({min_residual2:.3f})')  # Double check to make sure minimum is stable
 
 
@@ -357,6 +457,26 @@ def fit_crossing_angle_single(collider_sim, hist_data, scan_orientation):
     print(f'Min Residual: {min_residual:.3f}')  # Double check to make sure minimum is stable
 
 
+def fit_crossing_angles_2var(collider_sim, hist_data, scan_orientation):
+    """
+    Fit both together.
+    :param collider_sim: BunchCollider object to fit.
+    :param hist_data: Dictionary of histogram data.
+    :param scan_orientation: 'Horizontal' or 'Vertical'.
+    """
+    x0 = get_yellow_xing_angles(collider_sim, scan_orientation)
+    res = minimize(get_res_perp_parallel_xings, args=(collider_sim, hist_data, scan_orientation),
+                     x0=x0, method='Powell')
+
+    best_parallel_yellow_angle, best_perp_yellow_angle = res.x
+    min_residual = res.fun
+
+    min_res2 = get_res_perp_parallel_xings(res.x, collider_sim, hist_data, scan_orientation)  # Final time to set
+
+    print(f'Best Parallel Yellow Angle: {best_parallel_yellow_angle * 1e3:.3f} mrad, Best Perpendicular Yellow Angle: {best_perp_yellow_angle * 1e3:.3f} mrad')
+    print(f'Min Residual: {min_residual:.3f} ({min_res2:.3f})')  # Double check to make sure minimum is stable
+
+
 def fit_perp_crossing_angle(crossing_angle_parallel, collider_sim, hist_data, scan_orientation, xing_bounds):
     """
     Pass
@@ -375,10 +495,10 @@ def get_res_perp_xing(crossing_angle_perp, collider_sim, hist_data, scan_orienta
     """
     Pass
     """
-    set_xing_angles(collider_sim, scan_orientation, perp=crossing_angle_perp)
+    set_xing_angles(collider_sim, scan_orientation, perp_yellow=crossing_angle_perp)
 
     collider_sim.run_sim_parallel()
-    fit_shift(collider_sim, hist_data['counts'], hist_data['centers'])  # ?
+    fit_shift(collider_sim, hist_data['counts'], hist_data['centers'])
     return get_residual(collider_sim, hist_data)
 
 
@@ -389,26 +509,48 @@ def get_res_parallel_xing(crossing_angle_parallel, collider_sim, hist_data, scan
     set_xing_angles(collider_sim, scan_orientation, parallel_yellow=crossing_angle_parallel)
 
     collider_sim.run_sim_parallel()
-    fit_shift(collider_sim, hist_data['counts'], hist_data['centers'])  # ?
+    fit_shift(collider_sim, hist_data['counts'], hist_data['centers'])
     return get_residual(collider_sim, hist_data)
 
 
-def set_xing_angles(collider_sim, scan_orientation, parallel_yellow=None, perp=None):
+def get_res_perp_parallel_xings(crossing_angles, collider_sim, hist_data, scan_orientation):
+    """
+    Pass
+    """
+    set_xing_angles(collider_sim, scan_orientation, parallel_yellow=crossing_angles[0], perp_yellow=crossing_angles[1])
+
+    collider_sim.run_sim_parallel()
+    fit_shift(collider_sim, hist_data['counts'], hist_data['centers'])
+    return get_residual(collider_sim, hist_data)
+
+
+def set_xing_angles(collider_sim, scan_orientation, parallel_yellow=None, perp_yellow=None):
     """
     Set crossing angles of collider_sim
     """
     xings = list(collider_sim.get_bunch_crossing_angles())
     if scan_orientation == 'Horizontal':
-        if perp is not None:
-            xings[1], xings[3] = -perp, perp
+        if perp_yellow is not None:
+            xings[3] = perp_yellow
         if parallel_yellow is not None:
             xings[2] = parallel_yellow
     elif scan_orientation == 'Vertical':
-        if perp is not None:
-            xings[0], xings[2] = -perp, perp
+        if perp_yellow is not None:
+            xings[2] = perp_yellow
         if parallel_yellow is not None:
             xings[3] = parallel_yellow
     collider_sim.set_bunch_crossing(*xings)
+
+
+def get_yellow_xing_angles(collider_sim, scan_orientation):
+    """
+    Get crossing angles of collider_sim
+    """
+    xings = list(collider_sim.get_bunch_crossing_angles())
+    if scan_orientation == 'Horizontal':
+        return xings[2], xings[3]
+    elif scan_orientation == 'Vertical':
+        return xings[3], xings[2]
 
 
 def get_residual(collider_sim, hist_data):
@@ -462,15 +604,17 @@ def plot_mbd_and_sim_dist(collider_sim, hist_data, title=None, out_dir=None):
     collider_params = collider_sim.get_param_string()
 
     fig, ax = plt.subplots()
+    ax.set_xlabel('Z Vertex [cm]')
+    ax.set_ylabel('Counts')
+    ax.set_title(title)
+
     hist_data['width'] = hist_data['centers'][1] - hist_data['centers'][0]
     ax.bar(hist_data['centers'], hist_data['counts'], width=hist_data['width'], label='MBD')
     ax.plot(sim_zs, sim_z_dist, label='Simulation', color='red')
     ax.annotate(collider_params, xy=(0.05, 0.95), xycoords='axes fraction', fontsize=8, va='top', ha='left',
-                   bbox=dict(facecolor='white', alpha=0.8))
-    ax.set_xlabel('Z Vertex [cm]')
-    ax.set_ylabel('Counts')
-    ax.set_title(title)
-    ax.legend()
+                   bbox=dict(facecolor='white', alpha=0.1))
+
+    ax.legend(loc='upper left')
     fig.tight_layout()
 
     if out_dir is not None:
@@ -478,6 +622,11 @@ def plot_mbd_and_sim_dist(collider_sim, hist_data, title=None, out_dir=None):
         plt.savefig(f'{out_path}.pdf', format='pdf')
         plt.savefig(f'{out_path}.png', format='png')
         plt.close()
+
+    plot_data_dict = {'mbd_zs': hist_data['centers'], 'mbd_dist': hist_data['counts'], 'sim_zs': sim_zs,
+                     'sim_dist': sim_z_dist, 'collider_params': collider_params}
+
+    return plot_data_dict
 
 def create_dir(dir_path):
     if not os.path.exists(dir_path):

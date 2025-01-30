@@ -27,15 +27,16 @@ def main():
     # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
 
-    bw_fitting_path = f'{base_path}Analysis/bw_fitting/'
+    # bw_fitting_path = f'{base_path}Analysis/bw_fitting/'
+    bw_fitting_path = f'{base_path}Analysis/new_bw_opt/'
     create_dir(bw_fitting_path)
 
     default_bws = {'Horizontal': 162, 'Vertical': 151}
     orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
     # orientations_beam_widths = {'Horizontal': np.array([162])}
 
-    vernier_scan_dates = ['Aug12', 'Jul11']
-    # vernier_scan_dates = ['Aug12']
+    # vernier_scan_dates = ['Aug12', 'Jul11']
+    vernier_scan_dates = ['Aug12']
     for vernier_scan_date in vernier_scan_dates:
         dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
         z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
@@ -50,6 +51,9 @@ def main():
             create_dir(pdf_out_path)
             fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
                                                   pdf_out_path, orientation, vernier_scan_date, beam_widths, default_bws)
+            # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+            #                    orientation, vernier_scan_date)
+        plt.show()
 
         # # Run horizontal
         # orientation = 'Horizontal'
@@ -96,7 +100,8 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
         beam_widths = np.arange(150, 170, 5)
 
     # Important parameters
-    beta_star_nom = 85.
+    # beta_star_nom = 85.
+    beta_star_nom = 100.
     mbd_resolution = 2.0  # cm MBD resolution
     gauss_eff_width = 500  # cm Gaussian efficiency width
     # bkg = 0.4e-16  # Background level
@@ -181,19 +186,34 @@ def get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fi
     popt, pcov = cf(poly2, bws_fit, resids_fit, p0=[1, 1, 1])
     bws_plot = np.linspace(bws_fit.min(), bws_fit.max(), 500)
 
+    min_bw = min_x_poly2(*popt)
+    min_res = poly2(min_bw, *popt)
+
+    uncertainty = 1.0  # µm Define by eye
+
+    uncertainty_line_x = np.array([min_bw - uncertainty, min_bw + uncertainty])
+    uncertainty_line_y = poly2(uncertainty_line_x, *popt)
+
     fig, ax = plt.subplots()
-    ax.plot(bws, resids, marker='o', ls='none')
+    ax.plot(bws, resids, marker='o', ls='none', zorder=10)
     ax.plot(bws_plot, poly2(bws_plot, *popt), color='red')
+    ax.axvline(min_bw, color='green', linestyle='--')
+    ax.axvspan(min_bw - uncertainty, min_bw + uncertainty, color='green', alpha=0.2)
+    ax.plot(uncertainty_line_x, uncertainty_line_y, color='green', linestyle='--')
     ax.set_xlabel('Beam Width [µm]')
     ax.set_ylabel('Mean of Residuals for All Steps')
     ax.set_title(f'{scan_date} {orientation} Scan Residuals vs Beam Width')
     fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
 
 def poly2(x, a, b, c):
     return a * x ** 2 + b * x + c
+
+
+def min_x_poly2(a, b, c=None):
+    return -b / (2 * a)
 
 
 def update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim):

@@ -361,14 +361,14 @@ def estimate_final_luminosity(longitudinal_fit_path):
     :param longitudinal_fit_path:
     :return:
     """
-    samples = 1000
+    samples = 500
 
     # Important parameters
-    bw_x_nom, bw_y_nom, bw_err = 162.0, 155.0, 2.0  # um Width of bunch
-    beta_star_nom, beta_star_err = 85.0, 2.0  # cm
+    bw_x_nom, bw_y_nom, bw_err = 162.0, 154.5, 1.0  # um Width of bunch
+    beta_star_nom, beta_star_err = 85.0, 1.0  # cm
     mbd_online_resolution = 2.0  # cm MBD resolution on trigger level -- Doesn't matter for lumi calc!
-    blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 0.0  # um
-    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.0e-3
+    blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 5.0  # um
+    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.05e-3
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
@@ -426,7 +426,7 @@ def estimate_final_luminosity(longitudinal_fit_path):
     ax.hist(luminosities, bins=20)
     ax.axvline(mean_luminosity, color='r', linestyle='--', label=f'Mean: {mean_luminosity:.2e}')
     ax.axvline(default_luminosity, color='b', linestyle='--', label=f'Default: {default_luminosity:.2e}')
-    ax.set_xlabel('Luminosity')
+    ax.set_xlabel('Naked Luminosity')
     ax.set_ylabel('Counts')
     ax.legend()
     fig.tight_layout()

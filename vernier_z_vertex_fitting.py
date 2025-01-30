@@ -60,8 +60,8 @@ def main():
     # peripheral_metric_test(z_vertex_root_path)
     # peripheral_metric_sensitivity(base_path, z_vertex_root_path)
     # check_head_on_dependences(z_vertex_root_path)
-    plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
-    # fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    # plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
     # plot_all_z_vertex_hists(z_vertex_root_path)
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
@@ -238,7 +238,7 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     pe_blue_angle_y, pe_yellow_angle_y = -0.1e-3, +0.1e-3
 
     new_bw = 162
-    new_beta_star = 85
+    new_beta_star = 100.0
     new_mbd_res = 2.0
     # new_bkg = 0.4e-17
     new_bkg = 0.4e-16 * 0
@@ -251,7 +251,7 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
-    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0, +0.35e-3
+    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0, +0.0e-3
 
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
     ho_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == head_on_scan_step][0]
@@ -465,8 +465,8 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
 
-    new_bw = 150
-    new_beta_star = 85
+    new_bw_x, new_bw_y = 162.0, 154.5
+    new_beta_star = 100
     new_mbd_res = 2.0
     new_bkg = 0.4e-16
     new_additional_length_scaling = 1.0
@@ -540,7 +540,7 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     print(f'Area Ratio: {mbd_area / sim_area}')
 
     # Set and run new head on collider sim
-    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
     collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
     collider_sim.set_gaus_smearing_sigma(new_mbd_res)
     collider_sim.set_bkg(new_bkg)
@@ -640,7 +640,7 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     def objective_function_angle_y(angle_y, angle_yellow_x):
         """Objective function for a fixed angle_yellow_x, minimizing over angle_y."""
         # Set and run new peripheral collider sim
-        collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+        collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
         collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
         collider_sim.set_gaus_smearing_sigma(new_mbd_res)
         collider_sim.set_bkg(new_bkg)
@@ -710,7 +710,7 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     residuals = []
     for gaus_eff_width in gaus_eff_widths:
         # Set and run new peripheral collider sim
-        collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+        collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
         collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
         collider_sim.set_gaus_smearing_sigma(new_mbd_res)
         collider_sim.set_bkg(new_bkg)
@@ -761,7 +761,7 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
         for angle_y in angles_y:
             # Set and run new peripheral collider sim
             print(f'Angle: {angle_y}')
-            collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+            collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
             collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
             collider_sim.set_gaus_smearing_sigma(new_mbd_res)
             collider_sim.set_bkg(new_bkg)
@@ -797,7 +797,7 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     fig_resids.tight_layout()
 
     # Rerun with the min residuals angles and plot just this
-    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
     collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
     collider_sim.set_gaus_smearing_sigma(new_mbd_res)
     collider_sim.set_bkg(new_bkg)

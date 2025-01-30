@@ -23,8 +23,8 @@ from Measure import Measure
 
 
 def main():
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = '/home/dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
 
     bw_fitting_path = f'{base_path}Analysis/bw_fitting/'
@@ -34,8 +34,8 @@ def main():
     orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
     # orientations_beam_widths = {'Horizontal': np.array([162])}
 
-    vernier_scan_dates = ['Aug12', 'Jul11']
-    # vernier_scan_dates = ['Aug12']
+    # vernier_scan_dates = ['Aug12', 'Jul11']  # No CAD_Measurements/VernierScan_Jul11_combined.dat
+    vernier_scan_dates = ['Aug12']
     for vernier_scan_date in vernier_scan_dates:
         dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
         z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
@@ -142,9 +142,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
 
         bw_plot_dict = {'steps': [], 'angles': [[], [], [], []], 'residuals': [], 'dist_plot_data': []}
         for hist_data in z_vertex_hists_orient:
-            if hist_data["scan_step"] != 12:
-                continue
-            print(f'\nStarting Beam Width {bw} µm, Step {hist_data["scan_step"]}')
+            print(f'\nStarting {scan_date} Beam Width {bw} µm, Step {hist_data["scan_step"]}')
             fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_crossing_angles=True)
             title = f'{title_bw}, Step: {hist_data["scan_step"]}'
             plot_data_dict = plot_mbd_and_sim_dist(collider_sim, hist_data, title=title, out_dir=bw_out_path)

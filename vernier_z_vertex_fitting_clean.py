@@ -23,13 +23,20 @@ from Measure import Measure
 
 
 def main():
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = '/home/dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
-    default_bws = {'Horizontal': 161.6, 'Vertical': 154.5}
 
-    # beta_stars = [95, 105]
-    beta_stars = [90]
+    # run_fitting(base_path)
+    fit_residual_curves(base_path)
+
+    print('donzo')
+
+
+def run_fitting(base_path):
+    default_bws = {'Horizontal': 161.6, 'Vertical': 154.5}
+    beta_stars = [100, 105]
+    # beta_stars = [90]
 
     for beta_star in beta_stars:
         bw_fitting_path = f'{base_path}Analysis/bw_fitting_bstar{beta_star}/'
@@ -37,7 +44,8 @@ def main():
         create_dir(bw_fitting_path)
 
         # orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
-        orientations_beam_widths = {'Horizontal': np.arange(160.0, 169.0, 1), 'Vertical': np.arange(151.0, 160.0, 1)}
+        # orientations_beam_widths = {'Horizontal': np.arange(160.0, 169.0, 1), 'Vertical': np.arange(151.0, 160.0, 1)}
+        orientations_beam_widths = {'Vertical': np.arange(162.0, 163.0, 1)}
         # orientations_beam_widths = {'Horizontal': np.array([162])}
 
         # vernier_scan_dates = ['Aug12', 'Jul11']  # No CAD_Measurements/VernierScan_Jul11_combined.dat
@@ -57,35 +65,23 @@ def main():
                 fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
                                                       pdf_out_path, orientation, vernier_scan_date, beam_widths,
                                                       default_bws, beta_star)
-                # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-                #                    orientation, vernier_scan_date)
-            plt.show()
 
-            # # Run horizontal
-            # orientation = 'Horizontal'
-            # # beam_widths = np.arange(156, 167.5, 0.5)
-            # beam_widths = np.array([162])
-            # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
-            # create_dir(pdf_out_path)
-            # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-            #                                       orientation, vernier_scan_date, beam_widths, default_bws)
-            #
-            # # Run vertical
-            # orientation = 'Vertical'
-            # # beam_widths = np.arange(145, 156, 0.5)
-            # beam_widths = np.array([156])
-            # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
-            # create_dir(pdf_out_path)
-            # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-            #                                       orientation, vernier_scan_date, beam_widths, default_bws)
 
-        # Fit residual sum vs beam width to estimate minimum. Then run the minimum and make combined plot of distributions.
-        # orientation = 'Horizontal'
-        # pdf_out_path = f'{base_path}Analysis/new_bw_opt/{orientation.lower()}/'
-        # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path, orientation,
-        #                    vernier_scan_date)
+def fit_residual_curves(base_path):
+    beta_stars = [95, 100, 105]
+    orientations = ['Horizontal', 'Vertical']
+    vernier_scan_dates = ['Aug12']
 
-    print('donzo')
+    for orientation in orientations:
+        for vernier_scan_date in vernier_scan_dates:
+            pdf_out_paths = []
+            for beta_star in beta_stars:
+                bw_fitting_path = f'{base_path}Analysis/bw_fitting_bstar{beta_star}/'
+                vernier_date_path = f'{bw_fitting_path}{vernier_scan_date}/'
+                pdf_out_path = f'{vernier_date_path}{orientation.lower()}/'
+                pdf_out_paths.append(pdf_out_path)
+            get_min_bw(pdf_out_paths, orientation, vernier_scan_date, beta_stars)
+    plt.show()
 
 
 def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, out_path,
@@ -169,45 +165,57 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     plt.show()
 
 
-def get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, out_path, orientation, scan_date):
+def get_min_bw(out_path, orientation, scan_date, beta_stars=None):
     """
     Get the residuals from file and fit to a polynomial to find the minimum. Then run the simulation with the minimum
     beam width and plot the distributions.
     """
-    resid_vs_bw_csv_path = f'{out_path}{scan_date}_{orientation}_Scan_Residuals_residual_means.csv'
-    resid_vs_bw_df = pd.read_csv(resid_vs_bw_csv_path)
-
-    # Plot
-    bws = np.array(resid_vs_bw_df['Beam Width'])
-    resids = np.array(resid_vs_bw_df['Mean Residual'])
-
-    min_res_bw, min_res = bws[resids.argmin()], resids.min()
-
-    print(f'Minimum Residual: {min_res_bw} µm at {min_res} µm')
-
-    fit_filter = abs(bws - min_res_bw) < 2.5
-    print(f'Fitting to {bws[fit_filter]} µm')
-    bws_fit, resids_fit = bws[fit_filter], resids[fit_filter]
-
-    popt, pcov = cf(poly2, bws_fit, resids_fit, p0=[1, 1, 1])
-    bws_plot = np.linspace(bws_fit.min(), bws_fit.max(), 500)
-
-    min_bw = min_x_poly2(*popt)
-    min_res = poly2(min_bw, *popt)
-
-    uncertainty = 1.0  # µm Define by eye
-
-    uncertainty_line_x = np.array([min_bw - uncertainty, min_bw + uncertainty])
-    uncertainty_line_y = poly2(uncertainty_line_x, *popt)
-
+    if type(out_path) == str:
+        out_path = [out_path]
     fig, ax = plt.subplots()
-    ax.plot(bws, resids, marker='o', ls='none', zorder=10)
-    ax.plot(bws_plot, poly2(bws_plot, *popt), color='red')
-    ax.axvline(min_bw, color='green', linestyle='--')
-    ax.axvspan(min_bw - uncertainty, min_bw + uncertainty, color='green', alpha=0.2)
-    ax.plot(uncertainty_line_x, uncertainty_line_y, color='green', linestyle='--')
+    for i, out_path_i in enumerate(out_path):
+        resid_vs_bw_csv_path = f'{out_path_i}{scan_date}_{orientation}_Scan_Residuals_residual_means.csv'
+        resid_vs_bw_df = pd.read_csv(resid_vs_bw_csv_path)
+
+        # Plot
+        bws = np.array(resid_vs_bw_df['Beam Width'])
+        resids = np.array(resid_vs_bw_df['Mean Residual'])
+
+        min_res_bw, min_res = bws[resids.argmin()], resids.min()
+
+        print(f'Minimum Residual: {min_res_bw} µm at {min_res} µm')
+
+        fit_filter = abs(bws - min_res_bw) < 5
+        print(f'Fitting to {bws[fit_filter]} µm')
+        bws_fit, resids_fit = bws[fit_filter], resids[fit_filter]
+
+        popt, pcov = cf(poly2, bws_fit, resids_fit, p0=[1, 1, 1])
+        bws_plot = np.linspace(bws_fit.min(), bws_fit.max(), 500)
+
+        min_bw = min_x_poly2(*popt)
+        min_res = poly2(min_bw, *popt)
+
+        uncertainty = 1.0  # µm Define by eye
+
+        uncertainty_line_x = np.array([min_bw - uncertainty, min_bw + uncertainty])
+        uncertainty_line_y = poly2(uncertainty_line_x, *popt)
+
+        if beta_stars is not None and len(beta_stars) == len(out_path):
+            leg = f'beta_star = {beta_stars[i]}'
+        else:
+            leg = None
+
+        line, = ax.plot(bws, resids, marker='o', ls='none', zorder=10, alpha=0.8, label=leg)
+        color = line.get_color()
+        ax.plot(bws_plot, poly2(bws_plot, *popt), color=color, alpha=0.6)
+        # ax.axvline(min_bw, color=color, linestyle='-', alpha=0.6)
+        # ax.axhline(min_res, color=color, linestyle='-', alpha=0.6)
+        # ax.axvspan(min_bw - uncertainty, min_bw + uncertainty, color='green', alpha=0.2)
+        # ax.plot(uncertainty_line_x, uncertainty_line_y, color='green', linestyle='--')
     ax.set_xlabel('Beam Width [µm]')
     ax.set_ylabel('Mean of Residuals for All Steps')
+    if beta_stars is not None:
+        ax.legend()
     ax.set_title(f'{scan_date} {orientation} Scan Residuals vs Beam Width')
     fig.tight_layout()
 
@@ -359,9 +367,12 @@ def plot_plot_dict(plot_dict, title, out_dir=None):
         plt.close(fig)
         plt.close(fig_res_vs_steps)
 
-        # Save residual_means to a file
+        file_path = f'{out_path}_residual_means.csv'
+        file_exists = os.path.isfile(file_path)
+
+        # Save residual_means to a file, appending if it exists
         res_df = pd.DataFrame({'Beam Width': plot_dict['bws'], 'Mean Residual': plot_dict['residual_means']})
-        res_df.to_csv(f'{out_path}_residual_means.csv', index=False)
+        res_df.to_csv(file_path, mode='a', header=not file_exists, index=False)
 
 
 def print_status(bw, step, start_time, n_fits, total_fits):
@@ -640,7 +651,7 @@ def plot_mbd_and_sim_dist(collider_sim, hist_data, title=None, out_dir=None):
     ax.annotate(collider_params, xy=(0.05, 0.95), xycoords='axes fraction', fontsize=8, va='top', ha='left',
                    bbox=dict(facecolor='white', alpha=0.1))
 
-    ax.legend(loc='upper left')
+    ax.legend()
     fig.tight_layout()
 
     if out_dir is not None:

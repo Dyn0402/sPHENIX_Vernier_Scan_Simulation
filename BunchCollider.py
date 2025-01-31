@@ -410,7 +410,7 @@ class BunchCollider:
 
     def get_param_string(self):
         param_string = (f'Beta*s: {self.bunch1.beta_star:.1f}, {self.bunch2.beta_star:.1f} cm\n'
-                        f'Beam Widths: {self.bunch1.transverse_sigma[0]:.1f}, {self.bunch2.transverse_sigma[0]:.1f} um\n'
+                        f'Beam Widths: {self.bunch1.transverse_sigma[0]:.1f} (x), {self.bunch1.transverse_sigma[1]:.1f} (y) um\n'
                         f'Beam Lengths: {self.bunch1.get_beam_length() / 1e4:.1f}, {self.bunch2.get_beam_length() / 1e4:.1f} cm\n'
                         f'Crossing Angles y: {self.bunch1.angle_y * 1e3:.2f}, {self.bunch2.angle_y * 1e3:.2f} mrad\n'
                         f'Crossing Angles x: {self.bunch1.angle_x * 1e3:.2f}, {self.bunch2.angle_x * 1e3:.2f} mrad\n'

@@ -23,67 +23,73 @@ from Measure import Measure
 
 
 def main():
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = '/home/dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    default_bws = {'Horizontal': 161.6, 'Vertical': 154.5}
 
-    # bw_fitting_path = f'{base_path}Analysis/bw_fitting/'
-    bw_fitting_path = f'{base_path}Analysis/new_bw_opt/'
-    create_dir(bw_fitting_path)
+    # beta_stars = [95, 105]
+    beta_stars = [90]
 
-    default_bws = {'Horizontal': 162, 'Vertical': 151}
-    orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
-    # orientations_beam_widths = {'Horizontal': np.array([162])}
+    for beta_star in beta_stars:
+        bw_fitting_path = f'{base_path}Analysis/bw_fitting_bstar{beta_star}/'
+        # bw_fitting_path = f'{base_path}Analysis/new_bw_opt/'
+        create_dir(bw_fitting_path)
 
-    # vernier_scan_dates = ['Aug12', 'Jul11']  # No CAD_Measurements/VernierScan_Jul11_combined.dat
-    vernier_scan_dates = ['Aug12']
-    for vernier_scan_date in vernier_scan_dates:
-        dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
-        z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
-        cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
-        longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
+        # orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
+        orientations_beam_widths = {'Horizontal': np.arange(160.0, 169.0, 1), 'Vertical': np.arange(151.0, 160.0, 1)}
+        # orientations_beam_widths = {'Horizontal': np.array([162])}
 
-        vernier_date_path = f'{bw_fitting_path}{vernier_scan_date}/'
-        create_dir(vernier_date_path)
+        # vernier_scan_dates = ['Aug12', 'Jul11']  # No CAD_Measurements/VernierScan_Jul11_combined.dat
+        vernier_scan_dates = ['Aug12']
+        for vernier_scan_date in vernier_scan_dates:
+            dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
+            z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
+            cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
+            longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
 
-        for orientation, beam_widths in orientations_beam_widths.items():
-            pdf_out_path = f'{vernier_date_path}{orientation.lower()}/'
-            create_dir(pdf_out_path)
-            fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
-                                                  pdf_out_path, orientation, vernier_scan_date, beam_widths, default_bws)
-            # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-            #                    orientation, vernier_scan_date)
-        plt.show()
+            vernier_date_path = f'{bw_fitting_path}{vernier_scan_date}/'
+            create_dir(vernier_date_path)
 
-        # # Run horizontal
+            for orientation, beam_widths in orientations_beam_widths.items():
+                pdf_out_path = f'{vernier_date_path}{orientation.lower()}/'
+                create_dir(pdf_out_path)
+                fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
+                                                      pdf_out_path, orientation, vernier_scan_date, beam_widths,
+                                                      default_bws, beta_star)
+                # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+                #                    orientation, vernier_scan_date)
+            plt.show()
+
+            # # Run horizontal
+            # orientation = 'Horizontal'
+            # # beam_widths = np.arange(156, 167.5, 0.5)
+            # beam_widths = np.array([162])
+            # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
+            # create_dir(pdf_out_path)
+            # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+            #                                       orientation, vernier_scan_date, beam_widths, default_bws)
+            #
+            # # Run vertical
+            # orientation = 'Vertical'
+            # # beam_widths = np.arange(145, 156, 0.5)
+            # beam_widths = np.array([156])
+            # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
+            # create_dir(pdf_out_path)
+            # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
+            #                                       orientation, vernier_scan_date, beam_widths, default_bws)
+
+        # Fit residual sum vs beam width to estimate minimum. Then run the minimum and make combined plot of distributions.
         # orientation = 'Horizontal'
-        # # beam_widths = np.arange(156, 167.5, 0.5)
-        # beam_widths = np.array([162])
-        # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
-        # create_dir(pdf_out_path)
-        # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-        #                                       orientation, vernier_scan_date, beam_widths, default_bws)
-        #
-        # # Run vertical
-        # orientation = 'Vertical'
-        # # beam_widths = np.arange(145, 156, 0.5)
-        # beam_widths = np.array([156])
-        # pdf_out_path = f'{vernier_date_path}{orientation.lower()}_test/'
-        # create_dir(pdf_out_path)
-        # fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path,
-        #                                       orientation, vernier_scan_date, beam_widths, default_bws)
-
-    # Fit residual sum vs beam width to estimate minimum. Then run the minimum and make combined plot of distributions.
-    # orientation = 'Horizontal'
-    # pdf_out_path = f'{base_path}Analysis/new_bw_opt/{orientation.lower()}/'
-    # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path, orientation,
-    #                    vernier_scan_date)
+        # pdf_out_path = f'{base_path}Analysis/new_bw_opt/{orientation.lower()}/'
+        # get_min_bw_and_run(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path, orientation,
+        #                    vernier_scan_date)
 
     print('donzo')
 
 
 def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, out_path,
-                                          orientation, scan_date, beam_widths=None, default_bws=None):
+                                          orientation, scan_date, beam_widths=None, default_bws=None, beta_star=None):
     """
     For a list of bunch widths, fits the crossing angle to the z-vertex distributions for each bunch width.
     :param z_vertex_root_path: Path to root file with z-vertex distributions.
@@ -94,14 +100,14 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     :param scan_date: Date of the scan.
     :param beam_widths: List of beam widths to fit.
     :param default_bws: Default beam widths to use for the opposite orientation of the scan.
+    :param beta_star: Beta star to use for the simulation.
     """
 
+    # Important parameters
     if beam_widths is None:
         beam_widths = np.arange(150, 170, 5)
-
-    # Important parameters
-    # beta_star_nom = 85.
-    beta_star_nom = 100.
+    if beta_star is None:
+        beta_star = 85.
     mbd_resolution = 2.0  # cm MBD resolution
     gauss_eff_width = 500  # cm Gaussian efficiency width
     # bkg = 0.4e-16  # Background level
@@ -115,7 +121,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(n_points_xy, n_points_xy, n_points_z, n_points_t)
     collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
-    collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
+    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
     collider_sim.set_gaus_smearing_sigma(mbd_resolution)
     collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
     collider_sim.set_bkg(bkg)
@@ -148,7 +154,9 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
         bw_plot_dict = {'steps': [], 'angles': [[], [], [], []], 'residuals': [], 'dist_plot_data': []}
         for hist_data in z_vertex_hists_orient:
             print(f'\nStarting {scan_date} Beam Width {bw} µm, Step {hist_data["scan_step"]}')
-            fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_crossing_angles=True)
+
+            fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_crossing_angles=True)  # All the fitting
+
             title = f'{title_bw}, Step: {hist_data["scan_step"]}'
             plot_data_dict = plot_mbd_and_sim_dist(collider_sim, hist_data, title=title, out_dir=bw_out_path)
             bw_plot_dict['dist_plot_data'].append(plot_data_dict)

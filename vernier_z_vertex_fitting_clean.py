@@ -23,8 +23,8 @@ from Measure import Measure
 
 
 def main():
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = '/home/dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
 
     # run_fitting(base_path)
@@ -35,7 +35,7 @@ def main():
 
 def run_fitting(base_path):
     default_bws = {'Horizontal': 161.6, 'Vertical': 154.5}
-    beta_stars = [100, 105]
+    beta_stars = [90, 95, 100, 105]
     # beta_stars = [90]
 
     for beta_star in beta_stars:
@@ -44,8 +44,8 @@ def run_fitting(base_path):
         create_dir(bw_fitting_path)
 
         # orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
-        # orientations_beam_widths = {'Horizontal': np.arange(160.0, 169.0, 1), 'Vertical': np.arange(151.0, 160.0, 1)}
-        orientations_beam_widths = {'Vertical': np.arange(162.0, 163.0, 1)}
+        orientations_beam_widths = {'Horizontal': np.arange(161.5, 166.5, 1), 'Vertical': np.arange(155.5, 163.5, 1)}
+        # orientations_beam_widths = {'Vertical': np.arange(162.0, 163.0, 1)}
         # orientations_beam_widths = {'Horizontal': np.array([162])}
 
         # vernier_scan_dates = ['Aug12', 'Jul11']  # No CAD_Measurements/VernierScan_Jul11_combined.dat
@@ -68,7 +68,7 @@ def run_fitting(base_path):
 
 
 def fit_residual_curves(base_path):
-    beta_stars = [95, 100, 105]
+    beta_stars = [90, 95, 100, 105]
     orientations = ['Horizontal', 'Vertical']
     vernier_scan_dates = ['Aug12']
 

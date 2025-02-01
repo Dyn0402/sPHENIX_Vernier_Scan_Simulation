@@ -40,8 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = '/home/dylan/Desktop/vernier_scan/'
+    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
@@ -60,8 +60,8 @@ def main():
     # peripheral_metric_test(z_vertex_root_path)
     # peripheral_metric_sensitivity(base_path, z_vertex_root_path)
     # check_head_on_dependences(z_vertex_root_path)
-    # plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
-    fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
+    # fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path)
     # plot_all_z_vertex_hists(z_vertex_root_path)
     # sim_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
     # sim_fit_cad_params(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, pdf_out_path)
@@ -215,9 +215,11 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
 
-    orientation = 'Horizontal'
+    # orientation = 'Horizontal'
+    orientation = 'Vertical'
     head_on_scan_step = 1
-    peripheral_scan_step = 12
+    # peripheral_scan_step = 12
+    peripheral_scan_step = 5
 
     ho_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == head_on_scan_step)].iloc[0]
     pe_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == peripheral_scan_step)].iloc[0]
@@ -232,26 +234,29 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     pe_offsets = None
     ho_blue_angle_x, ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     ho_blue_angle_y, ho_yellow_angle_y = 0.0, 0.0
-    # pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
-    pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.063e-3  # mrad to rad
-    # pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
-    pe_blue_angle_y, pe_yellow_angle_y = -0.1e-3, +0.1e-3
+    pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
+    # pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.063e-3  # mrad to rad
+    pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
+    # pe_blue_angle_y, pe_yellow_angle_y = -0.1e-3, +0.1e-3
 
-    new_bw = 162
-    new_beta_star = 100.0
+    new_bw_x, new_bw_y = 164.0, 159.5
+    new_beta_star = 100.
     new_mbd_res = 2.0
     # new_bkg = 0.4e-17
     new_bkg = 0.4e-16 * 0
     new_additional_length_scaling = 1.0
     new_gaus_eff_width = 500  # cm
     new_ho_offsets = [[0.0, 0.0], [0.0, 0.0]]
-    new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
+    # new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
+    new_pe_offsets = None
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
     new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
-    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
+    # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3
+    new_pe_yellow_angle_x += 0.05e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
-    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0, +0.0e-3
+    new_pe_blue_angle_y, new_pe_yellow_angle_y = 0.0e-3, -0.01e-3
 
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
     ho_hist_data = [hist for hist in z_vertex_hists if hist['scan_axis'] == orientation and hist['scan_step'] == head_on_scan_step][0]
@@ -313,7 +318,7 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     print(f'Area Ratio: {mbd_area / sim_area}')
 
     # Set and run new head on collider sim
-    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
     collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
     collider_sim.set_gaus_smearing_sigma(new_mbd_res)
     collider_sim.set_bkg(new_bkg)
@@ -410,7 +415,7 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     pe_zs_og, pe_z_dist_og = collider_sim.get_z_density_dist()
 
     # Set and run new peripheral collider sim
-    collider_sim.set_bunch_sigmas(np.array([new_bw, new_bw]), np.array([new_bw, new_bw]))
+    collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
     collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
     collider_sim.set_gaus_smearing_sigma(new_mbd_res)
     collider_sim.set_bkg(new_bkg)
@@ -445,9 +450,11 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
 
-    orientation = 'Horizontal'
+    # orientation = 'Horizontal'
+    orientation = 'Vertical'
     head_on_scan_step = 1
-    peripheral_scan_step = 12
+    # peripheral_scan_step = 12
+    peripheral_scan_step = 5
 
     ho_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == head_on_scan_step)].iloc[0]
     pe_step_cad_data = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == peripheral_scan_step)].iloc[0]
@@ -465,17 +472,19 @@ def fit_angles_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, 
     pe_blue_angle_x, pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3  # mrad to rad
     pe_blue_angle_y, pe_yellow_angle_y = 0.0, 0.0
 
-    new_bw_x, new_bw_y = 161.6, 154.5
-    new_beta_star = 105.
+    new_bw_x, new_bw_y = 164.0, 159.5
+    new_beta_star = 100.
     new_mbd_res = 2.0
     new_bkg = 0.4e-16 * 0
     new_additional_length_scaling = 1.0
     new_gaus_eff_width = 500  # cm
     new_ho_offsets = [[0.0, 0.0], [0.0, 0.0]]
-    new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
+    # new_pe_offsets = [[-900.0, 0.0], [0.0, 0.0]]
+    new_pe_offsets = None
     new_ho_blue_angle_x, new_ho_yellow_angle_x = -ho_step_cad_data['bh8_avg'] / 1e3, -ho_step_cad_data['yh8_avg'] / 1e3
     new_ho_blue_angle_y, new_ho_yellow_angle_y = 0.0, 0.0
-    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
+    # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
+    new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -pe_step_cad_data['yh8_avg'] / 1e3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.09e-3
     # new_pe_blue_angle_x, new_pe_yellow_angle_x = -pe_step_cad_data['bh8_avg'] / 1e3, -0.07e-3
     new_pe_blue_angle_y, new_pe_yellow_angle_y = -0.4e-3, +0.4e-3

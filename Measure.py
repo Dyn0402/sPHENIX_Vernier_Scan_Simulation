@@ -199,10 +199,11 @@ class Measure:
         return self
 
     def __str__(self):
-        dec = err_dec(self.err)
+        dec = err_dec(self.err) if self.err != 0 else err_dec(self.val, 5)
         f_or_e = float_or_exp(self.val, dec)
-        if f_or_e == 'e' and self.err != 0 and np.isfinite(self.err):
-            precision = 1 + math.floor(math.log10(abs(self.val / self.err)))
+        if f_or_e == 'e' and np.isfinite(self.err):
+            precision = 1 + math.floor(math.log10(abs(self.val / self.err))) if self.err != 0 else 2
+            precision = max(precision, 2)
             val, err = match_exponents(self.val, self.err, precision)
             e_str = f'{val} ± {err}'
             f_str = f'{self.val:.{dec}f} ± {self.err:.{dec}f}'
@@ -218,7 +219,7 @@ def err_dec(x, prec=2):
     if math.isinf(x) or math.isnan(x):
         return 0
     dec = 0
-    while int(x) < 10**(prec - 1) and x != 0:
+    while int(abs(x)) < 10**(prec - 1) and x != 0:
         x *= 10
         dec += 1
     return dec

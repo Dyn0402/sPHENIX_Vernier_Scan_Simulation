@@ -1,0 +1,11 @@
+ Executable = run_vernier_parameter_scan.sh
+ Universe = vanilla
+ Notification = Never
+ Arguments = $(scan_date) $(scan_orientation) $(beam_width_x) $(beam_width_y) $(beta_star)
+ request_memory = $(memory)
+ output = log/condordneffsph_$(process).out
+ error = log/condordneffsph_$(process).err
+ Log = /tmp/condordneffsphcondor.log
+ Initaldir = /spenix/user/dneffsph/sPHENIX_Vernier_Scan_Simulation/run_rcf_jobs
+ PeriodicHold = (NumJobStarts>=1 && JobStatus == 1)
+ Queue memory, scan_orientation, scan_date, beam_width_x, beam_width_y, beta_star from queue.list

@@ -8,6 +8,8 @@ Created as sPHENIX_Vernier_Scan_Simulation/phenix_style_hourglass_analysis.py
 @author: Dylan Neff, Dylan
 """
 
+import platform
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -19,9 +21,11 @@ from vernier_z_vertex_fitting import read_cad_measurement_file, get_cw_rates, ge
 
 
 def main():
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    # base_path = '/home/dylan/Desktop/vernier_scan/'
-    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    if platform.system() == 'Linux':
+        base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+        # base_path = '/home/dylan/Desktop/vernier_scan/'
+    else:
+        base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     simulate_vernier_scan(base_path)
     print('donzo')
 

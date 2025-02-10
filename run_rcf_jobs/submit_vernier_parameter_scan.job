@@ -8,4 +8,4 @@
  Log = /tmp/condordneffsphcondor.log
  Initialdir = /sphenix/u/dneffsph/sPHENIX_Vernier_Scan_Simulation/run_rcf_jobs
  PeriodicHold = (NumJobStarts>=1 && JobStatus == 1)
- Queue memory, scan_orientation, scan_date, beam_width_x, beam_width_y, beta_star from vernier_parameter_scan_jobs.list
+ Queue memory, scan_date, scan_orientation, beam_width_x, beam_width_y, beta_star from vernier_parameter_scan_jobs.list

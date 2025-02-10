@@ -39,6 +39,11 @@ def main():
     cad_measurement_path = f'../CAD_Measurements/VernierScan_{scan_date}_combined.dat'
     longitudinal_fit_path = f'../CAD_Measurements/VernierScan_{scan_date}_COLOR_longitudinal_fit.dat'
 
+    print(f'Current directory: {os.getcwd()}')
+    print(f'z_vertex_root_path: {z_vertex_root_path}')
+    print(f'cad_measurement_path: {cad_measurement_path}')
+    print(f'longitudinal_fit_path: {longitudinal_fit_path}')
+
     fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, scan_orientation,
                                      scan_date, beam_width_x, beam_width_y, beta_star)
     print('donzo')

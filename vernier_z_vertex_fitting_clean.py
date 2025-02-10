@@ -310,7 +310,8 @@ def plot_bw_dict(bw_plot_dict, title, out_dir=None):
 
 
     if out_dir is not None:
-        out_path = f'{out_dir}{title.replace(" ","_").replace(":","").replace(",","").replace("__","_").replace("\n","_")}'
+        out_title = title.replace(" ","_").replace(":","").replace(",","").replace("__","_").replace("\n","_")
+        out_path = f'{out_dir}{out_title}'
         fig_angles_horiz.savefig(f'{out_path}_horizontal_angles.pdf', format='pdf')
         fig_angles_horiz.savefig(f'{out_path}_horizontal_angles.png', format='png')
         fig_angles_vert.savefig(f'{out_path}_vertical_angles.pdf', format='pdf')

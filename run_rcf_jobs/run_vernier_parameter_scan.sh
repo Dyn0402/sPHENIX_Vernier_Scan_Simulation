@@ -17,11 +17,11 @@ printenv
 
 if [ "$condor" = false ]; then
     #=================== Run standalone =========================#
-    python ../vernier_z_vertex_fitting_rcf.py "$1", "$2", "$3", "$4", "$5"
+    python ../vernier_z_vertex_fitting_rcf.py "$1", "$2", $3, $4, $5
     #=========================================================#
 
 else
     #=================== Run with condor =========================#
-    python ../vernier_z_vertex_fitting_rcf.py "$1", "$2", "$3", "$4", "$5"
+    python ../vernier_z_vertex_fitting_rcf.py "$1", "$2", $3, $4, $5
     #=========================================================#
 fi

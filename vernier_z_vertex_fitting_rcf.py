@@ -31,6 +31,7 @@ def main():
     if len(sys.argv) != 6:  # Get 5 sys argv: scan_date, scan_orientation, beam width x, beam width y, beta star
         print('Invalid number of arguments.')
         return
+    print(f'System argvs: {sys.argv}')
     scan_date, scan_orientation = sys.argv[1], sys.argv[2]
     beam_width_x, beam_width_y, beta_star = float(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5])
 

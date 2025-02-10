@@ -44,6 +44,8 @@ def main():
     print(f'cad_measurement_path: {cad_measurement_path}')
     print(f'longitudinal_fit_path: {longitudinal_fit_path}')
 
+    print(f'beam_width_x: {beam_width_x}, type: {type(beam_width_x)}, type(float(beam_width_x)): {type(float(beam_width_x))}')
+
     fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, scan_orientation,
                                      scan_date, beam_width_x, beam_width_y, beta_star)
     print('donzo')

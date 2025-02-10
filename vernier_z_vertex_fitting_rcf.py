@@ -35,9 +35,9 @@ def main():
     scan_date, scan_orientation = sys.argv[1], sys.argv[2]
     beam_width_x, beam_width_y, beta_star = float(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5])
 
-    z_vertex_root_path = f'vertex_data/vernier_scan_{scan_date}_mbd_vertex_z_distributions.root'
-    cad_measurement_path = f'CAD_Measurements/VernierScan_{scan_date}_combined.dat'
-    longitudinal_fit_path = f'CAD_Measurements/VernierScan_{scan_date}_COLOR_longitudinal_fit.dat'
+    z_vertex_root_path = f'../vertex_data/vernier_scan_{scan_date}_mbd_vertex_z_distributions.root'
+    cad_measurement_path = f'../CAD_Measurements/VernierScan_{scan_date}_combined.dat'
+    longitudinal_fit_path = f'../CAD_Measurements/VernierScan_{scan_date}_COLOR_longitudinal_fit.dat'
 
     fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, scan_orientation,
                                      scan_date, beam_width_x, beam_width_y, beta_star)

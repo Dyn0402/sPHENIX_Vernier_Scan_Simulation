@@ -1,0 +1,14 @@
+Fit Parameters for Yellow Beam Longitudinal Profile
+Fit Equation: $p(t) = \frac{\frac{1}{\sigma_1 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_1)^2}{2\sigma_1^2}\right)+ \frac{a_2}{\sigma_2 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_2)^2}{2\sigma_2^2}\right)+ \frac{a_3}{\sigma_3 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_3)^2}{2\sigma_3^2}\right)+ \frac{a_4}{\sigma_4 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_4)^2}{2\sigma_4^2}\right)}{1 + a_2 + a_3 + a_4}$
+Fit Parameters:
+mu1: 0.0
+sigma1: 593943.6760441506
+a2: 0.2429643365946458
+mu2: -1317047.3826370642
+sigma2: 354610.2562687349
+a3: 0.25323107489271374
+mu3: 1332562.5391386605
+sigma3: 376745.97459486924
+a4: 0.00702115350907457
+mu4: 2590984.247162232
+sigma4: 212030.1555400589

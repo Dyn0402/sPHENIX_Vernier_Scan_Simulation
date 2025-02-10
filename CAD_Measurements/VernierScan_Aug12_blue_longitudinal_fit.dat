@@ -1,0 +1,14 @@
+Fit Parameters for Blue Beam Longitudinal Profile
+Fit Equation: $p(t) = \frac{\frac{1}{\sigma_1 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_1)^2}{2\sigma_1^2}\right)+ \frac{a_2}{\sigma_2 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_2)^2}{2\sigma_2^2}\right)+ \frac{a_3}{\sigma_3 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_3)^2}{2\sigma_3^2}\right)+ \frac{a_4}{\sigma_4 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_4)^2}{2\sigma_4^2}\right)}{1 + a_2 + a_3 + a_4}$
+Fit Parameters:
+mu1: 0.0
+sigma1: 458744.9974111734
+a2: 0.4674268875407318
+mu2: -1289435.161322116
+sigma2: 408467.40795543685
+a3: 0.26441147056337
+mu3: 1345635.5110432173
+sigma3: 361562.70824268553
+a4: 3.6074395012373786
+mu4: 70560.66065353084
+sigma4: 1286259.6592164848

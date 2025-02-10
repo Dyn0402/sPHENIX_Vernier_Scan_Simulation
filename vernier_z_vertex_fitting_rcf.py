@@ -44,8 +44,6 @@ def main():
     print(f'cad_measurement_path: {cad_measurement_path}')
     print(f'longitudinal_fit_path: {longitudinal_fit_path}')
 
-    print(f'beam_width_x: {beam_width_x}, type: {type(beam_width_x)}, type(float(beam_width_x)): {type(float(beam_width_x))}')
-
     fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, scan_orientation,
                                      scan_date, beam_width_x, beam_width_y, beta_star)
     print('donzo')
@@ -76,7 +74,7 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
 
     collider_sim = BunchCollider()
-    collider_sim.set_bunch_sigmas(np.array([beam_width_x, beam_width_y]), np.array(beam_width_x, beam_width_y))
+    collider_sim.set_bunch_sigmas(np.array([beam_width_x, beam_width_y]), np.array([beam_width_x, beam_width_y]))
     collider_sim.set_grid_size(n_points_xy, n_points_xy, n_points_z, n_points_t)
     collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
     collider_sim.set_bunch_beta_stars(beta_star, beta_star)

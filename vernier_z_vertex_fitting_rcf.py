@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 from vernier_z_vertex_fitting import read_cad_measurement_file, get_cw_rates, get_mbd_z_dists
 from vernier_z_vertex_fitting_clean import fit_sim_to_mbd_step, plot_mbd_and_sim_dist, print_status, update_bw_plot_dict
-from vernier_z_vertex_fitting_clean import plot_bw_dict
+from vernier_z_vertex_fitting_clean import plot_bw_dict, create_dir
 
 from BunchCollider import BunchCollider
 
@@ -39,18 +39,17 @@ def main():
     cad_measurement_path = f'../CAD_Measurements/VernierScan_{scan_date}_combined.dat'
     longitudinal_fit_path = f'../CAD_Measurements/VernierScan_{scan_date}_COLOR_longitudinal_fit.dat'
 
-    print(f'Current directory: {os.getcwd()}')
-    print(f'z_vertex_root_path: {z_vertex_root_path}')
-    print(f'cad_measurement_path: {cad_measurement_path}')
-    print(f'longitudinal_fit_path: {longitudinal_fit_path}')
+    out_dir = create_dir('output/')
+    out_dir = create_dir(f'{out_dir}{scan_date}/')
+    out_dir = create_dir(f'{out_dir}{scan_orientation}/')
 
     fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, scan_orientation,
-                                     scan_date, beam_width_x, beam_width_y, beta_star)
+                                     scan_date, beam_width_x, beam_width_y, beta_star, out_dir)
     print('donzo')
 
 
 def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, orientation,
-                                     scan_date, beam_width_x, beam_width_y, beta_star):
+                                     scan_date, beam_width_x, beam_width_y, beta_star, out_dir):
     """
     For a list of bunch widths, fits the crossing angle to the z-vertex distributions for each bunch width.
     :param z_vertex_root_path: Path to root file with z-vertex distributions.
@@ -61,13 +60,16 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
     :param beam_width_x: Beam width in x direction.
     :param beam_width_y: Beam width in y direction.
     :param beta_star: Beta star to use for the simulation.
+    :param out_dir: Directory to output plots and data.
     """
-
     # Important parameters
     mbd_resolution = 2.0  # cm MBD resolution
     gauss_eff_width = 500  # cm Gaussian efficiency width
     bkg = 0.0  # Background level
     n_points_xy, n_points_z, n_points_t = 61, 151, 61
+
+    plot_out_dir = create_dir(f'{out_dir}plots/')
+    data_out_dir = create_dir(f'{out_dir}data/')
 
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
@@ -90,7 +92,7 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
     start_time, n_fits, total_fits = datetime.now(), 1, len(z_vertex_hists_orient)
     title_base = f'{scan_date} {orientation} Scan'
     bws_str = f'{beam_width_x:.1f}, {beam_width_y:.1f}'
-    title_bw = f'{title_base}\nBeam Width create_dir {bws_str} µm, beta* {beta_star} cm'
+    title_bw = f'{title_base}\nBeam Width {bws_str} microns, beta-star {beta_star} cm'
 
     first_step_hist = z_vertex_hists_orient[0]  # Fit the first step, which is head on
     fit_sim_to_mbd_step(collider_sim, first_step_hist, cad_data, True)
@@ -107,8 +109,8 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
         bw_plot_dict['dist_plot_data'].append(plot_data_dict)
         n_fits = print_status(bws_str, hist_data["scan_step"], start_time, n_fits, total_fits)
         update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim)  # Update dict for plotting
-    plot_bw_dict(bw_plot_dict, title_bw, out_dir='')  # Output to working directory
-    write_bw_dict_to_file(bw_plot_dict, '')  # Output to working directory
+    plot_bw_dict(bw_plot_dict, title_bw, out_dir=plot_out_dir)  # Output to working directory
+    write_bw_dict_to_file(bw_plot_dict, data_out_dir)  # Output to working directory
 
 
 def write_bw_dict_to_file(bw_plot_dict, out_dir):

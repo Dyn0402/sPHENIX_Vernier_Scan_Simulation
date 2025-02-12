@@ -68,8 +68,9 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
     bkg = 0.0  # Background level
     n_points_xy, n_points_z, n_points_t = 61, 151, 61
 
-    plot_out_dir = create_dir(f'{out_dir}plots/')
-    data_out_dir = create_dir(f'{out_dir}data/')
+    run_dir = create_dir(f'{out_dir}run_bwx_{beam_width_x:.1f}_bwy_{beam_width_y:.1f}_betastar_{beta_star:.1f}/')
+    plot_out_dir = create_dir(f'{run_dir}plots/')
+    data_out_dir = create_dir(f'{run_dir}data/')
 
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
@@ -109,15 +110,16 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
         bw_plot_dict['dist_plot_data'].append(plot_data_dict)
         n_fits = print_status(bws_str, hist_data["scan_step"], start_time, n_fits, total_fits)
         update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim)  # Update dict for plotting
-    plot_bw_dict(bw_plot_dict, title_bw, out_dir=plot_out_dir)  # Output to working directory
-    write_bw_dict_to_file(bw_plot_dict, data_out_dir)  # Output to working directory
+    plot_bw_dict(bw_plot_dict, title_bw, out_dir=plot_out_dir)
+    write_bw_dict_to_file(bw_plot_dict, data_out_dir)
+    write_collider_info_to_file(collider_sim, data_out_dir)
 
 
 def write_bw_dict_to_file(bw_plot_dict, out_dir):
     """
     Write the bw_plot_dict to a file in out_dir.
     :param bw_plot_dict: Dictionary of data to write.
-    :param out_dir: Directory to write the file.
+    :param out_dir: Directory to write output file.
     """
     df = pd.DataFrame({
         'step': bw_plot_dict['steps'],
@@ -127,7 +129,17 @@ def write_bw_dict_to_file(bw_plot_dict, out_dir):
         'yellow_vertical': bw_plot_dict['angles'][3],
         'residuals': bw_plot_dict['residuals']
     })
-    df.to_csv(f'{out_dir}scan_fit_data.csv', index=False)
+    df.to_csv(f'{out_dir}scan_data.csv', index=False)
+
+
+def write_collider_info_to_file(collider_sim, out_dir):
+    """
+    Write collider_sim info to a file in out_dir.
+    :param collider_sim: BunchCollider object.
+    :param out_dir: Directory to write output file.
+    """
+    with open(f'{out_dir}collider_sim_info.txt', 'w') as file:
+        file.write(str(collider_sim))
 
 
 if __name__ == '__main__':

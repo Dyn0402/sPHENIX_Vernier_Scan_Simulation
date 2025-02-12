@@ -29,7 +29,7 @@ def main():
                         for beta_star in beta_stars:
                             file.write(f'{memory}, {scan_date}, {scan_orientation}, {beam_width_x}, '
                                        f'{beam_width_y}, {beta_star}\n')
-    print('donzo')
+    print('Job list created.')
 
 
 if __name__ == '__main__':

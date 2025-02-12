@@ -285,7 +285,11 @@ class BunchDensity:
                 f'Position: {self.r}\n'
                 f'Time: {self.t} ns\n'
                 f'Timestep: {self.dt} ns\n'
-                f'Beta Star: {self.beta_star:.1f} cm')
+                f'Delay: {self.delay} ns\n'
+                f'Beta Star: {self.beta_star:.1f} cm'
+                f'Longitudinal Parameters: {self.longitudinal_params}'
+                f'Effective Longitudinal Parameters: {self.effective_longitudinal_params}'
+                f'Longitudinal Width Scaling: {self.longitudinal_width_scaling}')
 
 
 def read_longitudinal_beam_profile_fit_parameters(fit_out_path):

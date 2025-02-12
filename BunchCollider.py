@@ -426,9 +426,13 @@ class BunchCollider:
                 f'y_lim_sigma: {self.y_lim_sigma}, z_lim_sigma: {self.z_lim_sigma}, n_points_x: {self.n_points_x}, '
                 f'n_points_y: {self.n_points_y}, n_points_z: {self.n_points_z}, n_points_t: {self.n_points_t}, '
                 f'bunch1_r_original: {self.bunch1_r_original}, bunch2_r_original: {self.bunch2_r_original}, '
-                f'bunch1_beta_original: {self.bunch1_beta_original}, bunch2_beta_original: {self.bunch2_beta_original}\n'
-                f'\nbunch1: {self.bunch1}\n'
-                f'\nbunch2: {self.bunch2}\n')
+                f'bunch1_beta_original: {self.bunch1_beta_original}, bunch2_beta_original: {self.bunch2_beta_original}'
+                f'\nGaussian Smearing Sigma: {self.gaus_smearing_sigma}\n'
+                f'Gaussian Z Efficiency Width: {self.gaus_z_efficiency_width}\n'
+                f'Background: {self.bkg}\n'
+                f'\n\nbunch1:\n{self.bunch1}\n'
+                f'\n\nbunch2:\n{self.bunch2}\n'
+                )
 
 
 def gaus(x, a, b, c):

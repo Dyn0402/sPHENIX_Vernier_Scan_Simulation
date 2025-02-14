@@ -34,6 +34,7 @@ def main():
     print(f'System argvs: {sys.argv}')
     scan_date, scan_orientation = sys.argv[1], sys.argv[2]
     beam_width_x, beam_width_y, beta_star = float(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5])
+    save_plots = False
 
     z_vertex_root_path = f'../vertex_data/vernier_scan_{scan_date}_mbd_vertex_z_distributions.root'
     cad_measurement_path = f'../CAD_Measurements/VernierScan_{scan_date}_combined.dat'
@@ -44,12 +45,12 @@ def main():
     out_dir = create_dir(f'{out_dir}{scan_orientation}/')
 
     fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, scan_orientation,
-                                     scan_date, beam_width_x, beam_width_y, beta_star, out_dir)
+                                     scan_date, beam_width_x, beam_width_y, beta_star, out_dir, save_plots)
     print('donzo')
 
 
 def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, orientation,
-                                     scan_date, beam_width_x, beam_width_y, beta_star, out_dir):
+                                     scan_date, beam_width_x, beam_width_y, beta_star, out_dir, save_plots):
     """
     For a list of bunch widths, fits the crossing angle to the z-vertex distributions for each bunch width.
     :param z_vertex_root_path: Path to root file with z-vertex distributions.
@@ -61,6 +62,7 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
     :param beam_width_y: Beam width in y direction.
     :param beta_star: Beta star to use for the simulation.
     :param out_dir: Directory to output plots and data.
+    :param save_plots: If True, save plots to out_dir, if False, display plots.
     """
     # Important parameters
     mbd_resolution = 2.0  # cm MBD resolution
@@ -110,7 +112,8 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
         bw_plot_dict['dist_plot_data'].append(plot_data_dict)
         n_fits = print_status(bws_str, hist_data["scan_step"], start_time, n_fits, total_fits)
         update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim)  # Update dict for plotting
-    plot_bw_dict(bw_plot_dict, title_bw, out_dir=plot_out_dir)
+    if save_plots:
+        plot_bw_dict(bw_plot_dict, title_bw, out_dir=plot_out_dir)
     write_bw_dict_to_file(bw_plot_dict, data_out_dir)
     write_collider_info_to_file(collider_sim, data_out_dir)
 

@@ -16,7 +16,7 @@ def main():
     scan_orientations = ['Horizontal', 'Vertical']
     beam_widths_x = np.arange(160, 168 + 1, 1)
     beam_widths_y = np.arange(156, 164 + 1, 1)
-    beta_stars  = np.arange(80, 105 + 5, 5)
+    beta_stars  = np.arange(80, 115 + 5, 5)
     memory = '4096MB'
     job_file_name = 'vernier_parameter_scan_jobs.list'
 

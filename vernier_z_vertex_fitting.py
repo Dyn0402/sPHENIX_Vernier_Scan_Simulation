@@ -40,8 +40,8 @@ def main():
     # vernier_scan_date = 'Jul11'
     orientation = 'Horizontal'
     # orientation = 'Vertical'
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = '/home/dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     dist_root_file_name = f'vernier_scan_{vernier_scan_date}_mbd_vertex_z_distributions.root'
     z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
@@ -215,8 +215,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     cad_data = read_cad_measurement_file(cad_measurement_path)
     cw_rates = get_cw_rates(cad_data)
 
-    # orientation = 'Horizontal'
-    orientation = 'Vertical'
+    orientation = 'Horizontal'
+    # orientation = 'Vertical'
     head_on_scan_step = 1
     # peripheral_scan_step = 12
     peripheral_scan_step = 5
@@ -240,7 +240,10 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
     # pe_blue_angle_y, pe_yellow_angle_y = -0.1e-3, +0.1e-3
 
     new_bw_x, new_bw_y = 164.0, 159.5
-    new_beta_star = 100.
+    # new_beta_star = 100.
+    # new_beta_star = [97., 82., 88., 95.]
+    new_beta_star = np.array([97., 82., 88., 95.]) * 1.1
+    print(f'New Beta Star: {new_beta_star}')
     new_mbd_res = 2.0
     # new_bkg = 0.4e-17
     new_bkg = 0.4e-16 * 0
@@ -319,7 +322,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
 
     # Set and run new head on collider sim
     collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
-    collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    # collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    collider_sim.set_bunch_beta_stars(*new_beta_star)
     collider_sim.set_gaus_smearing_sigma(new_mbd_res)
     collider_sim.set_bkg(new_bkg)
     collider_sim.set_bunch_crossing(new_ho_blue_angle_x, new_ho_blue_angle_y, new_ho_yellow_angle_x, new_ho_yellow_angle_y)
@@ -416,7 +420,8 @@ def plot_head_on_and_peripheral(z_vertex_root_path, cad_measurement_path, longit
 
     # Set and run new peripheral collider sim
     collider_sim.set_bunch_sigmas(np.array([new_bw_x, new_bw_y]), np.array([new_bw_x, new_bw_y]))
-    collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    # collider_sim.set_bunch_beta_stars(new_beta_star, new_beta_star)
+    collider_sim.set_bunch_beta_stars(*new_beta_star)
     collider_sim.set_gaus_smearing_sigma(new_mbd_res)
     collider_sim.set_bkg(new_bkg)
     collider_sim.set_bunch_crossing(new_pe_blue_angle_x, new_pe_blue_angle_y, new_pe_yellow_angle_x, new_pe_yellow_angle_y)

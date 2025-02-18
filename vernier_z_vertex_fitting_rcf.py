@@ -78,11 +78,16 @@ def fit_crossing_angles_to_mbd_dists(z_vertex_root_path, cad_measurement_path, l
     cw_rates = get_cw_rates(cad_data)
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
 
+    measured_beta_star = np.array([97., 82., 88., 95.])
+    beta_star_scale_factor = beta_star / 90  # Set 90 cm (average of measured) to default values, then scale from there
+    beta_star_scaled = measured_beta_star * beta_star_scale_factor
+
     collider_sim = BunchCollider()
     collider_sim.set_bunch_sigmas(np.array([beam_width_x, beam_width_y]), np.array([beam_width_x, beam_width_y]))
     collider_sim.set_grid_size(n_points_xy, n_points_xy, n_points_z, n_points_t)
     collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
-    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+    # collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+    collider_sim.set_bunch_beta_stars(*beta_star_scaled)
     collider_sim.set_gaus_smearing_sigma(mbd_resolution)
     collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
     collider_sim.set_bkg(bkg)

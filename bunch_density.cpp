@@ -34,7 +34,7 @@ double calculate_sigma(double sigma, double z, double beta_star, double angle_x,
 py::array_t<double> density(
     py::array_t<double> x, py::array_t<double> y, py::array_t<double> z,
     double r_x, double r_y, double r_z, double sigma_x, double sigma_y,
-    double angle_x, double angle_y, double beta_star,
+    double angle_x, double angle_y, double beta_star_x, double beta_star_y,
     // Parameters for quad_gaus_pdf
     double b1, double c1, double a2, double b2, double c2,
     double a3, double b3, double c3, double a4, double b4, double c4
@@ -73,8 +73,8 @@ py::array_t<double> density(
                 double z_rot_yz = y_rel * sin_angle_yz + z_rot_xz * cos_angle_yz;
 
                 // Compute the modified sigmas
-                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k), beta_star, angle_x, angle_y);
-                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k), beta_star, angle_x, angle_y);
+                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k), beta_star_x, angle_x, angle_y);
+                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k), beta_star_y, angle_x, angle_y);
 
                 // Calculate the density using the quad Gaussian in the z-direction
                 double z_density = quad_gaus_pdf(z_rot_yz, b1, c1, a2, b2, c2, a3, b3, c3, a4, b4, c4);

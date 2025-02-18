@@ -30,7 +30,8 @@ class BunchDensity:
         self.dt = 0.  # ns Timestep to propagate bunch
         self.angle_x = 0.  # Rotation angle in y-z plane in radians
         self.angle_y = 0.  # Rotation angle in x-z plane in radians
-        self.beta_star = None  # cm Beta star value for the bunch
+        self.beta_star_x = None  # cm Beta star value for the bunch in the x plane
+        self.beta_star_y = None  # cm Beta star value for the bunch in the y plane
         self.delay = 0.  # ns Time delay of the bunch
 
         self.longitudinal_params = {'mu1': 0., 'sigma1': 1., 'a2': 0., 'mu2': 0., 'sigma2': 1.,
@@ -72,12 +73,17 @@ class BunchDensity:
         self.beta = np.array([x, y, z], dtype=np.float64)
         self.reset = True
 
-    def set_beta_star(self, beta_star):
+    def set_beta_star(self, beta_star_x, beta_star_y=None):
         """
-        Set the beta star value for the bunch.
-        :param beta_star: float Beta star value in cm
+        Set the beta star value for the bunch. If no beta_star_y, assume the same as beta_star_x
+        :param beta_star_x: float Beta star value in cm
+        :param beta_star_y: float Beta star value in cm
         """
-        self.beta_star = beta_star
+        self.beta_star_x = beta_star_x
+        if beta_star_y is None:
+            self.beta_star_y = beta_star_x
+        else:
+            self.beta_star_y = beta_star_y
         self.reset = True
 
     def set_sigma(self, x, y, z=None):
@@ -192,9 +198,11 @@ class BunchDensity:
         """
         if self.reset:
             self.calculate_r_and_beta()
+        beta_star_x = self.beta_star_x if self.beta_star_x is not None else 0
+        beta_star_y = self.beta_star_y if self.beta_star_y is not None else 0
         return bdcpp.density(x, y, z, self.r[0], self.r[1], self.r[2],
                              self.transverse_sigma[0], self.transverse_sigma[1],
-                             self.angle_x, self.angle_y, self.beta_star if self.beta_star is not None else 0,
+                             self.angle_x, self.angle_y, beta_star_x, beta_star_y,
                              * self.effective_longitudinal_params.values())
 
     def density_py(self, x, y, z):
@@ -234,14 +242,14 @@ class BunchDensity:
         relative_r[2] = z_rot_yz
 
         # Broadening along the z-axis (after rotation)
-        if self.beta_star is None:
+        if self.beta_star_x is None or self.beta_star_y is None:
             sigma_x = self.transverse_sigma[0]
             sigma_y = self.transverse_sigma[1]
         else:
             # Calculate distance to IP along the axis of travel, based on z and the angles
             distance_to_IP = z * np.sqrt(1 + np.tan(self.angle_x) ** 2 + np.tan(self.angle_y) ** 2)
-            sigma_x = self.transverse_sigma[0] * np.sqrt(1 + distance_to_IP ** 2 / (self.beta_star * 1e4) ** 2)
-            sigma_y = self.transverse_sigma[1] * np.sqrt(1 + distance_to_IP ** 2 / (self.beta_star * 1e4) ** 2)
+            sigma_x = self.transverse_sigma[0] * np.sqrt(1 + distance_to_IP ** 2 / (self.beta_star_x * 1e4) ** 2)
+            sigma_y = self.transverse_sigma[1] * np.sqrt(1 + distance_to_IP ** 2 / (self.beta_star_y * 1e4) ** 2)
 
         # Calculate the density using the modified sigma_x, sigma_y, and rotated coordinates
         density = np.exp(
@@ -286,7 +294,7 @@ class BunchDensity:
                 f'Time: {self.t} ns\n'
                 f'Timestep: {self.dt} ns\n'
                 f'Delay: {self.delay} ns\n'
-                f'Beta Star: {self.beta_star:.1f} cm'
+                f'Beta Star: ({self.beta_star_x:.1f}, {self.beta_star_y:.1f}) cm'
                 f'Longitudinal Parameters: {self.longitudinal_params}'
                 f'Effective Longitudinal Parameters: {self.effective_longitudinal_params}'
                 f'Longitudinal Width Scaling: {self.longitudinal_width_scaling}')

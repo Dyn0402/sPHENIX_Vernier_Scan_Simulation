@@ -11,6 +11,11 @@ Created as sphenix_polarimetry/setup.py
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
+# To build run:
+# python setup.py clean --all
+# python setup.py build_ext --inplace
+
+
 ext_modules = [
     Pybind11Extension(
         "bunch_density_cpp",

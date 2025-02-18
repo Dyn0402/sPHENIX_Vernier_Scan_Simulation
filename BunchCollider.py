@@ -91,9 +91,9 @@ class BunchCollider:
         self.bunch1.set_offsets(*self.bunch1_r_original[:2])
         self.bunch2.set_offsets(*self.bunch2_r_original[:2])
 
-    def set_bunch_beta_stars(self, beta_star1, beta_star2):
-        self.bunch1.beta_star = beta_star1
-        self.bunch2.beta_star = beta_star2
+    def set_bunch_beta_stars(self, beta_star1_x, beta_star2_x, beta_star1_y=None, beta_star2_y=None):
+        self.bunch1.set_beta_star(beta_star1_x, beta_star1_y)
+        self.bunch2.set_beta_star(beta_star2_x, beta_star2_y)
 
     def set_bunch_crossing(self, crossing_angle1_x, crossing_angle1_y, crossing_angle2_x, crossing_angle2_y):
         self.bunch1.set_angles(crossing_angle1_x, crossing_angle1_y)
@@ -409,7 +409,7 @@ class BunchCollider:
 
 
     def get_param_string(self):
-        param_string = (f'Beta*s: {self.bunch1.beta_star:.1f}, {self.bunch2.beta_star:.1f} cm\n'
+        param_string = (f'Beta*s: ({self.bunch1.beta_star_x:.1f}, {self.bunch1.beta_star_y:.1f}), ({self.bunch2.beta_star_x:.1f}, {self.bunch2.beta_star_y:.1f}) cm\n'
                         f'Beam Widths: {self.bunch1.transverse_sigma[0]:.1f} (x), {self.bunch1.transverse_sigma[1]:.1f} (y) um\n'
                         f'Beam Lengths: {self.bunch1.get_beam_length() / 1e4:.1f}, {self.bunch2.get_beam_length() / 1e4:.1f} cm\n'
                         f'Crossing Angles y: {self.bunch1.angle_y * 1e3:.2f}, {self.bunch2.angle_y * 1e3:.2f} mrad\n'

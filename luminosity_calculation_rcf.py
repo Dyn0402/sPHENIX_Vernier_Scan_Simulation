@@ -139,7 +139,7 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
 
     # Write results to pandas csv
     sample_df = pd.DataFrame(sample_results)
-    sample_df.to_csv(f'luminosity_samples_{job_num}.csv', index=False)
+    sample_df.to_csv(f'output/luminosity_samples_{job_num}.csv', index=False)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,11 @@
+ Executable = run_lumi_calc.sh
+ Universe = vanilla
+ Notification = Never
+ Arguments = $(job_num)
+ request_memory = $(memory)
+ output = log/condordneffsph_$(process).out
+ error = log/condordneffsph_$(process).err
+ Log = /tmp/condordneffsphcondor.log
+ Initialdir = /sphenix/u/dneffsph/sPHENIX_Vernier_Scan_Simulation/run_rcf_jobs_lumi_calc
+ PeriodicHold = (NumJobStarts>=1 && JobStatus == 1)
+ Queue memory, job_num from lumi_calc_jobs.list

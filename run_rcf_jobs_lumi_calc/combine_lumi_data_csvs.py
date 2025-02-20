@@ -24,7 +24,7 @@ def main():
         file_path = f'{out_path}/{file_name}'
         set_lumis = pd.read_csv(file_path)
         lumi_dfs.append(set_lumis)
-        job_num = file_name.split('_')[1].split('.')[0]
+        job_num = file_name.split('_')[-1].split('.')[0]
         job_nums.append(job_num)
     lumi_dfs = pd.concat(lumi_dfs)
     lumi_dfs.to_csv(f'{out_path}/{combined_csv_name}', index=False)

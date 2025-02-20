@@ -385,6 +385,16 @@ def estimate_final_luminosity(longitudinal_fit_path):
     print(f'Luminosity: {default_luminosity:.2e}')
     # print(f'Luminosity: {luminosity * 1e12:.2e}')
 
+    f_beam = 78.4  # kHz
+    n_blue = 1.636e11  # n_protons
+    n_yellow = 1.1e11  # n_protons
+    machine_lumi = 317.1524  # mb^-1 s^-1  Corrected machine luminosity from Gaus approx
+
+    # Convert machine lumi to naked lumi in um^-2 per bunch crossing
+    mb_to_um2 = 1e-19
+    naked_lumi_cw = machine_lumi / mb_to_um2 / (f_beam * 1e3) / n_blue / n_yellow
+    print(f'Naked luminosity per bunch crossing: {naked_lumi_cw:.2e}')
+
     # analytic_lumi = analytical_luminosity(bw_nom)
     # analytic_lumi = 2.25534e-6
     analytic_lumi = 2.24789e-6

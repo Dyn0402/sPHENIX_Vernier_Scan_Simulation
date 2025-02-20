@@ -83,15 +83,12 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
     beta_star_low, beta_star_high = 80.0, 105.0  # cm
     measured_beta_star = np.array([97., 82., 88., 95.])
 
-
-    mbd_online_resolution = 2.0  # cm MBD resolution on trigger level -- Doesn't matter for lumi calc!
     blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 2.0  # um
     blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.05e-3
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
     collider_sim.set_bunch_crossing(blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle)
-    collider_sim.set_gaus_smearing_sigma(mbd_online_resolution)
     blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
     yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)

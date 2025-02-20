@@ -30,8 +30,8 @@ def main():
     lumi_dfs.to_csv(f'{out_path}/{combined_csv_name}', index=False)
 
     # Print max job num and missing job nums
-    max_job_num = max(job_nums)
     job_nums = set(map(int, job_nums))
+    max_job_num = max(job_nums)
     missing_jobs = set(range(int(max_job_num))) - job_nums
     print(f'Max job number: {max_job_num}')
     print(f'Missing jobs: {missing_jobs}')

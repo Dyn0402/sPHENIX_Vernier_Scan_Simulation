@@ -23,7 +23,7 @@ def main():
             set_df = []
             for run_dir in os.listdir(set_dir):
                 if not os.path.isdir(f'{set_dir}{run_dir}'):
-                    print(f'{run_dir} directory not found.')
+                    print(f'{set_dir}{run_dir} is not a directory.')
                     continue
                 run_params = run_dir.replace('run_', '').split('_')
                 # Pair each consecutive item in run_params to make a dictionary of parameter names and values

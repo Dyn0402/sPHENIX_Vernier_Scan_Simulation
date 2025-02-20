@@ -14,6 +14,7 @@ import pandas as pd
 from datetime import datetime
 
 from BunchCollider import BunchCollider
+from vernier_z_vertex_fitting_clean import create_dir
 
 
 def main():
@@ -78,13 +79,19 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
     """
     n_samples = 1000
 
+    err_estimates = 'conservative'  # 'best'
+
     # Important parameters
-    bw_x_nom, bw_y_nom, bw_err = 162.0, 154.5, 0.5  # um Width of bunch
-    beta_star_low, beta_star_high = 80.0, 105.0  # cm
+    beta_star_low, beta_star_high = 80.0, 105.0 # cm
     measured_beta_star = np.array([97., 82., 88., 95.])
 
-    blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 2.0  # um
-    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.05e-3
+    blue_x_offset, blue_y_offset = 0.0, 0.0  # um
+    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle = 0.0, +0.14e-3, 0.0, -0.07e-3
+
+    if err_estimates == 'best':  # Best err estimates
+        bw_err, beta_star_err, offset_err, angle_err = 0.5, 5.0, 2.0, 0.05e-3  # um, cm, um, rad
+    else:  # Conservative err estimates
+        bw_err, beta_star_err, offset_err, angle_err = 1.0, 10.0, 5.0, 0.1e-3  # um, cm, um, rad
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
@@ -99,6 +106,8 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
         beta_star = np.random.uniform(beta_star_low, beta_star_high)
         beta_star_scale_factor_i = beta_star / 90  # Set 90 cm (average of measured) to default values, then scale from there
         beta_star_scaled_i = measured_beta_star * beta_star_scale_factor_i
+        for index in range(len(beta_star_scaled_i)):  # Sample each component separately
+            beta_star_scaled_i[index] = np.random.normal(beta_star_scaled_i[index], beta_star_err)
 
         bw_x_i = get_bw_from_beta_star(beta_star, bw_beta_star_fit_params['x'])
         bw_y_i = get_bw_from_beta_star(beta_star, bw_beta_star_fit_params['y'])
@@ -136,7 +145,9 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
 
     # Write results to pandas csv
     sample_df = pd.DataFrame(sample_results)
-    sample_df.to_csv(f'output/luminosity_samples_{job_num}.csv', index=False)
+    output_dir = f'output/{err_estimates}_err/'
+    create_dir(output_dir)
+    sample_df.to_csv(f'{output_dir}luminosity_samples_{job_num}.csv', index=False)
 
 
 if __name__ == '__main__':

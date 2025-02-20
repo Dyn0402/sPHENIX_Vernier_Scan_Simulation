@@ -13,15 +13,17 @@ import pandas as pd
 
 
 def main():
-    out_path = 'output'
-    combined_csv_name = 'combined_lumis.csv'
+    err_type = 'conservative'  # 'best'
+    out_path = f'output'
+    csv_path = f'{out_path}/{err_type}_err'
+    combined_csv_name = f'{err_type}_err_combined_lumis.csv'
 
     lumi_dfs, job_nums = [], []
-    for file_name in os.listdir(out_path):
+    for file_name in os.listdir(csv_path):
         if not file_name.endswith('.csv') or file_name == combined_csv_name:
             print(f'Skipping {file_name}')
             continue
-        file_path = f'{out_path}/{file_name}'
+        file_path = f'{csv_path}/{file_name}'
         set_lumis = pd.read_csv(file_path)
         lumi_dfs.append(set_lumis)
         job_num = file_name.split('_')[-1].split('.')[0]

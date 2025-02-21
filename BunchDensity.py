@@ -133,10 +133,10 @@ class BunchDensity:
         :param scaling: float Scaling factor for the longitudinal beam profile
         """
         self.longitudinal_width_scaling = scaling
-        self.effective_longitudinal_params['sigma1'] = self.longitudinal_params['sigma1'] * scaling
-        self.effective_longitudinal_params['sigma2'] = self.longitudinal_params['sigma2'] * scaling
-        self.effective_longitudinal_params['sigma3'] = self.longitudinal_params['sigma3'] * scaling
-        self.effective_longitudinal_params['sigma4'] = self.longitudinal_params['sigma4'] * scaling
+        for key in self.longitudinal_params:
+            if 'sigma' in key or 'mu' in key:  # Scale all parameters with dimension of length. mu1 centered at 0
+                self.effective_longitudinal_params[key] = self.longitudinal_params[key] * scaling
+
         self.reset = True
 
     def get_beam_length(self):

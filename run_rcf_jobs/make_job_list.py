@@ -14,8 +14,8 @@ import numpy as np
 def main():
     scan_dates = ['Aug12']
     scan_orientations = ['Horizontal', 'Vertical']
-    beam_widths_x = np.arange(150, 168 + 1, 1)
-    beam_widths_y = np.arange(146, 164 + 1, 1)
+    beam_widths_x = np.arange(150, 170 + 1, 1)
+    beam_widths_y = np.arange(146, 168 + 1, 1)
     beta_stars  = np.arange(80, 115 + 5, 5)
     memory = '4096MB'
     job_file_name = 'vernier_parameter_scan_jobs.list'

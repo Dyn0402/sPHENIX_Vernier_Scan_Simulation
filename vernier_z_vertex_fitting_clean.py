@@ -23,20 +23,20 @@ from Measure import Measure
 
 
 def main():
-    # base_path = '/local/home/dn277127/Bureau/vernier_scan/'
-    base_path = '/home/dylan/Desktop/vernier_scan/'
+    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
 
-    # run_fitting(base_path)
-    fit_residual_curves(base_path)
+    run_fitting(base_path)
+    # fit_residual_curves(base_path)
 
     print('donzo')
 
 
 def run_fitting(base_path):
     default_bws = {'Horizontal': 161.6, 'Vertical': 154.5}
-    beta_stars = [90, 95, 100, 105]
-    # beta_stars = [90]
+    # beta_stars = [90, 95, 100, 105]
+    beta_stars = [102]
 
     for beta_star in beta_stars:
         bw_fitting_path = f'{base_path}Analysis/bw_fitting_bstar{beta_star}/'
@@ -44,9 +44,9 @@ def run_fitting(base_path):
         create_dir(bw_fitting_path)
 
         # orientations_beam_widths = {'Horizontal': np.arange(156.0, 168.5, 0.5), 'Vertical': np.arange(145.0, 157.5, 0.5)}
-        orientations_beam_widths = {'Horizontal': np.arange(161.5, 166.5, 1), 'Vertical': np.arange(155.5, 163.5, 1)}
+        # orientations_beam_widths = {'Horizontal': np.arange(161.5, 166.5, 1), 'Vertical': np.arange(155.5, 163.5, 1)}
         # orientations_beam_widths = {'Vertical': np.arange(162.0, 163.0, 1)}
-        # orientations_beam_widths = {'Horizontal': np.array([162])}
+        orientations_beam_widths = {'Horizontal': np.array([162])}
 
         # vernier_scan_dates = ['Aug12', 'Jul11']  # No CAD_Measurements/VernierScan_Jul11_combined.dat
         vernier_scan_dates = ['Aug12']
@@ -114,10 +114,15 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     cw_rates = get_cw_rates(cad_data)
     z_vertex_hists = get_mbd_z_dists(z_vertex_root_path, first_dist=False, norms=cw_rates, abs_norm=True)
 
+    measured_beta_star = np.array([97., 82., 88., 95.])
+    beta_star_scale_factor = beta_star / 90  # Set 90 cm (average of measured) to default values, then scale from there
+    beta_star_scaled = measured_beta_star * beta_star_scale_factor
+
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(n_points_xy, n_points_xy, n_points_z, n_points_t)
     collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
-    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+    # collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+    collider_sim.set_bunch_beta_stars(*beta_star_scaled)
     collider_sim.set_gaus_smearing_sigma(mbd_resolution)
     collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
     collider_sim.set_bkg(bkg)
@@ -408,8 +413,8 @@ def fit_sim_to_mbd_step(collider_sim, hist_data, cad_data, fit_amp_shift_flag=Fa
     step_cad_data = cad_data[(cad_data['orientation'] == scan_orientation) &
                              (cad_data['step'] == hist_data['scan_step'])].iloc[0]
 
-    yellow_bunch_len_scaling = step_cad_data['yellow_bunch_length']
-    blue_bunch_len_scaling = step_cad_data['blue_bunch_length']
+    yellow_bunch_len_scaling = step_cad_data['yellow_bunch_length_scaling']
+    blue_bunch_len_scaling = step_cad_data['blue_bunch_length_scaling']
     collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
 
     offset = step_cad_data['offset_set_val'] * 1e3  # mm to um
@@ -589,6 +594,14 @@ def get_yellow_xing_angles(collider_sim, scan_orientation):
         return xings[2], xings[3]
     elif scan_orientation == 'Vertical':
         return xings[3], xings[2]
+
+
+def get_residual_chi(collider_sim, hist_data, nfit_pars=4):
+    sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
+    sim_interp = interp1d(sim_zs, sim_z_dist)
+    chi2 = np.sum(((hist_data['counts'] - sim_interp(hist_data['centers'])) / hist_data['count_errs']) ** 2)
+    reduced_chi2 = chi2 / (len(hist_data['counts']) - nfit_pars)
+    return reduced_chi2
 
 
 def get_residual(collider_sim, hist_data):

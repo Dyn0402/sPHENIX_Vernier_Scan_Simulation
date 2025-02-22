@@ -77,7 +77,7 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
     :param job_num:
     :return:
     """
-    n_samples = 1000
+    n_samples = 500
 
     err_estimates = 'conservative'  # 'best'
 
@@ -87,11 +87,12 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
 
     blue_x_offset, blue_y_offset = 0.0, 0.0  # um
     blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle = 0.0, +0.14e-3, 0.0, -0.07e-3
+    blue_len_scaling, yellow_len_scaling = 0.993863022403956, 0.991593955543314
 
     if err_estimates == 'best':  # Best err estimates
-        bw_err, beta_star_err, offset_err, angle_err = 0.5, 5.0, 2.0, 0.05e-3  # um, cm, um, rad
+        bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 0.5, 5.0, 2.0, 0.05e-3, 0.001  # um, cm, um, rad
     else:  # Conservative err estimates
-        bw_err, beta_star_err, offset_err, angle_err = 1.0, 10.0, 5.0, 0.1e-3  # um, cm, um, rad
+        bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 1.0, 10.0, 5.0, 0.1e-3, 0.005  # um, cm, um, rad
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
@@ -99,6 +100,7 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
     blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
     yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+    collider_sim.set_longitudinal_fit_scaling(blue_len_scaling, yellow_len_scaling)
 
     # Sample beam parameters
     sample_results = []
@@ -120,11 +122,14 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
         blue_y_angle_i = np.random.normal(blue_y_angle, angle_err)
         yellow_x_angle_i = np.random.normal(yellow_x_angle, angle_err)
         yellow_y_angle_i = np.random.normal(yellow_y_angle, angle_err)
+        blue_len_scale_i = np.random.normal(blue_len_scaling, len_scale_err)
+        yellow_len_scale_i = np.random.normal(yellow_len_scaling, len_scale_err)
 
         collider_sim.set_bunch_rs(np.array([blue_x_offset_i, blue_y_offset_i, -6.e6]), np.array([0., 0., +6.e6]))
         collider_sim.set_bunch_beta_stars(*beta_star_scaled_i)
         collider_sim.set_bunch_sigmas(np.array([bw_x_i, bw_y_i]), np.array([bw_x_i, bw_y_i]))
         collider_sim.set_bunch_crossing(blue_x_angle_i, blue_y_angle_i, yellow_x_angle_i, yellow_y_angle_i)
+        collider_sim.set_longitudinal_fit_scaling(blue_len_scale_i, yellow_len_scale_i)
 
         collider_sim.run_sim_parallel()
         luminosity = collider_sim.get_naked_luminosity()

@@ -22,14 +22,14 @@ from Measure import Measure
 def main():
     vernier_scan_date = 'Aug12'
     # vernier_scan_date = 'Jul11'
-    cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
-    # cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
+    # cad_measurements_path = 'C:/Users/Dylan/Desktop/vernier_scan/CAD_Measurements/'
+    cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan/CAD_Measurements/'
     cw_rate_path = 'cw_rates.txt'
     # crossing_angle(cad_measurements_path, vernier_scan_date)
     # bunch_length(cad_measurements_path, vernier_scan_date)
     # beam_offset_and_intensity(cad_measurements_path, vernier_scan_date)
-    # plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, False)
-    plot_individual_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, True)
+    plot_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, False)
+    # plot_individual_beam_longitudinal_measurements(cad_measurements_path, vernier_scan_date, True)
     # combine_cad_measurements(cad_measurements_path, vernier_scan_date, cw_rate_path)
     plt.show()
     print('donzo')
@@ -334,7 +334,15 @@ def bunch_length(cad_measurements_path, vernier_scan_date):
     file_path = f'{cad_measurements_path}VernierScan_{vernier_scan_date}_bunch_length.dat'
     data = read_bunch_length(file_path)
     convert_bunch_length_to_distance(data)
-    plot_bunch_length(data)
+
+    bnl_tz = pytz.timezone('America/New_York')
+    profile_times = {
+        'Jul11': bnl_tz.localize(datetime(2024, 7, 11, 14, 3)),
+        'Aug12': bnl_tz.localize(datetime(2024, 8, 12, 14, 29))
+    }
+    profile_time = profile_times[vernier_scan_date]
+
+    plot_bunch_length(data, profile_time)
 
 
 def beam_offset_and_intensity(cad_measurements_path, vernier_scan_date):
@@ -363,18 +371,22 @@ def plot_crossing_angle(data):
     plt.tight_layout()
 
 
-def plot_bunch_length(data):
+def plot_bunch_length(data, profile_time=None):
     plt.figure(figsize=(12, 6))
 
     plt.plot(list(data['time']), list(data['blue_bunch_length']), label='Blue', color='blue', marker='o')
     plt.plot(list(data['time']), list(data['yellow_bunch_length']), label='Yellow', color='orange', marker='o')
+    if profile_time:
+        plt.axvline(profile_time, color='red', linestyle='--', alpha=1.0, label='Z-Profile Measurement')
 
-    plt.xlabel('Time')
     plt.ylabel('Bunch Length (m)')
-    plt.title('Bunch Length vs Time')
+    plt.annotate('Bunch Length Expansion over the Vernier Scan', (0.03, 0.65), xycoords='axes fraction',
+                 ha='left', va='top', fontsize=16, bbox=dict(facecolor='white', boxstyle='round,pad=0.5', ec='none'))
     plt.legend()
     plt.grid(True)
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=0)
+    # Set format of x-axis to be time and display month/day hour:minute
+    plt.gca().xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%b %d %H:%M'))
     plt.tight_layout()
 
 

@@ -14,8 +14,9 @@ from vernier_z_vertex_fitting_clean import create_dir
 
 
 def main():
+    err_type = 'conservative'  # 'best'
     out_dir_name = 'output'
-    file_name = 'combined_lumis.csv'
+    file_name = f'{err_type}_err_combined_lumis.csv'
 
     sphenix_sftp_alias = 'sph-sftp'
     sphenix_run_dir = '/sphenix/u/dneffsph/sPHENIX_Vernier_Scan_Simulation/run_rcf_jobs_lumi_calc/'

@@ -61,7 +61,7 @@ def analyze_residuals(df, scan_date, orientation, interpolator):
     betastar = df['betastar']
     residuals = df['residual_mean']
 
-    good_betastar = [80, 85, 90, 95, 100, 105]
+    good_betastar = [80, 85, 90, 95, 100, 105, 110, 115]
     bwx = bwx[betastar.isin(good_betastar)]
     bwy = bwy[betastar.isin(good_betastar)]
     residuals = residuals[betastar.isin(good_betastar)]
@@ -211,9 +211,10 @@ def analyze_residuals(df, scan_date, orientation, interpolator):
     unique_betastars = np.unique(betastar)
     # Define figure and gridspec
     fig_2d = plt.figure(figsize=(16, 8))
-    gs = gridspec.GridSpec(2, 4, width_ratios=[1, 1, 1, 0.1], height_ratios=[1, 1])
+    n_row, n_col = 3, 3
+    gs = gridspec.GridSpec(n_row, n_col + 1, width_ratios=[1, 1, 1, 0.1], height_ratios=[1, 1, 1])
 
-    axes_2d = [fig_2d.add_subplot(gs[i, j]) for i in range(2) for j in range(3)]
+    axes_2d = [fig_2d.add_subplot(gs[i, j]) for i in range(n_row) for j in range(n_col)]
 
     # Create meshgrid
     p1_range = np.linspace(min(bwx), max(bwx), 100)

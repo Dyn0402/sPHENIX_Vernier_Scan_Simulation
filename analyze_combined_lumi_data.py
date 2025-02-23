@@ -12,9 +12,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit as cf
 from scipy.special import erf
+from scipy.stats.distributions import norm
 import pandas as pd
 
 from Measure import Measure
+from vernier_z_vertex_fitting import read_cad_measurement_file
 
 
 def main():
@@ -35,12 +37,14 @@ def main():
     # Plot histogram of luminosity
     luminosities = combined_lumis['luminosity']
     fig_lumi_hist, ax_lumi_hist = plt.subplots(figsize=(8, 6))
-    hist, bin_edges, _ = ax_lumi_hist.hist(luminosities, bins=100)
+    hist, bin_edges, _ = ax_lumi_hist.hist(luminosities, bins=100, density=True)
 
     # Calculate standard deviation and plot a Gaussian with same standard deviation
     std = np.std(luminosities)
+    asym_left, asym_right = np.percentile(luminosities, 16), np.percentile(luminosities, 84)
+    print(asym_left, asym_right)
     x = np.linspace(min(bin_edges), max(bin_edges), 1000)
-    y = gaus(x, amp=max(hist), loc=lumi_bs_90, scale=std)
+    y = norm.pdf(x, lumi_bs_90, std)
     ax_lumi_hist.plot(x, y, color='r', ls='--', label='Normal Approximation')
 
     lumi_bs_90_meas = Measure(lumi_bs_90, std)
@@ -58,40 +62,111 @@ def main():
     ax_lumi_hist.axvline(lumi_bs_90, color='r', label='Beta Star 90 cm')
     ax_lumi_hist.axvline(lumi_bs_105, color='g', label='Beta Star 105 cm')
     ax_lumi_hist.axvline(lumi_gaus, color='b', label='Gaussian Approximation')
+    ax_lumi_hist.axvline(asym_left, color='purple')
+    ax_lumi_hist.axvline(asym_right, color='purple')
     ax_lumi_hist.set_xlabel('Naked Luminosity [1/µm²]')
-    ax_lumi_hist.set_ylabel('Counts')
+    ax_lumi_hist.set_ylabel('Probability')
     ax_lumi_hist.legend()
     fig_lumi_hist.tight_layout()
-    plt.show()
+    # plt.show()
 
-    # Plot correlation plot of luminosity vs beta star
-    beta_stars = combined_lumis['beta_star']
-    fig_betastar_corr, ax_betastar_corr = plt.subplots()
-    ax_betastar_corr.scatter(beta_stars, luminosities, alpha=0.5)
-    ax_betastar_corr.set_title('Naked Luminosity vs Beta Star')
-    ax_betastar_corr.set_xlabel('Beta Star [cm]')
-    ax_betastar_corr.set_ylabel('Naked Luminosity [1/µm²]')
-    fig_betastar_corr.tight_layout()
-
-    # Plot bwx and bwy vs beta star
-    bwx = combined_lumis['bw_x']
-    bwy = combined_lumis['bw_y']
-    fig_bw_betastar, ax_bw_betastar = plt.subplots()
-    ax_bw_betastar.scatter(beta_stars, bwx, alpha=0.5, label='Beam Width X')
-    ax_bw_betastar.scatter(beta_stars, bwy, alpha=0.5, label='Beam Width Y')
-    ax_bw_betastar.set_title('Beam Width vs Beta Star')
-    ax_bw_betastar.set_xlabel('Beta Star [cm]')
-    ax_bw_betastar.set_ylabel('Beam Width [cm]')
-    ax_bw_betastar.legend()
-    fig_bw_betastar.tight_layout()
+    # # Plot correlation plot of luminosity vs beta star
+    # beta_stars = combined_lumis['beta_star']
+    # fig_betastar_corr, ax_betastar_corr = plt.subplots()
+    # ax_betastar_corr.scatter(beta_stars, luminosities, alpha=0.5)
+    # ax_betastar_corr.set_title('Naked Luminosity vs Beta Star')
+    # ax_betastar_corr.set_xlabel('Beta Star [cm]')
+    # ax_betastar_corr.set_ylabel('Naked Luminosity [1/µm²]')
+    # fig_betastar_corr.tight_layout()
+    #
+    # # Plot bwx and bwy vs beta star
+    # bwx = combined_lumis['bw_x']
+    # bwy = combined_lumis['bw_y']
+    # fig_bw_betastar, ax_bw_betastar = plt.subplots()
+    # ax_bw_betastar.scatter(beta_stars, bwx, alpha=0.5, label='Beam Width X')
+    # ax_bw_betastar.scatter(beta_stars, bwy, alpha=0.5, label='Beam Width Y')
+    # ax_bw_betastar.set_title('Beam Width vs Beta Star')
+    # ax_bw_betastar.set_xlabel('Beta Star [cm]')
+    # ax_bw_betastar.set_ylabel('Beam Width [cm]')
+    # ax_bw_betastar.legend()
+    # fig_bw_betastar.tight_layout()
 
     # Write lumis to file
     def_lumis['luminosity_err'] = std
     def_lumis.to_csv(f'lumi_vs_beta_star.csv', index=False)
 
+    # MBD Cross Section
+    max_rate_path = 'max_rate.txt'
+    cad_measurement_path = 'CAD_Measurements/VernierScan_Aug12_combined.dat'
+    max_rate = read_max_rate(max_rate_path)
+    cad_data = read_cad_measurement_file(cad_measurement_path)
+
+    n_bunch = 111
+
+    max_rate_per_bunch = max_rate / n_bunch
+
+    f_beam = 78.4  # kHz
+    n_blue, n_yellow = get_nblue_nyellow(cad_data, orientation='Horizontal', step=1, n_bunch=n_bunch)  # n_protons
+    print(f'N Blue: {n_blue:.2e}, N Yellow: {n_yellow:.2e}')
+    mb_to_um2 = 1e-19
+
+    lumis = luminosities * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
+    max_rate_samples = np.random.normal(max_rate_per_bunch.val, max_rate_per_bunch.err, len(lumis))
+    cross_sections = max_rate_samples / lumis
+
+    std_cross_section = np.std(cross_sections)
+    cross_section_bs_90 = max_rate_per_bunch.val / (lumi_bs_90 * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+    cross_section_bs_105 = max_rate_per_bunch.val / (lumi_bs_105 * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+    asym_cross_sec_left, asym_cross_sec_right = np.percentile(cross_sections, 16), np.percentile(cross_sections, 84)
+
+    fig_cross_section_hist, ax_cross_section_hist = plt.subplots()
+    hist_cross_section, bin_edges_cross_section, _ = ax_cross_section_hist.hist(cross_sections, bins=100, density=True)
+
+    x_cross_sec = np.linspace(min(bin_edges_cross_section), max(bin_edges_cross_section), 1000)
+    y_cross_sec = norm.pdf(x_cross_sec, cross_section_bs_90, std_cross_section)
+    ax_cross_section_hist.plot(x_cross_sec, y_cross_sec, color='r', ls='--', label='Normal Approximation')
+
+    ax_cross_section_hist.axvline(cross_section_bs_90, color='red', label='bs = 90')
+    ax_cross_section_hist.axvline(cross_section_bs_105, color='green', label='bs = 105')
+    ax_cross_section_hist.axvline(asym_cross_sec_left, color='purple')
+    ax_cross_section_hist.axvline(asym_cross_sec_right, color='purple')
+    ax_cross_section_hist.set_xlabel('MBD Cross Section [mb]')
+    ax_cross_section_hist.set_ylabel('Probability')
+    ax_cross_section_hist.legend()
+    fig_cross_section_hist.tight_layout()
+
+    cross_section_bs90_meas = Measure(cross_section_bs_90, std_cross_section)
+    cross_section_bs105_meas = Measure(cross_section_bs_105, std_cross_section)
+    left_err90, right_err90 = asym_cross_sec_left - cross_section_bs_90, asym_cross_sec_right - cross_section_bs_90
+    left_err105, right_err105 = asym_cross_sec_left - cross_section_bs_105, asym_cross_sec_right - cross_section_bs_105
+    print(f'MBD Cross-Section bs90: {cross_section_bs90_meas}, {left_err90} +{right_err90}')
+    print(f'MBD Cross-Section bs105: {cross_section_bs105_meas}, {left_err105} +{right_err105}')
+
+
+    # print(f'Max Rate Per Bunch: {max_rate_per_bunch} Hz')
+    # for index, row in lumi_data.iterrows():
+    #     beta_star = row['beta_star']
+    #     naked_lumi = Measure(row['luminosity'], row['luminosity_err'])
+    #     lumi = naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
+    #     cross_section = max_rate_per_bunch / lumi
+    #     print(f'Beta Star: {beta_star} cm, Luminosity: {lumi} mb⁻¹s⁻¹, Cross Section: {cross_section} mb')
+
     plt.show()
 
     print('donzo')
+
+def read_max_rate(path):
+    with open(path, 'r') as file:
+        max_rate = file.readline().split()
+        max_rate = Measure(float(max_rate[0]), float(max_rate[2]))
+    return max_rate
+
+def get_nblue_nyellow(cad_data, orientation='Horizontal', step=1, n_bunch=111):
+    cad_step = cad_data[(cad_data['orientation'] == orientation) & (cad_data['step'] == step)].iloc[0]
+    print(cad_step)
+    wcm_blue, wcm_yellow = cad_step['dcct_blue'], cad_step['dcct_yellow']
+    n_blue, n_yellow = wcm_blue * 1e9 / n_bunch, wcm_yellow * 1e9 / n_bunch
+    return n_blue, n_yellow
 
 
 def skew_normal_pdf(x, amp=1, loc=0, scale=1, alpha=0):
@@ -122,6 +197,10 @@ def skew_normal_pdf(x, amp=1, loc=0, scale=1, alpha=0):
 
 def gaus(x, amp=1, loc=0, scale=1):
     return amp * np.exp(-(x - loc)**2 / (2 * scale**2))
+
+
+def gaus_pdf(x, loc=0, scale=1):
+    pass
 
 
 if __name__ == '__main__':

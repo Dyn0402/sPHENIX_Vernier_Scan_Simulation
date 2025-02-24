@@ -8,13 +8,21 @@ Created as sPHENIX_Vernier_Scan_Simulation/read_cw_rates_from_root
 @author: Dylan Neff, dn277127
 """
 
+import platform
 import numpy as np
 import matplotlib.pyplot as plt
 import uproot
 
 
 def main():
-    path = f'/local/home/dn277127/Bureau/vernier_scan/vertex_data/MBDNSCount.root'
+    if platform.system() == 'Linux':
+        base_path = '/local/home/dn277127/Bureau/vernier_scan/vertex_data/'
+    elif platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/vernier_scan/vertex_data/'
+    else:
+        base_path = ''
+        print('Unknown system, no base path set.')
+    path = f'{base_path}MBDNSCount.root'
     bunch_revolution_frequency = 78.4  # kHz
     n_bunches = 111
     write = True

@@ -30,6 +30,9 @@ def main():
     vertical_head_on_rates_corr = get_head_on_rates(*vertical_rates_corr)
     horizontal_head_on_rates_corr = get_head_on_rates(*horizontal_rates_corr)
 
+    # save_path = None
+    save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/rate_measurement/'
+
     vertical_head_on_rates = [Measure(rc.val, r.err * rc.val / r.val)
                               for r, rc in zip(vertical_head_on_rates, vertical_head_on_rates_corr)]
     horizontal_head_on_rates = [Measure(rc.val, r.err * rc.val / r.val)
@@ -104,24 +107,24 @@ def main():
     df['scaled_rate_err'] = df['rate_err'] * df['lumi_scale']
 
     # Plot original rates and scaled rates vs time, coloring vertical and horizontal separately
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax_lumi = ax.twinx()
+    fig_comp, ax_comp = plt.subplots(figsize=(10, 4))
+    ax_lumi = ax_comp.twinx()
     for scan_orientation in scan_orientations:
         scan_df = df[df['scan_orientation'] == scan_orientation]
         times = np.array(pd.to_datetime(scan_df['time']))
-        ax.errorbar(times, np.array(scan_df['rate']) / 1e3, yerr=np.array(scan_df['scaled_rate_err']) / 1e3, fmt='o',
+        ax_comp.errorbar(times, np.array(scan_df['rate']) / 1e3, yerr=np.array(scan_df['scaled_rate_err']) / 1e3, fmt='o',
                     label=f'{scan_orientation} Rate', color=scan_df['color'].iloc[0])
-        ax.errorbar(times, np.array(scan_df['scaled_rate']) / 1e3, yerr=np.array(scan_df['scaled_rate_err']) / 1e3,
+        ax_comp.errorbar(times, np.array(scan_df['scaled_rate']) / 1e3, yerr=np.array(scan_df['scaled_rate_err']) / 1e3,
                     fmt='s', label=f'{scan_orientation} Scaled Rate', color=scan_df['color'].iloc[0])
     times = np.array(pd.to_datetime(df['time']))
     ax_lumi.plot(times, np.array(df['luminosity']), label=f'Naked Luminosity', color='red', alpha=0.5, zorder=0)
-    ax.set_ylabel('Rate [kHz]')
+    ax_comp.set_ylabel('Rate [kHz]')
     # Naked luminosity is inverse micron squared
     ax_lumi.set_ylabel('Naked Luminosity [1/µm²]')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
-    ax.legend()
+    ax_comp.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
+    ax_comp.legend()
     ax_lumi.legend()
-    fig.tight_layout()
+    fig_comp.tight_layout()
 
     # Calculate the error weighted mean of the scaled rate
     mean_rate = np.average(df['scaled_rate'], weights=1 / df['scaled_rate_err'] ** 2)
@@ -131,38 +134,46 @@ def main():
     mean_rate_std_meas = Measure(mean_rate, rate_std) / 1e3  # kHz
 
     # Plot just the scaled rates vs time
-    fig, ax = plt.subplots(figsize=(10, 4))
+    fig_cor, ax_cor = plt.subplots(figsize=(10, 4))
     times = np.array(pd.to_datetime(df['time']))
-    ax.errorbar(times, np.array(df['scaled_rate']) / 1e3, yerr=np.array(df['scaled_rate_err']) / 1e3, fmt='o',
+    ax_cor.errorbar(times, np.array(df['scaled_rate']) / 1e3, yerr=np.array(df['scaled_rate_err']) / 1e3, fmt='o',
                 label=f'Scaled Rate', color='black')
-    ax.axhline(mean_rate / 1e3, color='red', label=f'Mean Rate')
-    ax.fill_between(times, (mean_rate - mean_rate_err) / 1e3, (mean_rate + mean_rate_err) / 1e3, color='red', alpha=0.5,
+    ax_cor.axhline(mean_rate / 1e3, color='red', label=f'Mean Rate')
+    ax_cor.fill_between(times, (mean_rate - mean_rate_err) / 1e3, (mean_rate + mean_rate_err) / 1e3, color='red', alpha=0.5,
                     label='1σ Error')
-    ax.fill_between(times, (mean_rate - rate_std) / 1e3, (mean_rate + rate_std) / 1e3, color='red', alpha=0.2,
+    ax_cor.fill_between(times, (mean_rate - rate_std) / 1e3, (mean_rate + rate_std) / 1e3, color='red', alpha=0.2,
                     label=f'1σ Spread')
     mean_str = (f'Mean rate with standard error: {mean_rate_meas} kHz\n'
                 f'Mean rate with standard deviation as error: {mean_rate_std_meas} kHz')
-    ax.annotate(mean_str, (0.5, 0.08), xycoords='axes fraction', va='bottom', ha='center', fontsize=14,
+    ax_cor.annotate(mean_str, (0.5, 0.08), xycoords='axes fraction', va='bottom', ha='center', fontsize=14,
                 bbox=dict(facecolor='wheat', alpha=0.3, boxstyle='round,pad=0.5'))
-    ax.set_ylabel('Rate [kHz]')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
-    ax.legend()
-    fig.tight_layout()
+    ax_cor.set_ylabel('Rate [kHz]')
+    ax_cor.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
+    ax_cor.legend()
+    fig_cor.tight_layout()
 
     # Plot the blue and yellow crossing angles vs time
-    fig, ax = plt.subplots(figsize=(10, 4))
+    fig_xing, ax_xing = plt.subplots(figsize=(10, 4))
     times = np.array(pd.to_datetime(df['time']))
-    ax.plot(times, np.array(df['blue_angle_x']), marker='o', ls='-', label='Horizontal (X) Blue Angle', color='blue')
-    ax.plot(times, np.array(df['yellow_angle_x']), marker='o', ls='-', label='Horizontal (X) Yellow Angle', color='orange')
-    ax.set_ylabel('Crossing Angle [mrad]')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
-    ax.legend()
-    fig.tight_layout()
+    ax_xing.plot(times, np.array(df['blue_angle_x']), marker='o', ls='-', label='Horizontal (X) Blue Angle', color='blue')
+    ax_xing.plot(times, np.array(df['yellow_angle_x']), marker='o', ls='-', label='Horizontal (X) Yellow Angle', color='orange')
+    ax_xing.set_ylabel('Crossing Angle [mrad]')
+    ax_xing.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
+    ax_xing.legend()
+    fig_xing.tight_layout()
 
     # Write mean and std uncertainty to file
     print(f'Mean rate: {mean_rate_std_meas} kHz')
     with open('max_rate.txt', 'w') as file:
         file.write(f'{mean_rate} +- {rate_std} Hz')
+
+    if save_path:
+        fig_comp.savefig(f'{save_path}rate_comparison_{scan_date}.png')
+        fig_comp.savefig(f'{save_path}rate_comparison_{scan_date}.pdf')
+        fig_cor.savefig(f'{save_path}rate_average_{scan_date}.png')
+        fig_cor.savefig(f'{save_path}rate_average_{scan_date}.pdf')
+        fig_xing.savefig(f'{save_path}crossing_angles_{scan_date}.png')
+        fig_xing.savefig(f'{save_path}crossing_angles_{scan_date}.pdf')
 
     plt.show()
 

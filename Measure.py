@@ -44,6 +44,9 @@ class Measure:
     def err(self):
         del self._err
 
+    def str_latex(self):
+        return str(self).replace(' ± ', ' \\pm ')
+
     def __neg__(self):
         return Measure(-self.val, self.err)
 

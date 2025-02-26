@@ -27,7 +27,8 @@ def main():
     # base_path = '/home/dylan/Desktop/vernier_scan/'
     # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
 
-    run_fitting(base_path)
+    # run_fitting(base_path)
+    run_fitting_opt_from_file(base_path)
     # fit_residual_curves(base_path)
 
     print('donzo')
@@ -65,6 +66,38 @@ def run_fitting(base_path):
                 fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
                                                       pdf_out_path, orientation, vernier_scan_date, beam_widths,
                                                       default_bws, beta_star)
+
+
+def run_fitting_opt_from_file(base_path):
+    vernier_scan_dates = ['Aug12']
+    orientations = ['Horizontal', 'Vertical']
+    for scan_date in vernier_scan_dates:
+        opt_file_path = f'run_rcf_jobs/output/{scan_date}/bw_opt_vs_beta_star.txt'
+        df = pd.read_csv(opt_file_path)
+        df.columns = ['beta_star', 'bw_x', 'bw_y']  # Rename columns
+
+        dist_root_file_name = f'vernier_scan_{scan_date}_mbd_vertex_z_distributions.root'
+        z_vertex_root_path = f'{base_path}vertex_data/{dist_root_file_name}'
+        cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{scan_date}_combined.dat'
+        longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{scan_date}_COLOR_longitudinal_fit.dat'
+
+        for beta_star in df['beta_star']:
+            bw_fitting_path = f'{base_path}Analysis/bw_fitting/bstar{int(beta_star + 0.5)}/'
+            create_dir(bw_fitting_path)
+
+            vernier_date_path = f'{bw_fitting_path}{scan_date}/'
+            create_dir(vernier_date_path)
+
+            row_beta_star = df[df['beta_star'] == beta_star].iloc[0]
+            bw_x, bw_y = row_beta_star['bw_x'], row_beta_star['bw_y']
+            default_bws = {'Horizontal': bw_x, 'Vertical': bw_y}
+
+            for orientation in orientations:
+                pdf_out_path = f'{vernier_date_path}{orientation.lower()}/'
+                create_dir(pdf_out_path)
+                fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
+                                                      pdf_out_path, orientation, scan_date,
+                                                      np.array([default_bws[orientation]]), default_bws, beta_star)
 
 
 def fit_residual_curves(base_path):
@@ -137,7 +170,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     plot_dict = {'bws': beam_widths, 'residual_means': [], 'steps': [], 'residuals': []}
     for bw in beam_widths:
         title_bw = f'{title_base} Beam Width {bw} µm'
-        bw_out_path = create_dir(f'{out_path}{bw}/')
+        bw_out_path = create_dir(f'{out_path}{bw:.1f}/')
         bw_xy = [bw, bw]
         if default_bws is not None:
             if orientation == 'Horizontal':

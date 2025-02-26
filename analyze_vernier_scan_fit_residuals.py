@@ -8,6 +8,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/analyze_vernier_scan_fit_residuals
 @author: Dylan Neff, dn277127
 """
 
+import platform
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -28,7 +29,10 @@ def main():
     # interpolator = 'linear'
     interpolator = 'cubic'  # 'linear'
     # save_path = None
-    save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/BW_Measurement/'
+    if platform.system() == 'Linux':
+        save_path = '/local/home/dn277127/Bureau/vernier_scan/presentation/analysis_note/BW_Measurement/'
+    else:  # Windows
+        save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/BW_Measurement/'
 
     for scan_date in scan_dates:
         df_orientations = []
@@ -186,8 +190,8 @@ def analyze_residuals(df, scan_date, orientation, interpolator, save_path=None):
             opt_x, opt_y = bwy_opt, betastar_opt
             opt_z, opt_z_lab, opt_z_unit = bwx_opt, 'Beam Width X', 'µm'
 
-        ax[ax_i].contourf(P1, P2, Z, levels=20, cmap='viridis')
-        ax[ax_i].scatter(opt_x, opt_y, color='red', marker='x')
+        ax[ax_i].contourf(P1, P2, Z, levels=20, cmap='jet_r')
+        ax[ax_i].scatter(opt_x, opt_y, color='black', marker='x')
         ax[ax_i].set_xlabel(f'{p1_lab} [{p1_unit}]')
         ax[ax_i].set_ylabel(f'{p2_lab} [{p2_unit}]')
         ax[ax_i].annotate(f'Optimal {opt_z_lab} = {opt_z:.1f} {opt_z_unit}', xy=(0.95, 0.05), xycoords='axes fraction',

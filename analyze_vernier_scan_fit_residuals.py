@@ -40,7 +40,7 @@ def main():
             file_path = f'{out_dir_name}/{scan_date}/{orientation}/{file_name}'
             df = pd.read_csv(file_path)
             df_orientations.append(df)
-            # analyze_residuals(df, scan_date, orientation, interpolator, save_path)
+            analyze_residuals(df, scan_date, orientation, interpolator, save_path)
         # Combine orientation results, summing residuals
         df_combined = sum_orientation_residuals(df_orientations)
         analyze_residuals(df_combined, scan_date, 'Combined', interpolator, save_path)

@@ -10,6 +10,8 @@ Created as sPHENIX_Vernier_Scan_Simulation/analyze_combined_lumi_data
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import PathPatch
+import matplotlib.path as mpath
 from scipy.optimize import curve_fit as cf
 from scipy.special import erf
 from scipy.stats.distributions import norm
@@ -40,7 +42,7 @@ def main():
     # Plot histogram of luminosity
     luminosities = combined_lumis['luminosity']
     fig_lumi_hist, ax_lumi_hist = plt.subplots(figsize=(8, 6))
-    hist, bin_edges, _ = ax_lumi_hist.hist(luminosities, bins=100, density=True, color='k')
+    hist, bin_edges, _ = ax_lumi_hist.hist(luminosities, bins=100, density=True, color='k', histtype='step')
 
     # Calculate standard deviation and plot a Gaussian with same standard deviation
     std = np.std(luminosities)
@@ -65,7 +67,15 @@ def main():
     ax_lumi_hist.axvline(lumi_bs_90, color='r', label=r'$\beta^* =$ 90 cm')
     ax_lumi_hist.axvline(lumi_bs_105, color='g', label=r'$\beta^* =$ 105 cm')
     ax_lumi_hist.axvline(lumi_gaus, color='b', label='Gaussian Approximation')
-    ax_lumi_hist.fill_betweenx([0, max(hist)], asym_left, asym_right, color='yellow', alpha=0.2, label='68% CI')
+
+    # Plot a bar plot under the step distribution between the 16th and 84th percentiles
+    bin_centers = (bin_edges[1:] + bin_edges[:-1]) / 2
+    bin_width = bin_edges[1] - bin_edges[0]
+    ci_filter = (bin_centers >= asym_left) & (bin_centers <= asym_right)
+    bin_centers_ci = bin_centers[ci_filter]
+    hist_ci = hist[ci_filter]
+    ax_lumi_hist.bar(bin_centers_ci, hist_ci, width=bin_width, color='k', alpha=0.4, label='68% CI')
+
     ax_lumi_hist.set_xlabel('Naked Luminosity [1/µm²]')
     ax_lumi_hist.set_ylabel('Probability')
     ax_lumi_hist.legend()
@@ -137,7 +147,15 @@ def main():
 
     fig_cross_section_hist, ax_cross_section_hist = plt.subplots(figsize=(8, 6))
     hist_cross_section, bin_edges_cross_section, _ = ax_cross_section_hist.hist(cross_sections, bins=100, density=True,
-                                                                                color='k')
+                                                                                color='k', histtype='step')
+    # Plot a bar plot under the step distribution between the 16th and 84th percentiles
+    bin_centers_cross_section = (bin_edges_cross_section[1:] + bin_edges_cross_section[:-1]) / 2
+    bin_width = bin_edges_cross_section[1] - bin_edges_cross_section[0]
+    ci_filter = (bin_centers_cross_section >= asym_cross_sec_left) & (bin_centers_cross_section <= asym_cross_sec_right)
+    bin_centers_ci = bin_centers_cross_section[ci_filter]
+    hist_ci = hist_cross_section[ci_filter]
+    ax_cross_section_hist.bar(bin_centers_ci, hist_ci, width=bin_width, color='k',
+                              alpha=0.4, label='68% CI')
 
     x_cross_sec = np.linspace(min(bin_edges_cross_section), max(bin_edges_cross_section), 1000)
     y_cross_sec = norm.pdf(x_cross_sec, cross_section_bs_90, std_cross_section)
@@ -145,8 +163,9 @@ def main():
 
     ax_cross_section_hist.axvline(cross_section_bs_90, color='red', label=r'$\beta^* =$ 90 cm')
     ax_cross_section_hist.axvline(cross_section_bs_105, color='green', label=r'$\beta^* =$ 105 cm')
-    ax_cross_section_hist.fill_betweenx([0, max(hist_cross_section)], asym_cross_sec_left, asym_cross_sec_right,
-                                        color='yellow', alpha=0.2, label='68% CI')
+    ax_cross_section_hist.axvline(cross_section_gaus, color='blue', label='Gaussian Approximation')
+    # ax_cross_section_hist.fill_betweenx([0, max(hist_cross_section)], asym_cross_sec_left, asym_cross_sec_right,
+    #                                     color='yellow', alpha=0.2, label='68% CI')
     ax_cross_section_hist.set_xlabel('MBD Cross Section [mb]')
     ax_cross_section_hist.set_ylabel('Probability')
     ax_cross_section_hist.annotate(full_cross_str, (0.4, 0.4), xycoords='axes fraction', ha='left', va='bottom',

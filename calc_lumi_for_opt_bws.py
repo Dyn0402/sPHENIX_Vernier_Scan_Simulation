@@ -8,6 +8,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/calc_lumi_for_opt_bws
 @author: Dylan Neff, dn277127
 """
 
+import platform
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -19,6 +20,10 @@ from luminosity_calculation_rcf import get_bw_beta_star_fit_params, get_bw_from_
 def main():
     scan_date = 'Aug12'
     beta_star_bw_fit_path = f'run_rcf_jobs/output/{scan_date}/bw_opt_vs_beta_star_fits.txt'
+    if platform.system() == 'Linux':
+        save_path = '/local/home/dn277127/Bureau/vernier_scan/presentation/analysis_note/Cross_Section/'
+    else:  # Windows
+        save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/Cross_Section/'
 
     # Get fit parameters
     bw_beta_star_fit_params = get_bw_beta_star_fit_params(beta_star_bw_fit_path)
@@ -84,25 +89,23 @@ def main():
         luminosity = collider_sim.get_naked_luminosity()
         lumis_dict.update({beta_star: luminosity})
 
-    lumis = list(lumis_dict.values())
+    lumis = np.array(list(lumis_dict.values())) * 1e6  # Convert to 1/mm^2
 
     # Plot lumi vs beta star
-    fig, ax = plt.subplots()
-    ax.plot(lumi_calc_beta_stars, lumis, marker='o')
-    ax.set_title('Luminosity vs Beta Star')
-    ax.set_xlabel('Beta Star [cm]')
-    ax.set_ylabel('Naked Luminosity [1/µm²]')
-    fig.tight_layout()
+    fig_lumis, ax_lumis = plt.subplots(nrows=2, figsize=(10, 5), sharex='all')
+    ax_lumis[1].plot(lumi_calc_beta_stars, lumis, marker='o', markersize=10)
+    ax_lumis[1].set_xlabel('Beta Star [cm]')
+    ax_lumis[1].set_ylabel('Naked Luminosity [1/mm²]')
+    ax_lumis[1].annotate('Zoomed on Numerical Integration', xy=(0.1, 0.2), fontsize=16, xycoords='axes fraction',
+                         ha='left', va='center')
 
     # Plot again but with cw lumi as reference
-    fig, ax = plt.subplots()
-    ax.plot(lumi_calc_beta_stars, lumis, marker='o')
-    ax.axhline(y=naked_lumi_cw, color='r', linestyle='--', label='Gaussian Approximation')
-    ax.set_title('Luminosity vs Beta Star')
-    ax.set_xlabel('Beta Star [cm]')
-    ax.set_ylabel('Naked Luminosity [1/µm²]')
-    ax.legend()
-    fig.tight_layout()
+    ax_lumis[0].plot(lumi_calc_beta_stars, lumis, marker='o', markersize=10, label='Full Numerical Integration')
+    ax_lumis[0].axhline(y=naked_lumi_cw * 1e6, color='r', linestyle='--', label='Gaussian Approximation')
+    ax_lumis[0].set_xlabel('Beta Star [cm]')
+    ax_lumis[0].set_ylabel('Naked Luminosity [1/mm²]')
+    ax_lumis[0].legend()
+    fig_lumis.subplots_adjust(left=0.075, right=0.995, top=0.995, bottom=0.09, hspace=0.05)
 
     # Write lumis to file
     df = [
@@ -112,6 +115,10 @@ def main():
     ]
     df = pd.DataFrame(df)
     df.to_csv(f'lumi_vs_beta_star.csv', index=False)
+
+    # Save plots
+    fig_lumis.savefig(f'{save_path}lumi_vs_beta_star.png')
+    fig_lumis.savefig(f'{save_path}lumi_vs_beta_star.pdf')
 
     plt.show()
 

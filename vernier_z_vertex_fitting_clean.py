@@ -9,6 +9,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/vernier_z_vertex_fitting_clean.py
 """
 
 import os
+import platform
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize, minimize_scalar
@@ -23,9 +24,11 @@ from Measure import Measure
 
 
 def main():
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    if platform.system() == 'Linux':
+        base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    else:  # Windows
+        base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
     # base_path = '/home/dylan/Desktop/vernier_scan/'
-    # base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
 
     # run_fitting(base_path)
     run_fitting_opt_from_file(base_path)
@@ -81,6 +84,7 @@ def run_fitting_opt_from_file(base_path):
         cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{scan_date}_combined.dat'
         longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{scan_date}_COLOR_longitudinal_fit.dat'
 
+        df = df.sort_values(by='beta_star', ascending=False)  # sort beta_star in reverse order
         for beta_star in df['beta_star']:
             bw_fitting_path = f'{base_path}Analysis/bw_fitting/bstar{int(beta_star + 0.5)}/'
             create_dir(bw_fitting_path)
@@ -93,6 +97,7 @@ def run_fitting_opt_from_file(base_path):
             default_bws = {'Horizontal': bw_x, 'Vertical': bw_y}
 
             for orientation in orientations:
+                print(f'Starting {scan_date} {orientation} Scan with Beta Star {beta_star}')
                 pdf_out_path = f'{vernier_date_path}{orientation.lower()}/'
                 create_dir(pdf_out_path)
                 fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,

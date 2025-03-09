@@ -144,7 +144,9 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
             'blue_x_angle': blue_x_angle_i,
             'blue_y_angle': blue_y_angle_i,
             'yellow_x_angle': yellow_x_angle_i,
-            'yellow_y_angle': yellow_y_angle_i
+            'yellow_y_angle': yellow_y_angle_i,
+            'blue_len_scaling': blue_len_scale_i,
+            'yellow_len_scaling': yellow_len_scale_i
         }
         sample_results.append(sample_dict)
 

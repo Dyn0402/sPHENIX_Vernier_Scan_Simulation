@@ -10,6 +10,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/analyze_combined_lumi_data
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from matplotlib.patches import PathPatch
 import matplotlib.path as mpath
 from scipy.optimize import curve_fit as cf
@@ -31,6 +32,169 @@ def main():
 
     def_lumi_path = 'lumi_vs_beta_star.csv'
     def_lumis = pd.read_csv(def_lumi_path)
+
+    # run_full_analysis(def_lumis, combined_lumis, save_path)
+    # check_parameter_sensitivity(def_lumis, combined_lumis, save_path)
+    plot_lumi_crossing_angle_dependence(combined_lumis)
+
+    plt.show()
+
+    print('donzo')
+
+
+def check_parameter_sensitivity(def_lumis, combined_lumis, save_path=None):
+    """
+    Check the sensitivity of the luminosity and cross section distributions to the parameters of the luminosity
+    calculation.
+    :param def_lumis:
+    :param combined_lumis:
+    :param save_path:
+    :return:
+    """
+    # First, plot original luminosity histogram
+    luminosities = combined_lumis['luminosity']
+    fig_lumi_hist, ax_lumi_hist = plt.subplots(figsize=(8, 6))
+    hist, bin_edges, _ = ax_lumi_hist.hist(luminosities, bins=100, density=True, color='k', histtype='step')
+    ax_lumi_hist.set_xlabel('luminosity')
+    ax_lumi_hist.set_ylabel('Probability')
+    fig_lumi_hist.tight_layout()
+
+    # Start with offset. Plot normalized histograms of entries with constricting offsets.
+    combined_lumis['r_offset'] = np.sqrt(combined_lumis['blue_x_offset']**2 + combined_lumis['blue_y_offset']**2)
+
+    bin_width = 1  # µm
+    r_offset_bins = np.arange(0, int(combined_lumis['r_offset'].max()) + 1, bin_width)
+
+    # Plot histogram of r_offset
+    r_offsets = combined_lumis['r_offset']
+    fig_r_offset_hist, ax_r_offset_hist = plt.subplots(figsize=(8, 6))
+    hist, bin_edges, _ = ax_r_offset_hist.hist(r_offsets, bins=r_offset_bins, density=True, color='k', histtype='step')
+    ax_r_offset_hist.set_xlabel('r_offset [µm]')
+
+    # Make bins of 1 micron offset. Calculate average luminosity in each bin and plot. Use std as error.
+    lumi_bins = []
+    lumi_errs = []
+    for i in range(len(r_offset_bins) - 1):
+        bin_filter = (combined_lumis['r_offset'] >= r_offset_bins[i]) & (combined_lumis['r_offset'] < r_offset_bins[i+1])
+        lumi_bin = combined_lumis[bin_filter]['luminosity']
+        lumi_bins.append(np.mean(lumi_bin))
+        lumi_errs.append(np.std(lumi_bin) / np.sqrt(len(lumi_bin)))
+
+    fig_lumi_hist, ax_lum_hist = plt.subplots(figsize=(8, 6))
+    ax_lum_hist.errorbar(r_offset_bins[:-1], lumi_bins, yerr=lumi_errs, fmt='o', color='k')
+    ax_lum_hist.set_xlabel('r_offset [µm]')
+    ax_lum_hist.set_ylabel('Luminosity [1/µm²]')
+    ax_lum_hist.set_title('Luminosity vs r_offset')
+    fig_lumi_hist.tight_layout()
+
+    # Now check sensitivity to crossing angle.
+    combined_lumis['crossing_angle_x'] = combined_lumis['blue_x_angle'] - combined_lumis['yellow_x_angle']
+    combined_lumis['crossing_angle_y'] = combined_lumis['blue_y_angle'] - combined_lumis['yellow_y_angle']
+
+    # Plot histogram of crossing angle
+    crossing_angles_x = combined_lumis['crossing_angle_x'] * 1e3
+    crossing_angles_y = combined_lumis['crossing_angle_y'] * 1e3
+    fig_crossing_angle_hist, ax_crossing_angle_hist = plt.subplots(2, 1, figsize=(8, 6))
+    hist_x, bin_edges_x, _ = ax_crossing_angle_hist[0].hist(crossing_angles_x, bins=100, density=True, color='k', histtype='step')
+    hist_y, bin_edges_y, _ = ax_crossing_angle_hist[1].hist(crossing_angles_y, bins=100, density=True, color='k', histtype='step')
+    ax_crossing_angle_hist[0].set_xlabel('Crossing Angle X [mrad]')
+    ax_crossing_angle_hist[1].set_xlabel('Crossing Angle Y [mrad]')
+
+    # Separate x and y dimensions. Make 1 micron bins of x offset and 20 bins of x crossing angle.
+    # Plot luminosity vs x crossing angle for each x offset bin.
+    x_offset_bins = np.arange(0, int(combined_lumis['blue_x_offset'].max()) + 1, bin_width)
+    crossing_angle_bins = np.linspace(combined_lumis['crossing_angle_x'].min(), combined_lumis['crossing_angle_x'].max(), 20)
+    crossing_angle_bin_centers = (crossing_angle_bins[1:] + crossing_angle_bins[:-1]) / 2
+
+    fig_lumi_crossing_angle, ax_lumi_crossing_angle = plt.subplots(1, 1, figsize=(8, 6))
+    for i in range(len(x_offset_bins) - 1):
+        bin_filter = (combined_lumis['blue_x_offset'] >= x_offset_bins[i]) & (combined_lumis['blue_x_offset'] < x_offset_bins[i+1])
+        lumi_bin = combined_lumis[bin_filter]['luminosity']
+        crossing_angle_bin = combined_lumis[bin_filter]['crossing_angle_x']
+
+        print(f'x_offset: {x_offset_bins[i]} µm, n: {len(lumi_bin)}')
+
+        lumis, lumi_errs = [], []
+        for j in range(len(crossing_angle_bins) - 1):
+            angle_filter = (crossing_angle_bin >= crossing_angle_bins[j]) & (crossing_angle_bin < crossing_angle_bins[j+1])
+            lumi = np.mean(lumi_bin[angle_filter])
+            lumi_err = np.std(lumi_bin[angle_filter]) / np.sqrt(len(lumi_bin[angle_filter]))
+            print(f'angle: {crossing_angle_bin_centers[j]} mrad, n: {len(lumi_bin[angle_filter])}, lumi: {lumi:.2e} ± {lumi_err:.2e}')
+            lumis.append(lumi)
+            lumi_errs.append(lumi_err)
+
+        ax_lumi_crossing_angle.errorbar(crossing_angle_bin_centers, lumis, yerr=lumi_errs, fmt='o', label=f'{x_offset_bins[i]} µm')
+    ax_lumi_crossing_angle.set_xlabel('Crossing Angle X [mrad]')
+    ax_lumi_crossing_angle.set_ylabel('Luminosity [1/µm²]')
+
+
+    # It looks like offset doesn't actually matter much. Can you just make a plot of the luminosity vs crossing angle?
+    combined_lumis['crossing_angle'] = np.sqrt(combined_lumis['crossing_angle_x']**2 + combined_lumis['crossing_angle_y']**2)
+    combined_lumis['crossing_angle'] = combined_lumis['crossing_angle'] * 1e3
+
+    fig_lumi_crossing_angle, ax_lumi_crossing_angle = plt.subplots(figsize=(8, 6))
+    ax_lumi_crossing_angle.scatter(combined_lumis['crossing_angle'], combined_lumis['luminosity'], alpha=0.5)
+    ax_lumi_crossing_angle.set_title('Luminosity vs Crossing Angle')
+    ax_lumi_crossing_angle.set_xlabel('Crossing Angle [mrad]')
+    ax_lumi_crossing_angle.set_ylabel('Luminosity [1/µm²]')
+    fig_lumi_crossing_angle.tight_layout()
+
+
+def plot_lumi_crossing_angle_dependence(combined_lumis):
+    """
+    Plot the dependence of the luminosity on the crossing angle.
+    :param combined_lumis:
+    :return:
+    """
+    combined_lumis['crossing_angle_x'] = (combined_lumis['blue_x_angle'] - combined_lumis['yellow_x_angle']) * 1e3
+    combined_lumis['crossing_angle_y'] = (combined_lumis['blue_y_angle'] - combined_lumis['yellow_y_angle']) * 1e3
+    combined_lumis['crossing_angle'] = np.sqrt(combined_lumis['crossing_angle_x']**2 + combined_lumis['crossing_angle_y']**2)
+
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(2, 4, width_ratios=[1, 6, 0.15, 0.5], height_ratios=[1, 6], wspace=0.0, hspace=0.0)
+
+    # 2D histogram
+    ax_lumi_crossing_angle = fig.add_subplot(gs[1, 1])
+    hist, x_edges, y_edges, im = ax_lumi_crossing_angle.hist2d(combined_lumis['crossing_angle'],
+                                                               combined_lumis['luminosity'],
+                                                               bins=100, cmap='jet', cmin=1)
+    ax_lumi_crossing_angle.set_xlabel('Crossing Angle [mrad]')
+    ax_lumi_crossing_angle.set_ylabel('Luminosity [1/µm²]')
+    # Hide all y_axis labels and ticks
+    ax_lumi_crossing_angle.yaxis.set_tick_params(size=0)
+    ax_lumi_crossing_angle.yaxis.set_ticklabels([])
+
+    # Colorbar
+    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[1, 3]))
+    cbar.set_label('Number of Samples')
+
+    # Rotated 1D histogram of Luminosity
+    ax_lumi_hist = fig.add_subplot(gs[1, 0])
+    ax_lumi_hist.hist(combined_lumis['luminosity'], bins=y_edges, orientation='horizontal', color='black', alpha=1.0, histtype='step')
+    ax_lumi_hist.invert_xaxis()
+    ax_lumi_hist.xaxis.set_ticklabels([])
+    ax_lumi_hist.set_ylabel('Luminosity [1/µm²]')
+
+    # 1D histogram of Crossing Angle
+    ax_crossing_angle_hist = fig.add_subplot(gs[0, 1])
+    ax_crossing_angle_hist.hist(combined_lumis['crossing_angle'], bins=x_edges, color='black', alpha=1.0, histtype='step')
+    ax_crossing_angle_hist.set_yticklabels([])
+    ax_crossing_angle_hist.set_xticklabels([])
+
+    # fig.tight_layout()
+    fig.subplots_adjust(top=0.975, bottom=0.075, left=0.055, right=0.935, hspace=0.0, wspace=0.0)
+
+
+def run_full_analysis(def_lumis, combined_lumis, save_path=None):
+    # err_type = 'conservative'  # 'best'  ''
+    # combined_lumi_path = f'run_rcf_jobs_lumi_calc/output/{err_type}_err_combined_lumis.csv'
+    # combined_lumis = pd.read_csv(combined_lumi_path)
+    #
+    # # save_path = None
+    # save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/Cross_Section/'
+    #
+    # def_lumi_path = 'lumi_vs_beta_star.csv'
+    # def_lumis = pd.read_csv(def_lumi_path)
     print(def_lumis)
     lumi_bs_90 = def_lumis[def_lumis['beta_star'] == 90.0]['luminosity'].iloc[0]
     lumi_bs_105 = def_lumis[def_lumis['beta_star'] == 105.0]['luminosity'].iloc[0]
@@ -203,10 +367,6 @@ def main():
     bin_centers = (bin_edges_cross_section[1:] + bin_edges_cross_section[:-1]) / 2
     hist_df = pd.DataFrame({'bin_center': bin_centers, 'hist': hist_cross_section})
     hist_df.to_csv('mbd_cross_section_distribution.csv', index=False)
-
-    plt.show()
-
-    print('donzo')
 
 
 def read_max_rate(path):

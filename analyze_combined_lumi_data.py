@@ -36,6 +36,10 @@ def main():
     # run_full_analysis(def_lumis, combined_lumis, save_path)
     # check_parameter_sensitivity(def_lumis, combined_lumis, save_path)
     plot_lumi_crossing_angle_dependence(combined_lumis)
+    plot_lumi_offset_dependence(combined_lumis)
+    plot_lumi_beta_star_dependence(combined_lumis)
+    plot_lumi_bw_x_dependence(combined_lumis)
+    plot_lumi_bw_y_dependence(combined_lumis)
 
     plt.show()
 
@@ -182,6 +186,168 @@ def plot_lumi_crossing_angle_dependence(combined_lumis):
     ax_crossing_angle_hist.set_xticklabels([])
 
     # fig.tight_layout()
+    fig.subplots_adjust(top=0.975, bottom=0.075, left=0.055, right=0.935, hspace=0.0, wspace=0.0)
+
+
+def plot_lumi_offset_dependence(combined_lumis):
+    """
+    Plot the dependence of the luminosity on the offset.
+    :param combined_lumis:
+    :return:
+    """
+    combined_lumis["r_offset"] = np.sqrt(combined_lumis["blue_x_offset"]**2  + combined_lumis["blue_y_offset"]**2)
+
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(2, 4, width_ratios=[1, 6, 0.15, 0.5], height_ratios=[1, 6], wspace=0.0, hspace=0.0)
+
+    # 2D histogram
+    ax_lumi_offset = fig.add_subplot(gs[1, 1])
+    hist, x_edges, y_edges, im = ax_lumi_offset.hist2d(combined_lumis["r_offset"],
+                                                         combined_lumis["luminosity"],
+                                                            bins=100, cmap="jet", cmin=1)
+    ax_lumi_offset.set_xlabel("Offset [µm]")
+    ax_lumi_offset.set_ylabel("Luminosity [1/µm²]")
+    # Hide all y_axis labels and ticks
+    ax_lumi_offset.yaxis.set_tick_params(size=0)
+    ax_lumi_offset.yaxis.set_ticklabels([])
+
+    # Colorbar
+    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[1, 3]))
+    cbar.set_label("Number of Samples")
+
+    # Rotated 1D histogram of Luminosity
+    ax_lumi_hist = fig.add_subplot(gs[1, 0])
+    ax_lumi_hist.hist(combined_lumis["luminosity"], bins=y_edges, orientation="horizontal", color="black", alpha=1.0, histtype="step")
+    ax_lumi_hist.invert_xaxis()
+    ax_lumi_hist.xaxis.set_ticklabels([])
+    ax_lumi_hist.set_ylabel("Luminosity [1/µm²]")
+
+    # 1D histogram of Offset
+    ax_offset_hist = fig.add_subplot(gs[0, 1])
+    ax_offset_hist.hist(combined_lumis["r_offset"], bins=x_edges, color="black", alpha=1.0, histtype="step")
+    ax_offset_hist.set_yticklabels([])
+    ax_offset_hist.set_xticklabels([])
+
+    fig.subplots_adjust(top=0.975, bottom=0.075, left=0.055, right=0.935, hspace=0.0, wspace=0.0)
+
+
+def plot_lumi_beta_star_dependence(combined_lumis):
+    """
+    Plot the dependence of the luminosity on the beta star.
+    :param combined_lumis:
+    :return:
+    """
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(2, 4, width_ratios=[1, 6, 0.15, 0.5], height_ratios=[1, 6], wspace=0.0, hspace=0.0)
+
+    # 2D histogram
+    ax_lumi_beta_star = fig.add_subplot(gs[1, 1])
+    hist, x_edges, y_edges, im = ax_lumi_beta_star.hist2d(combined_lumis["beta_star"],
+                                                         combined_lumis["luminosity"],
+                                                            bins=100, cmap="jet", cmin=1)
+    ax_lumi_beta_star.set_xlabel("Beta Star [cm]")
+    ax_lumi_beta_star.set_ylabel("Luminosity [1/µm²]")
+    # Hide all y_axis labels and ticks
+    ax_lumi_beta_star.yaxis.set_tick_params(size=0)
+    ax_lumi_beta_star.yaxis.set_ticklabels([])
+
+    # Colorbar
+    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[1, 3]))
+    cbar.set_label("Number of Samples")
+
+    # Rotated 1D histogram of Luminosity
+    ax_lumi_hist = fig.add_subplot(gs[1, 0])
+    ax_lumi_hist.hist(combined_lumis["luminosity"], bins=y_edges, orientation="horizontal", color="black", alpha=1.0, histtype="step")
+    ax_lumi_hist.invert_xaxis()
+    ax_lumi_hist.xaxis.set_ticklabels([])
+    ax_lumi_hist.set_ylabel("Luminosity [1/µm²]")
+
+    # 1D histogram of Beta Star
+    ax_beta_star_hist = fig.add_subplot(gs[0, 1])
+    ax_beta_star_hist.hist(combined_lumis["beta_star"], bins=x_edges, color="black", alpha=1.0, histtype="step")
+    ax_beta_star_hist.set_yticklabels([])
+    ax_beta_star_hist.set_xticklabels([])
+
+    fig.subplots_adjust(top=0.975, bottom=0.075, left=0.055, right=0.935, hspace=0.0, wspace=0.0)
+
+
+def plot_lumi_bw_x_dependence(combined_lumis):
+    """
+    Plot the dependence of the luminosity on the beam width x.
+    :param combined_lumis:
+    :return:
+    """
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(2, 4, width_ratios=[1, 6, 0.15, 0.5], height_ratios=[1, 6], wspace=0.0, hspace=0.0)
+
+    # 2D histogram
+    ax_lumi_bw_x = fig.add_subplot(gs[1, 1])
+    hist, x_edges, y_edges, im = ax_lumi_bw_x.hist2d(combined_lumis["bw_x"],
+                                                         combined_lumis["luminosity"],
+                                                            bins=100, cmap="jet", cmin=1)
+    ax_lumi_bw_x.set_xlabel("Beam Width X [cm]")
+    ax_lumi_bw_x.set_ylabel("Luminosity [1/µm²]")
+    # Hide all y_axis labels and ticks
+    ax_lumi_bw_x.yaxis.set_tick_params(size=0)
+    ax_lumi_bw_x.yaxis.set_ticklabels([])
+
+    # Colorbar
+    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[1, 3]))
+    cbar.set_label("Number of Samples")
+
+    # Rotated 1D histogram of Luminosity
+    ax_lumi_hist = fig.add_subplot(gs[1, 0])
+    ax_lumi_hist.hist(combined_lumis["luminosity"], bins=y_edges, orientation="horizontal", color="black", alpha=1.0, histtype="step")
+    ax_lumi_hist.invert_xaxis()
+    ax_lumi_hist.xaxis.set_ticklabels([])
+    ax_lumi_hist.set_ylabel("Luminosity [1/µm²]")
+
+    # 1D histogram of Beam Width X
+    ax_bw_x_hist = fig.add_subplot(gs[0, 1])
+    ax_bw_x_hist.hist(combined_lumis["bw_x"], bins=x_edges, color="black", alpha=1.0, histtype="step")
+    ax_bw_x_hist.set_yticklabels([])
+    ax_bw_x_hist.set_xticklabels([])
+
+    fig.subplots_adjust(top=0.975, bottom=0.075, left=0.055, right=0.935, hspace=0.0, wspace=0.0)
+
+
+def plot_lumi_bw_y_dependence(combined_lumis):
+    """
+    Plot the dependence of the luminosity on the beam width y.
+    :param combined_lumis:
+    :return:
+    """
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(2, 4, width_ratios=[1, 6, 0.15, 0.5], height_ratios=[1, 6], wspace=0.0, hspace=0.0)
+
+    # 2D histogram
+    ax_lumi_bw_y = fig.add_subplot(gs[1, 1])
+    hist, x_edges, y_edges, im = ax_lumi_bw_y.hist2d(combined_lumis["bw_y"],
+                                                         combined_lumis["luminosity"],
+                                                            bins=100, cmap="jet", cmin=1)
+    ax_lumi_bw_y.set_xlabel("Beam Width Y [cm]")
+    ax_lumi_bw_y.set_ylabel("Luminosity [1/µm²]")
+    # Hide all y_axis labels and ticks
+    ax_lumi_bw_y.yaxis.set_tick_params(size=0)
+    ax_lumi_bw_y.yaxis.set_ticklabels([])
+
+    # Colorbar
+    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[1, 3]))
+    cbar.set_label("Number of Samples")
+
+    # Rotated 1D histogram of Luminosity
+    ax_lumi_hist = fig.add_subplot(gs[1, 0])
+    ax_lumi_hist.hist(combined_lumis["luminosity"], bins=y_edges, orientation="horizontal", color="black", alpha=1.0, histtype="step")
+    ax_lumi_hist.invert_xaxis()
+    ax_lumi_hist.xaxis.set_ticklabels([])
+    ax_lumi_hist.set_ylabel("Luminosity [1/µm²]")
+
+    # 1D histogram of Beam Width Y
+    ax_bw_y_hist = fig.add_subplot(gs[0, 1])
+    ax_bw_y_hist.hist(combined_lumis["bw_y"], bins=x_edges, color="black", alpha=1.0, histtype="step")
+    ax_bw_y_hist.set_yticklabels([])
+    ax_bw_y_hist.set_xticklabels([])
+
     fig.subplots_adjust(top=0.975, bottom=0.075, left=0.055, right=0.935, hspace=0.0, wspace=0.0)
 
 

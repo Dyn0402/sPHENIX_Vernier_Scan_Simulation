@@ -31,7 +31,7 @@ def main():
 
 
 def simulate_vernier_scan(base_path):
-    run_scan = False  # If, false, read in data from file
+    run_scan = True  # If, false, read in data from file
 
     bunch_width_truth = 150.  # microns Transverse Gaussian bunch width
     beta_star_actual = 85  # cm
@@ -43,7 +43,7 @@ def simulate_vernier_scan(base_path):
     mbd_resolution = 0.0  # cm MBD resolution
     # gauss_eff_width = 500  # cm Gaussian efficiency width
     gauss_eff_width = None  # cm Gaussian efficiency width
-    crossing_angles = False  # If True, use crossing angles from CAD data, if False set to exactly head on
+    crossing_angles = True  # If True, use crossing angles from CAD data, if False set to exactly head on
     # bkg = 0.4e-16  # Background level
     bkg = 0.0  # Background level
 

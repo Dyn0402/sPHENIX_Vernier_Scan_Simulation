@@ -31,29 +31,36 @@ def main():
 
 
 def simulate_vernier_scan(base_path):
-    run_scan = True  # If, false, read in data from file
+    run_scan = False  # If, false, read in data from file
 
-    bunch_width_truth = 150.  # microns Transverse Gaussian bunch width
-    beta_star_actual = 85  # cm
+    # If simple just use beta star and bunch width, if realistic use all realistic parameters,
+    # if crossing use crossing angles with realistic beam width and beta star
+    # realistic = 'simple'
+    # realistic = 'crossing'
+    realistic = 'realistic'
+
+    # if realistic == 'realistic' or realistic == 'crossing':
+    #     bunch_width_truth = np.array([161.79, 157.08])  # microns Transverse Gaussian bunch width
+    #     beta_star_actual = np.array([97., 82., 88., 95.])  # cm
+    # else:
+    bunch_width_truth = 160.  # microns Transverse Gaussian bunch width
+    beta_star_actual = 90.  # cm
     beta_star_off = 9e11  # cm Effectively turned off
-    # beta_star = 9e11  # cm
-    # bunch_width = 200.  # microns Transverse Gaussian bunch width
 
-    # mbd_resolution = 2.0  # cm MBD resolution
-    mbd_resolution = 0.0  # cm MBD resolution
-    # gauss_eff_width = 500  # cm Gaussian efficiency width
-    gauss_eff_width = None  # cm Gaussian efficiency width
-    crossing_angles = True  # If True, use crossing angles from CAD data, if False set to exactly head on
-    # bkg = 0.4e-16  # Background level
-    bkg = 0.0  # Background level
+    mbd_resolution_real = 2.0  # cm MBD resolution
+    mbd_resolution_simple = 0.0  # cm MBD resolution
+    gauss_eff_width_real = 500  # cm Gaussian efficiency width
+    gauss_eff_width_simple = None  # cm Gaussian efficiency width
+    bkg_real = 0.0  # Background level
+    bkg_simple = 0.0  # Background level
 
     fit_func = vernier_scan_fit_bkg
     # fit_func = vernier_scan_fit_nobkg
     n_params = fit_func.__code__.co_argcount - 1  # Get number of parameters in fit function
-    fit_pars_dict = {'p0': [1, 150, 0], 'names': ['Amp', 'Sigma', 'X0']}
+    fit_pars_dict = {'p0': [1, 150, 0], 'names': ['Amp', 'Sigma', 'x0']}
     if n_params == 4:
         fit_pars_dict['p0'].append(0)
-        fit_pars_dict['names'].append('B')
+        fit_pars_dict['names'].append('b')
 
     vernier_scan_date = 'Aug12'
     scan_orientation = 'Horizontal'
@@ -64,9 +71,14 @@ def simulate_vernier_scan(base_path):
     if run_scan:
         collider_sim = BunchCollider()
         collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
-        collider_sim.set_gaus_smearing_sigma(mbd_resolution)
-        collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
-        collider_sim.set_bkg(bkg)
+        if realistic == 'realistic':
+            collider_sim.set_gaus_smearing_sigma(mbd_resolution_real)
+            collider_sim.set_gaus_z_efficiency_width(gauss_eff_width_real)
+            collider_sim.set_bkg(bkg_real)
+        else:
+            collider_sim.set_gaus_smearing_sigma(mbd_resolution_simple)
+            collider_sim.set_gaus_z_efficiency_width(gauss_eff_width_simple)
+            collider_sim.set_bkg(bkg_simple)
         blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
         yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
         collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
@@ -78,7 +90,10 @@ def simulate_vernier_scan(base_path):
     for bunch_width in bunch_widths:
         if run_scan:
             print(f'Starting Scan with Bunch Width: {bunch_width}')
-            collider_sim.set_bunch_sigmas(np.array([bunch_width, bunch_width]), np.array([bunch_width, bunch_width]))
+            if type(bunch_width) == np.ndarray:
+                collider_sim.set_bunch_sigmas(np.array([bunch_width[0], bunch_width[1]]), np.array([bunch_width[0], bunch_width[1]]))
+            else:
+                collider_sim.set_bunch_sigmas(np.array([bunch_width, bunch_width]), np.array([bunch_width, bunch_width]))
 
             cad_data = read_cad_measurement_file(cad_measurement_path)
             cad_data_orientation = cad_data[cad_data['orientation'] == scan_orientation]
@@ -93,16 +108,24 @@ def simulate_vernier_scan(base_path):
                 elif scan_orientation == 'Vertical':
                     collider_sim.set_bunch_offsets(np.array([0., offset]), np.array([0., 0.]))
 
-                if crossing_angles:
+                if realistic == 'realistic' or realistic == 'crossing':
                     blue_angle_x, yellow_angle_x = -step_cad_data['bh8_avg'] / 1e3, -step_cad_data['yh8_avg'] / 1e3
                 else:
                     blue_angle_x, yellow_angle_x = 0., 0.
                 collider_sim.set_bunch_crossing(blue_angle_x, 0., yellow_angle_x, 0.0)
                 print(f'Offset: {offset}, Blue Angle X: {blue_angle_x * 1e3:.3f} mrad, Yellow Angle X: {yellow_angle_x * 1e3:.3f} mrad')
 
+                if realistic == 'realistic':
+                    yellow_bunch_len_scaling = step_cad_data['yellow_bunch_length_scaling']
+                    blue_bunch_len_scaling = step_cad_data['blue_bunch_length_scaling']
+                    collider_sim.set_longitudinal_fit_scaling(blue_bunch_len_scaling, yellow_bunch_len_scaling)
+
                 data_dict['Offsets'].append(offset)
                 for beta_star_name, beta_star in beta_stars.items():
-                    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+                    if type(beta_star) is np.ndarray:
+                        collider_sim.set_bunch_beta_stars(*beta_star)
+                    else:
+                        collider_sim.set_bunch_beta_stars(beta_star, beta_star)
                     collider_sim.run_sim_parallel()
                     lumi = collider_sim.get_naked_luminosity()
                     print(f'Beta star {beta_star_name} Luminosity: {lumi:.3e}')
@@ -120,23 +143,41 @@ def simulate_vernier_scan(base_path):
                 p0 = fit_pars_dict['p0']
                 p0[0] = max(lumis)
                 popt, pcov = cf(fit_func, data_df_first['Offsets'], lumis, p0=p0)
+                if type(bunch_width) == np.ndarray:
+                    bunch_widths[-1] = bunch_width
+                    if scan_orientation == 'Horizontal':
+                        bunch_widths[-1][0] = abs(popt[1])  # Ensure sigma is positive
+                    else:
+                        bunch_widths[-1][1] = abs(popt[1])  # Ensure sigma is positive
                 bunch_widths[-1] = abs(popt[1])  # Ensure sigma is positive
-                with open(f'{out_csv_path}_first_measured_bunch_width.txt', 'w') as file:
-                    file.write(f'{int(bunch_widths[-1])}')
+                with open(f'{out_csv_path}_first_measured_bunch_width_{realistic}.txt', 'w') as file:
+                    file.write(f'{abs(popt[1])}')
                 out_sufx = 'first'
 
-            data_df_first.to_csv(f'{out_csv_path}_{out_sufx}.csv', index=False)
+            data_df_first.to_csv(f'{out_csv_path}_{out_sufx}_{realistic}.csv',
+                                 index=False)
 
-    data_df_first = pd.read_csv(f'{out_csv_path}_first.csv')
-    data_df_second = pd.read_csv(f'{out_csv_path}_second.csv')
-    with open(f'{out_csv_path}_first_measured_bunch_width.txt', 'r') as file:
-        bunch_widths[-1] = float(file.read())
+    data_df_first = pd.read_csv(f'{out_csv_path}_first_{realistic}.csv')
+    data_df_second = pd.read_csv(f'{out_csv_path}_second_{realistic}.csv')
+    with open(f'{out_csv_path}_first_measured_bunch_width_{realistic}.txt', 'r') as file:
+        measured_bunch_width = float(file.read())
+    if type(bunch_width_truth) == np.ndarray:
+        bunch_widths[-1] = bunch_width_truth.copy()
+        if scan_orientation == 'Horizontal':
+            bunch_widths[-1][0] = measured_bunch_width
+        else:
+            bunch_widths[-1][1] = measured_bunch_width
+    else:
+        bunch_widths[-1] = measured_bunch_width
 
     fig_together, ax_together = plt.subplots(figsize=(8, 4))
-    fig_2col, ax_grid = plt.subplots(2, 2, figsize=(10, 4), sharey='all', sharex='all')
+    # fig_2col, ax_grid = plt.subplots(2, 2, figsize=(10, 4), sharey='all', sharex='all')
+    fig_3row, ax_3row = plt.subplots(3, 1, figsize=(8, 7), sharey='all', sharex='all')
 
+    print(f'Bunch widths: {bunch_widths}')
+    both_fit_results = []
     for j, data_df in enumerate([data_df_first, data_df_second]):
-        ax_2col = ax_grid[j]
+        # ax_2col = ax_grid[j]
         offsets = np.array(data_df['Offsets'])
         fit_results = {beta_star_name: {} for beta_star_name in beta_stars.keys()}
         for i, beta_star_name in enumerate(beta_stars.keys()):
@@ -158,12 +199,25 @@ def simulate_vernier_scan(base_path):
             fig, ax = plt.subplots()
             ax.scatter(offsets, lumis, label=beta_star_name)
             ax.plot(x_fit, fit_func(x_fit, *popt), color='red', label='Fit')
-            fit_str = f'σ={bunch_widths[j]:.0f} μm Hourglass {beta_star_name}\n'
+            orient_bw = bunch_widths[j]
+            if type(orient_bw) == np.ndarray:
+                orient_bw = orient_bw[0] if scan_orientation == 'Horizontal' else orient_bw[1]
+            fit_str = f'σ={orient_bw:.0f} μm Hourglass {beta_star_name}\n'
             for fit_par_name, fit_par_meas in zip(fit_pars_dict['names'], pmeas):
+                if fit_par_name == 'Amp' or fit_par_name == 'B':
+                    fit_par_meas = fit_par_meas * 1e6
+                fit_unit = ''
+                if fit_par_name == 'Amp' or fit_par_name == 'b':
+                    fit_unit = r'mm$^{-2}$'
+                elif fit_par_name == 'Sigma' or fit_par_name == 'x0':
+                    fit_unit = 'μm'
                 if type(fit_par_meas) == Measure:
-                    fit_str += f'{fit_par_name}: {fit_par_meas}\n'
+                    print(fit_par_name, fit_par_meas)
+                    fit_str += f'{fit_par_name}: {fit_par_meas} {fit_unit}\n'
                 else:
-                    fit_str += f'{fit_par_name}: {fit_par_meas:.3e}\n'
+                    # fit_str += f'{fit_par_name}: {fit_par_meas:.3e} {fit_unit}\n'
+                    fit_str += f'{fit_par_name}: {fit_par_meas:.5} {fit_unit}\n'
+
             fit_str = fit_str.strip()
             ax.annotate(fit_str, (0.05, 0.95), xycoords='axes fraction', ha='left', va='top', fontsize=12,
                         bbox=dict(facecolor='wheat', alpha=0.5, boxstyle='round'))
@@ -180,14 +234,25 @@ def simulate_vernier_scan(base_path):
             ax_together.annotate(fit_str, (0.02 + j * 0.3, 0.97 - i * 0.35), xycoords='axes fraction', ha='left', va='top',
                                  fontsize=11, bbox=dict(facecolor=color, alpha=0.2, boxstyle='round'))
 
-            ax_2col[i].plot(offsets, lumis, color=color, label=f'Data', marker='o', ls='none', zorder=10)
-            ax_2col[i].plot(x_fit, fit_func(x_fit, *popt), color=color, label=f'Fit', zorder=5)
-            ax_2col[i].annotate(fit_str, (0.02, 0.96), xycoords='axes fraction', ha='left', va='top', fontsize=9,
-                                bbox=dict(facecolor=color, alpha=0.2, boxstyle='round'))
-            ax_2col[i].set_xlabel('Offset [μm]')
-            if i == 0:
-                ax_2col[i].set_ylabel('Naked Luminosity')
-            ax_2col[i].legend()
+            if j * 2 + i < 3:
+                ax_3row[j * 2 + i].plot(offsets, lumis * 1e6, color=color, label=f'Simulated Data', marker='o', ls='none', zorder=10)
+                ax_3row[j * 2 + i].plot(x_fit, fit_func(x_fit, *popt) * 1e6, color=color, label=f'Fit', zorder=5)
+                ax_3row[j * 2 + i].annotate(fit_str, (0.03, 0.9), xycoords='axes fraction', ha='left', va='top',
+                                            fontsize=10, bbox=dict(facecolor=color, alpha=0.2, boxstyle='round', pad=0.5))
+                if j * 2 + i == 2:
+                    ax_3row[j * 2 + i].set_xlabel('Offset [μm]')
+                ax_3row[j * 2 + i].set_ylabel(r'Naked Luminosity [mm$^{-2}$]')
+                ax_3row[j * 2 + i].legend()
+                fit_eq_str = r'$\mathbf{L} = \mathbf{A} \exp\left(-\frac{(\mathbf{x} - \mathbf{x_0})^2}{4 \mathbf{\sigma}^2}\right) + \mathbf{B}$'
+
+            # ax_2col[i].plot(offsets, lumis, color=color, label=f'Data', marker='o', ls='none', zorder=10)
+            # ax_2col[i].plot(x_fit, fit_func(x_fit, *popt), color=color, label=f'Fit', zorder=5)
+            # ax_2col[i].annotate(fit_str, (0.02, 0.96), xycoords='axes fraction', ha='left', va='top', fontsize=9,
+            #                     bbox=dict(facecolor=color, alpha=0.2, boxstyle='round'))
+            # ax_2col[i].set_xlabel('Offset [μm]')
+            # if i == 0:
+            #     ax_2col[i].set_ylabel('Naked Luminosity')
+            # ax_2col[i].legend()
 
         print(f'\nBeam Width: {bunch_widths[j]}')
         # Neglecting hourglass overestimates luminosity. Need to multiply by hourglass on / off, smaller than 1
@@ -207,15 +272,34 @@ def simulate_vernier_scan(base_path):
         print(f'Max luminosity Hourglass Off: {fit_results["Off"]["Amp"]}')
         print(f'Max luminosity Hourglass Corrected: {fit_results["Off"]["Amp"] * lumi_correction}')
 
+        both_fit_results.append(fit_results)
+
+    true_lumi = both_fit_results[0]['On']['Amp']
+    uncorrected_lumi = both_fit_results[1]['Off']['Amp']
+    amp_correction = both_fit_results[0]['On']['Amp'] / both_fit_results[0]['Off']['Amp']
+    sigma_correction = both_fit_results[0]['On']['Sigma'] / both_fit_results[0]['Off']['Sigma']
+    corrected_lumi = uncorrected_lumi * amp_correction * sigma_correction**2
+
+    print(f'True Luminosity: {true_lumi}')
+    print(f'Uncorrected Luminosity: {uncorrected_lumi}')
+    print(f'Amp Correction: {amp_correction}')
+    print(f'Sigma Correction: {sigma_correction}')
+    print(f'True Luminosity: {true_lumi}')
+    print(f'Corrected Luminosity: {corrected_lumi}')
+    print(f'Percent Off: {(corrected_lumi - true_lumi) / true_lumi * 100}%')
+    print(f'Percent Correction: {(corrected_lumi - uncorrected_lumi) / uncorrected_lumi * 100}%')
+
     ax_together.set_ylim(bottom=0)
     ax_together.set_xlabel('Offset [μm]')
     ax_together.set_ylabel('Naked Luminosity')
     ax_together.legend()
     fig_together.tight_layout()
 
-    ax_2col[0].set_ylim(bottom=0)
-    fig_2col.tight_layout()
-    fig_2col.subplots_adjust(wspace=0.0, hspace=0.0, top=0.96, bottom=0.11, left=0.04, right=0.995)
+    ax_3row[0].set_ylim(bottom=0)
+    fig_3row.subplots_adjust(wspace=0, hspace=0, top=0.995, bottom=0.065, left=0.075, right=0.995)
+    # ax_2col[0].set_ylim(bottom=0)
+    # fig_2col.tight_layout()
+    # fig_2col.subplots_adjust(wspace=0.0, hspace=0.0, top=0.96, bottom=0.11, left=0.04, right=0.995)
 
     plt.show()
 

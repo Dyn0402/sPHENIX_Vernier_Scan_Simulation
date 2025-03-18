@@ -33,13 +33,13 @@ def main():
     def_lumi_path = 'lumi_vs_beta_star.csv'
     def_lumis = pd.read_csv(def_lumi_path)
 
-    # run_full_analysis(def_lumis, combined_lumis, save_path)
+    run_full_analysis(def_lumis, combined_lumis, save_path)
     # check_parameter_sensitivity(def_lumis, combined_lumis, save_path)
-    plot_lumi_crossing_angle_dependence(combined_lumis)
-    plot_lumi_offset_dependence(combined_lumis)
-    plot_lumi_beta_star_dependence(combined_lumis)
-    plot_lumi_bw_x_dependence(combined_lumis)
-    plot_lumi_bw_y_dependence(combined_lumis)
+    # plot_lumi_crossing_angle_dependence(combined_lumis)
+    # plot_lumi_offset_dependence(combined_lumis)
+    # plot_lumi_beta_star_dependence(combined_lumis)
+    # plot_lumi_bw_x_dependence(combined_lumis)
+    # plot_lumi_bw_y_dependence(combined_lumis)
 
     plt.show()
 
@@ -523,16 +523,16 @@ def run_full_analysis(def_lumis, combined_lumis, save_path=None):
     #     cross_section = max_rate_per_bunch / lumi
     #     print(f'Beta Star: {beta_star} cm, Luminosity: {lumi} mb⁻¹s⁻¹, Cross Section: {cross_section} mb')
 
-    if save_path:
-        fig_lumi_hist.savefig(f'{save_path}luminosity_histogram.png')
-        fig_lumi_hist.savefig(f'{save_path}luminosity_histogram.pdf')
-        fig_cross_section_hist.savefig(f'{save_path}cross_section_histogram.png')
-        fig_cross_section_hist.savefig(f'{save_path}cross_section_histogram.pdf')
-
-    # Write cross_section histogram to file as csv
-    bin_centers = (bin_edges_cross_section[1:] + bin_edges_cross_section[:-1]) / 2
-    hist_df = pd.DataFrame({'bin_center': bin_centers, 'hist': hist_cross_section})
-    hist_df.to_csv('mbd_cross_section_distribution.csv', index=False)
+    # if save_path:
+    #     fig_lumi_hist.savefig(f'{save_path}luminosity_histogram.png')
+    #     fig_lumi_hist.savefig(f'{save_path}luminosity_histogram.pdf')
+    #     fig_cross_section_hist.savefig(f'{save_path}cross_section_histogram.png')
+    #     fig_cross_section_hist.savefig(f'{save_path}cross_section_histogram.pdf')
+    #
+    # # Write cross_section histogram to file as csv
+    # bin_centers = (bin_edges_cross_section[1:] + bin_edges_cross_section[:-1]) / 2
+    # hist_df = pd.DataFrame({'bin_center': bin_centers, 'hist': hist_cross_section})
+    # hist_df.to_csv('mbd_cross_section_distribution.csv', index=False)
 
 
 def read_max_rate(path):

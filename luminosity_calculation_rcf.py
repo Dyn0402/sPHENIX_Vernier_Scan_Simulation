@@ -86,13 +86,14 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
     measured_beta_star = np.array([97., 82., 88., 95.])
 
     blue_x_offset, blue_y_offset = 0.0, 0.0  # um
-    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle = 0.0, +0.14e-3, 0.0, -0.07e-3
+    # blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle = 0.0, +0.14e-3, 0.0, -0.07e-3  # Major bug!
+    blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle = -0.07e-3, 0.0, -0.115e-3, 0.0
     blue_len_scaling, yellow_len_scaling = 0.993863022403956, 0.991593955543314
 
     if err_estimates == 'best':  # Best err estimates
-        bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 0.5, 5.0, 2.0, 0.05e-3, 0.001  # um, cm, um, rad
+        bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 0.5, 5.0, 2.0, 0.05e-3, 0.001  # um, cm, um, rad, %
     else:  # Conservative err estimates
-        bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 1.0, 10.0, 5.0, 0.1e-3, 0.005  # um, cm, um, rad
+        bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 1.0, 10.0, 5.0, 0.1e-3, 0.005  # um, cm, um, rad, %
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))

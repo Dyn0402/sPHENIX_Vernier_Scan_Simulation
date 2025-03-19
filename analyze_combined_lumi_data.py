@@ -35,11 +35,11 @@ def main():
 
     run_full_analysis(def_lumis, combined_lumis, save_path)
     # check_parameter_sensitivity(def_lumis, combined_lumis, save_path)
-    # plot_lumi_crossing_angle_dependence(combined_lumis)
-    # plot_lumi_offset_dependence(combined_lumis)
-    # plot_lumi_beta_star_dependence(combined_lumis)
-    # plot_lumi_bw_x_dependence(combined_lumis)
-    # plot_lumi_bw_y_dependence(combined_lumis)
+    plot_lumi_crossing_angle_dependence(combined_lumis)
+    plot_lumi_offset_dependence(combined_lumis)
+    plot_lumi_beta_star_dependence(combined_lumis)
+    plot_lumi_bw_x_dependence(combined_lumis)
+    plot_lumi_bw_y_dependence(combined_lumis)
 
     plt.show()
 

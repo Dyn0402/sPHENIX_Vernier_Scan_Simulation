@@ -8,6 +8,8 @@ Created as sPHENIX_Vernier_Scan_Simulation/compare_with_c_sim
 @author: Dylan Neff, dn277127
 """
 
+import platform
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -18,7 +20,10 @@ from BunchCollider import BunchCollider
 
 
 def main():
-    base_path = '/local/home/dn277127/Bureau/vernier_scan/'
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/vernier_scan/'
     compare_to_c_sim(base_path)
     # compare_to_mbd24(base_path)
 
@@ -97,6 +102,7 @@ def compare_to_c_sim(base_path):
     bin_centers /= 10  # Convert from mm to cm
 
     # Important parameters
+    offset_x, offset_y = 500., 0.
     bw_x, bw_y = 139, 143
     bunch_length = 1.250e6  # m
     beta_star_nom = 70.
@@ -105,12 +111,15 @@ def compare_to_c_sim(base_path):
                      fr'$\sigma_y = {bw_y} \mu m$' + '\n' +
                      fr'$\beta^* = {beta_star_nom} cm$' + '\n' +
                      fr'$L = {bunch_length / 1e6} m$' + '\n' +
-                     'Head On')
+                     fr'Offset: {[offset_x, offset_y]} $\mu m$'
+                     )
+                     # 'Head On')
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([0., 0., -6.e6]), np.array([0., 0., +6.e6]))
     collider_sim.set_bunch_beta_stars(beta_star_nom, beta_star_nom)
     collider_sim.set_bunch_sigmas(np.array([bw_x, bw_y, bunch_length]), np.array([bw_x, bw_y, bunch_length]))
+    collider_sim.set_bunch_offsets([offset_x, offset_y], [0., 0.])
 
     collider_sim.run_sim_parallel()
     zs, z_dist = collider_sim.get_z_density_dist()

@@ -3,7 +3,7 @@ void vernier_mc()
 // two beam densities (trans. and long.); and many other effects
 {
   // 1st beam shift
-  const float DX1 = 0.0; // mm
+  const float DX1 = 0.5; // mm
   const float DY1 = 0.0; // mm
   const float DAX1 = 0.0e-3; // angle (rad)
   const float DAY1 = 0.0e-3; // angle (rad)

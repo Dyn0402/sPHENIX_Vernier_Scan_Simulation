@@ -205,7 +205,11 @@ class Measure:
         dec = err_dec(self.err) if self.err != 0 else err_dec(self.val, 5)
         f_or_e = float_or_exp(self.val, dec)
         if f_or_e == 'e' and np.isfinite(self.err):
-            precision = 1 + math.floor(math.log10(abs(self.val / self.err))) if self.err != 0 else 2
+            print(f'val: {self.val}, err: {self.err}')
+            try:
+                precision = 1 + math.floor(math.log10(abs(self.val / self.err))) if self.err != 0 else 2
+            except ValueError:
+                precision = 2
             precision = max(precision, 2)
             val, err = match_exponents(self.val, self.err, precision)
             e_str = f'{val} ± {err}'

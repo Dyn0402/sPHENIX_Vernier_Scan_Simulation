@@ -74,6 +74,7 @@ def run_fitting(base_path):
 def run_fitting_opt_from_file(base_path):
     vernier_scan_dates = ['Aug12']
     orientations = ['Horizontal', 'Vertical']
+    write_all_params = True
     for scan_date in vernier_scan_dates:
         opt_file_path = f'run_rcf_jobs/output/{scan_date}/bw_opt_vs_beta_star.txt'
         df = pd.read_csv(opt_file_path)
@@ -93,6 +94,8 @@ def run_fitting_opt_from_file(base_path):
             create_dir(vernier_date_path)
 
             row_beta_star = df[df['beta_star'] == beta_star].iloc[0]
+            if row_beta_star['beta_star'] != 105:
+                continue
             bw_x, bw_y = row_beta_star['bw_x'], row_beta_star['bw_y']
             default_bws = {'Horizontal': bw_x, 'Vertical': bw_y}
 
@@ -102,7 +105,8 @@ def run_fitting_opt_from_file(base_path):
                 create_dir(pdf_out_path)
                 fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path,
                                                       pdf_out_path, orientation, scan_date,
-                                                      np.array([default_bws[orientation]]), default_bws, beta_star)
+                                                      np.array([default_bws[orientation]]), default_bws, beta_star,
+                                                      write_all_params)
 
 
 def fit_residual_curves(base_path):
@@ -123,7 +127,8 @@ def fit_residual_curves(base_path):
 
 
 def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_path, longitudinal_fit_path, out_path,
-                                          orientation, scan_date, beam_widths=None, default_bws=None, beta_star=None):
+                                          orientation, scan_date, beam_widths=None, default_bws=None, beta_star=None,
+                                          write_all_params=False):
     """
     For a list of bunch widths, fits the crossing angle to the z-vertex distributions for each bunch width.
     :param z_vertex_root_path: Path to root file with z-vertex distributions.
@@ -135,6 +140,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
     :param beam_widths: List of beam widths to fit.
     :param default_bws: Default beam widths to use for the opposite orientation of the scan.
     :param beta_star: Beta star to use for the simulation.
+    :param write_all_params: If True, write all fit parameters to a csv file.
     """
 
     # Important parameters
@@ -190,7 +196,7 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
         title = f'{title_bw}, Step {first_step_hist["scan_step"]} Original'
         plot_mbd_and_sim_dist(collider_sim, first_step_hist, title=title, out_dir=bw_out_path)
 
-        bw_plot_dict = {'steps': [], 'angles': [[], [], [], []], 'residuals': [], 'dist_plot_data': []}
+        bw_plot_dict = {'steps': [], 'angles': [[], [], [], []], 'residuals': [], 'dist_plot_data': [], 'fit_df': []}
         for hist_data in z_vertex_hists_orient:
             print(f'\nStarting {scan_date} Beam Width {bw} µm, Step {hist_data["scan_step"]}')
 
@@ -202,6 +208,8 @@ def fit_crossing_angles_for_bw_variations(z_vertex_root_path, cad_measurement_pa
             n_fits = print_status(bw, hist_data["scan_step"], start_time, n_fits, total_fits)
             update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim)  # Update dict for plotting
         plot_bw_dict(bw_plot_dict, title_bw, out_dir=bw_out_path)
+        if write_all_params:
+            write_all_params_to_csv(pd.DataFrame(bw_plot_dict['fit_df']), bw_out_path)
         update_plot_dict(plot_dict, bw_plot_dict)  # Update dict for plotting
     plot_plot_dict(plot_dict, f'{title_base} Residuals', out_dir=out_path)
 
@@ -288,6 +296,48 @@ def update_bw_plot_dict(bw_plot_dict, hist_data, collider_sim):
     angles = collider_sim.get_bunch_crossing_angles()
     for i in range(4):
         bw_plot_dict['angles'][i].append(angles[i] * 1e3)  # Convert to mrad
+    fit_df = {
+        'naked_luminosity': collider_sim.get_naked_luminosity(),
+        'scan_step': bw_plot_dict['steps'][-1],
+        'residuals': bw_plot_dict['residuals'][-1],
+        'z_shift': collider_sim.z_shift,
+        'amplitude': collider_sim.amplitude,
+        'gaus_smearing_sigma': collider_sim.gaus_smearing_sigma,
+        'gaus_z_efficiency_width': collider_sim.gaus_z_efficiency_width,
+        'bkg': collider_sim.bkg,
+        'bunch1_offset_x': collider_sim.bunch1.offset_x,
+        'bunch1_offset_y': collider_sim.bunch1.offset_y,
+        'bunch2_offset_x': collider_sim.bunch2.offset_x,
+        'bunch2_offset_y': collider_sim.bunch2.offset_y,
+        'bunch1_sigma_x': collider_sim.bunch1.transverse_sigma[0],
+        'bunch1_sigma_y': collider_sim.bunch1.transverse_sigma[1],
+        'bunch2_sigma_x': collider_sim.bunch2.transverse_sigma[0],
+        'bunch2_sigma_y': collider_sim.bunch2.transverse_sigma[1],
+        'bunch1_angle_x': collider_sim.bunch1.angle_x,
+        'bunch1_angle_y': collider_sim.bunch1.angle_y,
+        'bunch2_angle_x': collider_sim.bunch2.angle_x,
+        'bunch2_angle_y': collider_sim.bunch2.angle_y,
+        'bunch1_beta_star_x': collider_sim.bunch1.beta_star_x,
+        'bunch1_beta_star_y': collider_sim.bunch1.beta_star_y,
+        'bunch2_beta_star_x': collider_sim.bunch2.beta_star_x,
+        'bunch2_beta_star_y': collider_sim.bunch2.beta_star_y,
+        'bunch1_long_params': collider_sim.bunch1.longitudinal_params,
+        'bunch2_long_params': collider_sim.bunch2.longitudinal_params,
+        'bunch1_long_scale': collider_sim.bunch1.longitudinal_width_scaling,
+        'bunch2_long_scale': collider_sim.bunch2.longitudinal_width_scaling
+    }
+    bw_plot_dict['fit_df'].append(fit_df)
+
+
+def write_all_params_to_csv(scan_fit_params, out_path):
+    """
+    Write all fit parameters for scan to a csv file.
+    :param scan_fit_params:
+    :param out_path:
+    :return:
+    """
+    scan_fit_params.to_csv(f'{out_path}scan_fit.csv', index=False)
+    print(f'Wrote fit params to {out_path}scan_fit.csv')
 
 
 def plot_bw_dict(bw_plot_dict, title, out_dir=None):

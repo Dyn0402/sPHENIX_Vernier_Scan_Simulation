@@ -92,8 +92,10 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
 
     if err_estimates == 'best':  # Best err estimates
         bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 0.5, 5.0, 2.0, 0.05e-3, 0.001  # um, cm, um, rad, %
+        after_burner_lumi_err = 0.0
     else:  # Conservative err estimates
         bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 1.0, 10.0, 5.0, 0.1e-3, 0.005  # um, cm, um, rad, %
+        after_burner_lumi_err = 0.04 * 2.1e-6  # 4% error on 2.1e-6 um^-2 s^-1, to account for tuning?
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))
@@ -133,10 +135,12 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
         collider_sim.set_longitudinal_fit_scaling(blue_len_scale_i, yellow_len_scale_i)
 
         collider_sim.run_sim_parallel()
-        luminosity = collider_sim.get_naked_luminosity()
+        luminosity_pre_afterburner = collider_sim.get_naked_luminosity()
+        luminosity = np.random.normal(luminosity_pre_afterburner, after_burner_lumi_err)
         print(f'{datetime.now()} Sample {i + 1}/{n_samples} luminosity: {luminosity:.2e}')
         sample_dict = {
             'luminosity': luminosity,
+            'luminosity_pre_afterburner': luminosity_pre_afterburner,
             'bw_x': bw_x_i,
             'bw_y': bw_y_i,
             'beta_star': beta_star,

@@ -27,8 +27,8 @@ def main():
         # base_path = '/home/dylan/Desktop/vernier_scan/'
     else:
         base_path = 'C:/Users/Dylan/Desktop/vernier_scan/'
-    # simulate_vernier_scan(base_path)
-    plot_distorted_width_vs_bw(base_path)
+    simulate_vernier_scan(base_path)
+    # plot_distorted_width_vs_bw(base_path)
     print('donzo')
 
 
@@ -137,19 +137,38 @@ def simulate_vernier_scan(base_path):
 
     # If simple just use beta star and bunch width, if realistic use all realistic parameters,
     # if crossing use crossing angles with realistic beam width and beta star
-    realistic = 'simple'
+    # realistic = 'simple'
     # realistic = 'crossing'
     # realistic = 'realistic'
-    # realistic = 'very_realistic'
-    # file_post = ''
-    file_post = '_70_bw'
+    realistic = 'very_realistic'
+    file_post = ''
+    # file_post = '_vertical'
+    # file_post = '_no_bkg_fit'
+    # file_post = '_70_bw'
+    # file_post = '_bs90'
+    # file_post = '_vertical_bs90'
+    # file_post = '_bs90_bw160'
+    # file_post = '_vertical_bs90_bw160'
+    scan_orientation = 'Horizontal'
+    # scan_orientation = 'Vertical'
+    manual_sigma_correction = None
 
     if realistic == 'very_realistic':
         bunch_width_truth = np.array([161.79, 157.08])  # microns Transverse Gaussian bunch width
         beta_star_actual = np.array([97., 82., 88., 95.])  # cm
+        manual_sigma_correction = {'measured': {'x': 184.79308803, 'y': 178.33153464},
+                                   'true': {'x': bunch_width_truth[0], 'y': bunch_width_truth[0]}}
+
+        # beta_star_actual = 90  # cm
+        # manual_sigma_correction = {'measured': {'x': 184.30046984, 'y': 178.78183456},
+        #                            'true': {'x': bunch_width_truth[0], 'y': bunch_width_truth[0]}}
+        # bunch_width_truth = np.array([160, 160])  # microns Transverse Gaussian bunch width
+        # beta_star_actual = 90  # cm
+        # manual_sigma_correction = {'measured': {'x': 182.01, 'y': 182.01},
+        #                            'true': {'x': bunch_width_truth[0], 'y': bunch_width_truth[0]}}
     else:
-        # bunch_width_truth = 160.  # microns Transverse Gaussian bunch width
-        bunch_width_truth = 70.  # microns Transverse Gaussian bunch width
+        bunch_width_truth = 160.  # microns Transverse Gaussian bunch width
+        # bunch_width_truth = 70.  # microns Transverse Gaussian bunch width
         beta_star_actual = 90.  # cm
     beta_star_off = 9e11  # cm Effectively turned off
 
@@ -169,8 +188,13 @@ def simulate_vernier_scan(base_path):
         fit_pars_dict['p0'].append(0)
         fit_pars_dict['names'].append('b')
 
+
+    # crossing_angles = None
+    # crossing_angles_simple = {
+    #     'Horizontal_Scan':
+    # }
+
     vernier_scan_date = 'Aug12'
-    scan_orientation = 'Horizontal'
     cad_measurement_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_combined.dat'
     longitudinal_fit_path = f'{base_path}CAD_Measurements/VernierScan_{vernier_scan_date}_COLOR_longitudinal_fit.dat'
     out_csv_path = f'{base_path}simulated_phenix_scan/VernierScan_{vernier_scan_date}_{scan_orientation}'
@@ -255,13 +279,17 @@ def simulate_vernier_scan(base_path):
                 lumis = np.array(data_df_first['On'])  # Fit to vernier_scan fit
                 p0 = fit_pars_dict['p0']
                 p0[0] = max(lumis)
-                if type(bunch_widths[-1]) is np.ndarray:
+                if type(bunch_width) is np.ndarray:
                     if scan_orientation == 'Horizontal':
                         p0[1] = bunch_width[0]
                     else:
                         p0[1] = bunch_width[1]
                 else:
                     p0[1] = bunch_width
+                print(f'data_df_first: {data_df_first}')
+                print(f'lumis: {lumis}')
+                print(f'p0: {p0}')
+
                 popt, pcov = cf(fit_func, data_df_first['Offsets'], lumis, p0=p0)
                 if type(bunch_width) == np.ndarray:
                     bunch_widths[-1] = bunch_width
@@ -321,6 +349,8 @@ def simulate_vernier_scan(base_path):
             pmeas = [Measure(popt[i], perr[i]) if perr[i] > 0 else popt[i] for i in range(len(popt))]
             for fit_par_i, fit_par_name in enumerate(fit_pars_dict['names']):
                 fit_results[beta_star_name][fit_par_name] = pmeas[fit_par_i]
+            fit_results[beta_star_name]['max'] = max(lumis)
+            fit_results[beta_star_name]['sigma_true'] = orient_bw
 
             x_fit = np.linspace(min(offsets), max(offsets), 1000)
 
@@ -402,20 +432,38 @@ def simulate_vernier_scan(base_path):
 
         both_fit_results.append(fit_results)
 
-    true_lumi = both_fit_results[0]['On']['Amp']
-    uncorrected_lumi = both_fit_results[1]['Off']['Amp']
-    amp_correction = both_fit_results[0]['On']['Amp'] / both_fit_results[0]['Off']['Amp']
-    sigma_correction = both_fit_results[0]['On']['Sigma'] / both_fit_results[0]['Off']['Sigma']
-    corrected_lumi = uncorrected_lumi * amp_correction * sigma_correction**2
+    print(f'\nbunch_widths: {bunch_widths}')
+    # true_lumi = both_fit_results[0]['On']['Amp']
+    true_lumi = both_fit_results[0]['On']['max']
+    # uncorrected_lumi = both_fit_results[1]['Off']['Amp']
+    uncorrected_lumi = both_fit_results[1]['Off']['max']
+    if manual_sigma_correction is None:
+        bw_squared = bunch_widths[-1][0] * bunch_widths[-1][1] if type(bunch_widths[-1]) is np.ndarray else bunch_widths[-1] ** 2
+    else:
+        bw_squared = manual_sigma_correction['measured']['x'] * manual_sigma_correction['measured']['y']
+    uncorrected_lumi_from_bws = 1.0 / (4 * np.pi * bw_squared)
+    # amp_correction = both_fit_results[0]['On']['Amp'] / both_fit_results[0]['Off']['Amp']
+    amp_correction = both_fit_results[0]['On']['max'] / both_fit_results[0]['Off']['max']
+    # sigma_correction = both_fit_results[0]['On']['Sigma'] / both_fit_results[0]['Off']['Sigma']
+    if manual_sigma_correction is None:
+        sigma_correction = (both_fit_results[0]['On']['Sigma'] / both_fit_results[0]['Off']['sigma_true'])**2
+    else:
+        sigma_correction = manual_sigma_correction['measured']['x'] / manual_sigma_correction['true']['x']
+        sigma_correction *= manual_sigma_correction['measured']['y'] / manual_sigma_correction['true']['y']
+    corrected_lumi = uncorrected_lumi * amp_correction * sigma_correction
+    corrected_lumi_from_bws = uncorrected_lumi_from_bws * amp_correction * sigma_correction
 
     print(f'True Luminosity: {true_lumi}')
     print(f'Uncorrected Luminosity: {uncorrected_lumi}')
+    print(f'Uncorrected Luminosity from Bunch Widths: {uncorrected_lumi_from_bws}')
     print(f'Amp Correction: {amp_correction}')
     print(f'Sigma Correction: {sigma_correction}')
     print(f'True Luminosity: {true_lumi}')
     print(f'Corrected Luminosity: {corrected_lumi}')
     print(f'Percent Off: {(corrected_lumi - true_lumi) / true_lumi * 100}%')
+    print(f'Percent Off from Bunch Widths: {(corrected_lumi_from_bws - true_lumi) / true_lumi * 100}%')
     print(f'Percent Correction: {(corrected_lumi - uncorrected_lumi) / uncorrected_lumi * 100}%')
+    print(f'Percent Correction from Bunch Widths: {(corrected_lumi - uncorrected_lumi_from_bws) / uncorrected_lumi_from_bws * 100}%')
 
     ax_together.set_ylim(bottom=0)
     ax_together.set_xlabel('Offset [μm]')

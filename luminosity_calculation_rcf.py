@@ -95,7 +95,9 @@ def estimate_final_luminosity(longitudinal_fit_path, bw_beta_star_fit_params, jo
         after_burner_lumi_err = 0.0
     else:  # Conservative err estimates
         bw_err, beta_star_err, offset_err, angle_err, len_scale_err = 1.0, 10.0, 5.0, 0.1e-3, 0.005  # um, cm, um, rad, %
-        after_burner_lumi_err = 0.04 * 2.1e-6  # 4% error on 2.1e-6 um^-2 s^-1, to account for tuning?
+        # after_burner_lumi_err = 0.04 * 2.1e-6  # 4% error on 2.1e-6 um^-2 s^-1, to account for tuning?
+        after_burner_lumi_err = 2.25e-6 - 2.1e-6  # CW minus most probable
+        after_burner_lumi_err += 2.21e-6 - 2.1e-6  # betastar 105 minus most probable
 
     collider_sim = BunchCollider()
     collider_sim.set_bunch_rs(np.array([blue_x_offset, blue_y_offset, -6.e6]), np.array([0., 0., +6.e6]))

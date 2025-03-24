@@ -24,8 +24,8 @@ def main():
         save_path = '/local/home/dn277127/Bureau/vernier_scan/presentation/analysis_note/Cross_Section/'
     else:  # Windows
         save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/Cross_Section/'
-    # calculate_opt_bw_lumis(scan_date, beta_star_bw_fit_path, save_path)
-    calculate_with_without_hourglass(scan_date, beta_star_bw_fit_path, save_path)
+    calculate_opt_bw_lumis(scan_date, beta_star_bw_fit_path, save_path)
+    # calculate_with_without_hourglass(scan_date, beta_star_bw_fit_path, save_path)
     print('donzo')
 
 
@@ -58,6 +58,7 @@ def calculate_opt_bw_lumis(scan_date, beta_star_bw_fit_path, save_path):
     blue_x_offset, blue_y_offset, offset_err = 0.0, 0.0, 2.0  # um
     # blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = 0.0, +0.14e-3, 0.0, -0.07e-3, 0.05e-3  # Major typo bug!!!!
     blue_x_angle, blue_y_angle, yellow_x_angle, yellow_y_angle, angle_err = -0.07e-3, 0.0, -0.11476e-3, 0.0, 0.05e-3
+    blue_len_scaling, yellow_len_scaling = 0.993863022403956, 0.991593955543314  # Included after crossing angle typo found, not before!
 
     # Gaussian approximation with bad beam width luminosity
     f_beam = 78.4  # kHz
@@ -76,6 +77,7 @@ def calculate_opt_bw_lumis(scan_date, beta_star_bw_fit_path, save_path):
     blue_fit_path = longitudinal_fit_path.replace('_COLOR_', '_blue_')
     yellow_fit_path = longitudinal_fit_path.replace('_COLOR_', '_yellow_')
     collider_sim.set_longitudinal_fit_parameters_from_file(blue_fit_path, yellow_fit_path)
+    collider_sim.set_longitudinal_fit_scaling(blue_len_scaling, yellow_len_scaling)  # Included after crossing angle typo found, not before!
 
     lumis_dict = {}
     for beta_star in lumi_calc_beta_stars:

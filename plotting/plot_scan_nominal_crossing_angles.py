@@ -22,7 +22,7 @@ def main():
     if platform.system() == 'Windows':
         base_path = 'C:/Users/Dylan/Desktop/pp_crossing_angles/'
     else:  # Linus
-        base_path = ''  # Figure out later
+        base_path = '/local/home/dn277127/Bureau/pp_crossing_angles/'  # Figure out later
     bpm_dir = f'{base_path}bpm_measurements/'
     run_info_path = 'run_info.csv'
     # month = None  # either month or None to include all months
@@ -122,9 +122,16 @@ def plot_crossing_angles_vs_time(crossing_angles_df):
     :return:
     """
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(crossing_angles_df['time'], crossing_angles_df['bh8_crossing_angle'], label='Blue', color='blue')
-    ax.plot(crossing_angles_df['time'], crossing_angles_df['yh8_crossing_angle'], label='Yellow', color='orange')
-    ax.plot(crossing_angles_df['time'], crossing_angles_df['gh8_crossing_angle'], label='Relative', color='green')
+    print(crossing_angles_df.columns)
+    print(crossing_angles_df['time'])
+    print(crossing_angles_df['bh8_crossing_angle'])
+    time, blue, yellow, rel = [np.array(crossing_angles_df[series]) for series in ['time', 'bh8_crossing_angle', 'yh8_crossing_angle', 'gh8_crossing_angle']]
+    ax.plot(time, blue, label='Blue', color='b')
+    ax.plot(time, yellow, label='Yellow', color='orange')
+    ax.plot(time, rel, label='Relative', color='g')
+    # ax.plot(crossing_angles_df['time'], crossing_angles_df['bh8_crossing_angle'], label='Blue', color='blue')
+    # ax.plot(crossing_angles_df['time'], crossing_angles_df['yh8_crossing_angle'], label='Yellow', color='orange')
+    # ax.plot(crossing_angles_df['time'], crossing_angles_df['gh8_crossing_angle'], label='Relative', color='green')
     ax.axhline(0, ls='-', alpha=0.3, color='black')
     ax.set_ylabel('Crossing Angle (mrad)')
     ax.legend()

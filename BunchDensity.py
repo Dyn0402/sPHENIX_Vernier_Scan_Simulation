@@ -43,7 +43,7 @@ class BunchDensity:
         self.offset_x = 0.  # Offset in x in um
         self.offset_y = 0.  # Offset in y in um
 
-        self.reset = True  # If true calculate r and bete before next density calculation, if false use current values
+        self.reset = True  # If true, calculate r and beta before next density calculation. If false, use current values
 
     def set_initial_z(self, z):
         """
@@ -200,10 +200,50 @@ class BunchDensity:
             self.calculate_r_and_beta()
         beta_star_x = self.beta_star_x if self.beta_star_x is not None else 0
         beta_star_y = self.beta_star_y if self.beta_star_y is not None else 0
-        return bdcpp.density(x, y, z, self.r[0], self.r[1], self.r[2],
-                             self.transverse_sigma[0], self.transverse_sigma[1],
-                             self.angle_x, self.angle_y, beta_star_x, beta_star_y,
-                             * self.effective_longitudinal_params.values())
+
+        if len(self.effective_longitudinal_params.values()) == 11:
+            return bdcpp.density(x, y, z, self.r[0], self.r[1], self.r[2],
+                                 self.transverse_sigma[0], self.transverse_sigma[1],
+                                 self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+                                 * self.effective_longitudinal_params.values())
+        else:
+            # Prepare list of [a, b, c] for each Gaussian
+            gaussians = extract_gaussian_list(self.effective_longitudinal_params)
+
+            return bdcpp.density_n_gaussians(
+                x, y, z,
+                self.r[0], self.r[1], self.r[2],
+                self.transverse_sigma[0], self.transverse_sigma[1],
+                self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+                gaussians
+            )
+
+    def density_arbitrary(self, x, y, z):
+        """
+        Calculate the density of the bunch at a given point in the lab frame using an arbitrary number of Gaussians
+        in the longitudinal (z) direction.
+
+        :param x: float or np.ndarray of x positions
+        :param y: float or np.ndarray of y positions
+        :param z: float or np.ndarray of z positions
+        :return: float or np.ndarray Density at given positions
+        """
+        if self.reset:
+            self.calculate_r_and_beta()
+
+        beta_star_x = self.beta_star_x if self.beta_star_x is not None else 0
+        beta_star_y = self.beta_star_y if self.beta_star_y is not None else 0
+
+        # Prepare list of [a, b, c] for each Gaussian
+        gaussians = extract_gaussian_list(self.effective_longitudinal_params)
+
+        return bdcpp.density_arbitrary_gaussians(
+            x, y, z,
+            self.r[0], self.r[1], self.r[2],
+            self.transverse_sigma[0], self.transverse_sigma[1],
+            self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+            gaussians
+        )
 
     def density_py(self, x, y, z):
         """
@@ -319,3 +359,26 @@ def gaus_pdf(x, b, c):
 def quad_gaus_pdf(x, b1, c1, a2, b2, c2, a3, b3, c3, a4, b4, c4):
     return (gaus_pdf(x, b1, c1) + a2 * gaus_pdf(x, b2, c2) + a3 * gaus_pdf(x, b3, c3) + a4 * gaus_pdf(x, b4, c4)) / (
             1 + a2 + a3 + a4)
+
+def extract_gaussian_list(longitudinal_params):
+    """
+    Convert a flat dict of longitudinal parameters into a list of Gaussians [a, b, c]
+    where a is the relative weight, b is the mean, and c is the std deviation.
+    The first Gaussian is always assumed to have a weight of 1.0.
+    """
+    gaussians = []
+    # First gaussian is always unweighted
+    mu1 = longitudinal_params['mu1']
+    sigma1 = longitudinal_params['sigma1']
+    gaussians.append([1.0, mu1, sigma1])
+
+    # Check for additional Gaussians
+    i = 2
+    while f'a{i}' in longitudinal_params:
+        a = longitudinal_params[f'a{i}']
+        mu = longitudinal_params[f'mu{i}']
+        sigma = longitudinal_params[f'sigma{i}']
+        gaussians.append([a, mu, sigma])
+        i += 1
+
+    return gaussians

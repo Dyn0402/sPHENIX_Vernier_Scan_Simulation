@@ -8,6 +8,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/longitudinal_profiles
 @author: Dylan Neff, dn277127
 """
 
+import platform
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit as cf
@@ -18,12 +19,17 @@ from Measure import Measure
 
 
 def main():
-    cad_measurements_path = '/local/home/dn277127/Bureau/vernier_scan_AuAu24/CAD_Measurements/'
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+    cad_measurements_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/'
 
     # min_time, max_time = 30, 75
     min_time, max_time = 0, 106
     # min_val = 1.5
     min_val = 0.2
+    fit_range = [35, 70]
     # max_pdf_val = 0.125 if vernier_scan_date == 'Aug12' else 0.1
     beam_colors = ['blue', 'yellow']
     plot_colors = ['blue', 'orange']
@@ -31,6 +37,7 @@ def main():
     # plot_colors = ['blue']
     # sufx = '_21:33'
     sufx = '_22'
+    peak_list = define_peaks()
 
     write_out = True
     p0 = None
@@ -79,56 +86,38 @@ def main():
             if np.max(bunch_vals) < min_val:
                 continue
             bin_width = bunch_times[1] - bunch_times[0]
-            vals = list(np.array(bunch_vals) / np.sum(bunch_vals) / bin_width)
-            fit_times.extend(bunch_times)
-            fit_vals.extend(vals)
+            bunch_times, bunch_vals = np.array(bunch_times), np.array(bunch_vals)
+            fit_mask = (bunch_times > fit_range[0]) & (bunch_times < fit_range[1])
+            vals = bunch_vals[fit_mask] / np.sum(bunch_vals[fit_mask]) / bin_width
+            fit_times.extend(list(bunch_times[fit_mask]))
+            fit_vals.extend(list(vals))
 
-            if p0 is None:  # Get guess from first blue bunch
+            # if p0 is None:  # Get guess from first blue bunch
                 # p0, bounds, peak_xs = make_initial_guess_from_data(np.array(bunch_times), np.array(vals))
-                p0, bounds, peak_xs = make_initial_guess_from_expectation(np.array(bunch_times), np.array(vals))
+                # p0, bounds, peak_xs = make_initial_guess_from_expectation(np.array(bunch_times), np.array(vals))
+            p0, bounds = build_manual_initial_guess(peak_list[beam_color])
 
         print(f'{beam_color} {weird_ones} weird ones of {len(times)} bunches')
 
-        # popt, pcov = cf(quad_gaus_pdf, fit_times, fit_vals, p0=p0s_quad[beam_color], bounds=bnds_quad)
         popt, pcov = cf(multi_gaus_pdf, fit_times, fit_vals, p0=p0, bounds=bounds)
         perr = np.sqrt(np.diag(pcov))
         pmeas = [Measure(p, e) for p, e in zip(popt, perr)]
-        # fit_str = [rf'$\mu_1$ = {pmeas[0]} ns', rf'$\sigma_1$ = {pmeas[1]} ns',
-        #            rf'$\mu_2$ = {pmeas[3]} ns', rf'$\sigma_2$ = {pmeas[4]} ns', rf'$a_2$ = {pmeas[2]}',
-        #            rf'$\mu_3$ = {pmeas[6]} ns', rf'$\sigma_3$ = {pmeas[7]} ns', rf'$a_3$ = {pmeas[5]}',
-        #            rf'$\mu_4$ = {pmeas[9]} ns', rf'$\sigma_4$ = {pmeas[10]} ns', rf'$a_4$ = {pmeas[8]}']
-        # fit_str = '\n'.join(fit_str)
-
-        # Write out quad gaussian fit equation
-        # fit_eq = (
-        #     r'$p(t) = \frac{\frac{1}{\sigma_1 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_1)^2}{2\sigma_1^2}\right)'
-        #     r'+ \frac{a_2}{\sigma_2 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_2)^2}{2\sigma_2^2}\right)'
-        #     r'+ \frac{a_3}{\sigma_3 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_3)^2}{2\sigma_3^2}\right)'
-        #     r'+ \frac{a_4}{\sigma_4 \sqrt{2 \pi}} \exp\left(-\frac{(t - \mu_4)^2}{2\sigma_4^2}\right)}'
-        #     r'{1 + a_2 + a_3 + a_4}$')
 
         fig_all, ax_all = plt.subplots(figsize=(8, 6))
         x_plot = np.linspace(fit_times[0], fit_times[-1], 1000)
         ax_all.plot(fit_times, fit_vals, color=plot_color, alpha=0.01, ls='none', marker='.', label='CAD Profiles')
-        # ax_all.plot(x_plot, quad_gaus_pdf(x_plot, *popt), color='red', ls='-', label='Fit')
         ax_all.plot(x_plot, multi_gaus_pdf(x_plot, *p0), color='green', ls='-', label='Guess')
-        p0_sum, popt_sum = 1 + np.sum(p0[2::3]), 1 + np.sum(popt[2::3])
-        ax_all.plot(x_plot, p0[-3] / p0_sum * gaus_pdf(x_plot, *p0[-2:]), color='green', ls='--')
+        ax_all.plot(x_plot, p0[-3] / (1 + np.sum(p0[2::3])) * gaus_pdf(x_plot, *p0[-2:]), color='green', ls='--')
         ax_all.plot(x_plot, multi_gaus_pdf(x_plot, *popt), color='red', ls='-', label='Fit')
-        ax_all.plot(x_plot, popt[-3] / popt_sum * gaus_pdf(x_plot, *popt[-2:]), color='red', ls='--')
-        # ax_all.axvline(popt[0], color='green', ls='--', alpha=0.5, zorder=0)
+        ax_all.plot(x_plot, popt[-3] / (1 + np.sum(popt[2::3])) * gaus_pdf(x_plot, *popt[-2:]), color='red', ls='--')
         ax_all.set_xlabel('Time (ns)')
         ax_all.set_ylabel('Probability Density')
         ax_all.set_title(
             f'AuAu24 Vernier Scan {beam_color.capitalize()} Beam Longitudinal Bunch Density')
-        # ax_all.annotate(fit_str, (0.01, 0.98), xycoords='axes fraction', ha='left', va='top',
-        #                 bbox=dict(boxstyle='round', fc='white', alpha=0.8), fontsize=12)
-        # ax_all.annotate(fit_eq, (0.02, 0.02), xycoords='axes fraction', ha='left', va='bottom',
-        #                 bbox=dict(boxstyle='round', fc='white', alpha=1.0), fontsize=14.5)
-        # ax_all.set_ylim(-0.029, 0.1)
         ax_all.set_xlim(min_time, max_time)
         ax_all.legend(loc='upper right', fontsize=14)
         ax_all.grid(True)
+        ax_all.set_xlim(30, 75)
         fig_all.tight_layout()
 
         if write_out:  # Write out fit parameters
@@ -151,6 +140,42 @@ def main():
     plt.show()
 
     print('donzo')
+
+
+def define_peaks():
+    spacing = 3.3
+    sigma = 0.8
+    center_blue = 52.55
+    center_yellow = 52.36
+    manual_peaks = {
+        'blue' : [
+            {'a': 1.0, 'mu': center_blue, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_blue + spacing + 0.1, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_blue - spacing - 0.3, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_blue + 2 * spacing - 0.3, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_blue - 2 * spacing + 0.25, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_blue + 3 * spacing - 1.2, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_blue - 3 * spacing + 1.0, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_blue + 4 * spacing - 1.8, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_blue - 4 * spacing + 1.5, 'sigma': sigma},
+            # {'a': 0.00, 'mu': center_blue, 'sigma': sigma * 5},
+        ],
+        'yellow' : [
+            {'a': 1.0, 'mu': center_yellow, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_yellow + spacing, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_yellow - spacing - 0.4, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_yellow + 2 * spacing, 'sigma': sigma},
+            {'a': 0.2, 'mu': center_yellow - 2 * spacing + 0.5, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_yellow + 3 * spacing - 1, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_yellow - 3 * spacing + 1.5, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_yellow + 4 * spacing - 1.5, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_yellow - 4 * spacing + 1.8, 'sigma': sigma},
+            {'a': 0.05, 'mu': center_yellow - 4 * spacing + 1.8, 'sigma': sigma},
+            # {'a': 0.2, 'mu': center_yellow, 'sigma': sigma * 5},
+        ]
+    }
+
+    return manual_peaks
 
 
 def multi_gaus_pdf(x, *params):
@@ -259,6 +284,31 @@ def make_initial_guess_from_expectation(x_data, y_data, n_peaks=8, sigma_guess=1
     bounds_upper += [np.inf, peak_xs[0] + 4, 20]
 
     return p0, (bounds_lower, bounds_upper), peak_xs
+
+
+def build_manual_initial_guess(peak_list):
+    """
+    peak_list: list of dictionaries like:
+        [{'a': 1.0, 'mu': 52.3, 'sigma': 1.0}, ...]
+        First peak doesn't use 'a' (it's absorbed into normalization)
+    """
+    mu_range = 3
+    p0 = [peak_list[0]['mu'], peak_list[0]['sigma']]
+    bounds_lower = [peak_list[0]['mu'] - mu_range, 0]
+    bounds_upper = [peak_list[0]['mu'] + mu_range, 5]
+
+    for peak in peak_list[1:]:
+        a = peak.get('a', 1.0)
+        mu = peak['mu']
+        sigma = peak['sigma']
+        p0 += [a, mu, sigma]
+        bounds_lower += [0, mu - mu_range, 0]
+        bounds_upper += [np.inf, mu + mu_range, 5]
+
+    # bounds_upper[-1] = 50  # Last sigma is wide
+
+    return p0, (bounds_lower, bounds_upper)
+
 
 
 def write_longitudinal_beam_profile_fit_parameters(fit_out_path, beam_color, fit_parameters):

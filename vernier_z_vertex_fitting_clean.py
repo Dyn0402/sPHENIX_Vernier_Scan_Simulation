@@ -718,9 +718,11 @@ def fit_amp_shift(collider_sim, z_dist_data, zs_data):
     scale = max(z_dist_data) / max(z_dist)
     z_max_sim = zs[np.argmax(z_dist)]
     z_max_hist = zs_data[np.argmax(z_dist_data)]
-    shift = z_max_sim - z_max_hist  # microns
+    # shift = z_max_sim - z_max_hist  # microns  # Pretty sure this is in cm!!!!!
+    shift = (z_max_sim - z_max_hist) * 1e4  # microns
+    print(f'Shift guess: {shift:.3f} um')
 
-    res = minimize(amp_shift_residual, np.array([1.0, 0.0]),
+    res = minimize(amp_shift_residual, np.array([1.0, 0.0]), method='Nelder-Mead',
                    args=(collider_sim, scale, shift, z_dist_data, zs_data),
                    bounds=((0.0, 2.0), (-10e4, 10e4)))
     scale = res.x[0] * scale
@@ -735,7 +737,10 @@ def amp_shift_residual(x, collider_sim, scale_0, shift_0, z_dist_data, zs_data):
     collider_sim.set_z_shift(x[1] + shift_0)
     sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
     sim_interp = interp1d(sim_zs, sim_z_dist)
-    return np.sqrt(np.sum((z_dist_data - sim_interp(zs_data)) ** 2)) / np.mean(z_dist_data)
+    # return np.sqrt(np.sum((z_dist_data - sim_interp(zs_data)) ** 2)) / np.mean(z_dist_data)
+    resid = np.sqrt(np.sum((z_dist_data - sim_interp(zs_data)) ** 2)) / np.mean(z_dist_data)
+    # print(f'Amplitude: {x[0] * scale_0:.3f}, Shift: {x[1] + shift_0:.3f} um, dshift: {x[1]} um, Residual: {resid:.3f}')
+    return resid
 
 
 def plot_mbd_and_sim_dist(collider_sim, hist_data, title=None, out_dir=None):

@@ -157,8 +157,78 @@ py::array_t<double> density_n_gaussians(
     return result;
 }
 
+
+// Linearly interpolated PDF using (z_vals, pdf_vals)
+double interp_pdf(double z, const std::vector<double>& z_vals, const std::vector<double>& pdf_vals) {
+    if (z_vals.empty() || pdf_vals.empty() || z_vals.size() != pdf_vals.size())
+        return 0.0;
+
+    // Out-of-bounds
+    if (z <= z_vals.front()) return pdf_vals.front();
+    if (z >= z_vals.back()) return pdf_vals.back();
+
+    // Binary search for interval
+    auto upper = std::upper_bound(z_vals.begin(), z_vals.end(), z);
+    size_t idx = std::distance(z_vals.begin(), upper) - 1;
+
+    double z0 = z_vals[idx], z1 = z_vals[idx + 1];
+    double p0 = pdf_vals[idx], p1 = pdf_vals[idx + 1];
+
+    // Linear interpolation
+    return p0 + (p1 - p0) * (z - z0) / (z1 - z0);
+}
+
+
+py::array_t<double> density_interpolated_pdf(
+    py::array_t<double> x, py::array_t<double> y, py::array_t<double> z,
+    double r_x, double r_y, double r_z, double sigma_x, double sigma_y,
+    double angle_x, double angle_y, double beta_star_x, double beta_star_y,
+    std::vector<double> z_vals, std::vector<double> pdf_vals
+) {
+    auto buf_x = x.unchecked<3>();
+    auto buf_y = y.unchecked<3>();
+    auto buf_z = z.unchecked<3>();
+
+    std::vector<py::ssize_t> shape = { buf_x.shape(0), buf_x.shape(1), buf_x.shape(2) };
+    py::array_t<double> result(shape);
+    auto buf_result = result.mutable_unchecked<3>();
+
+    double cos_angle_xz = std::cos(angle_x);
+    double sin_angle_xz = std::sin(angle_x);
+    double cos_angle_yz = std::cos(angle_y);
+    double sin_angle_yz = std::sin(angle_y);
+
+    for (py::ssize_t i = 0; i < buf_x.shape(0); i++) {
+        for (py::ssize_t j = 0; j < buf_x.shape(1); j++) {
+            for (py::ssize_t k = 0; k < buf_x.shape(2); k++) {
+                double x_rel = buf_x(i, j, k) - r_x;
+                double y_rel = buf_y(i, j, k) - r_y;
+                double z_rel = buf_z(i, j, k) - r_z;
+
+                double x_rot = x_rel * cos_angle_xz - z_rel * sin_angle_xz;
+                double z_rot_xz = x_rel * sin_angle_xz + z_rel * cos_angle_xz;
+                double y_rot = y_rel * cos_angle_yz - z_rot_xz * sin_angle_yz;
+                double z_rot_yz = y_rel * sin_angle_yz + z_rot_xz * cos_angle_yz;
+
+                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k), beta_star_x, angle_x, angle_y);
+                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k), beta_star_y, angle_x, angle_y);
+
+                double z_density = interp_pdf(z_rot_yz, z_vals, pdf_vals);
+
+                double exponent = -0.5 * (x_rot * x_rot / (sigma_x_mod * sigma_x_mod) +
+                                          y_rot * y_rot / (sigma_y_mod * sigma_y_mod));
+
+                buf_result(i, j, k) = std::exp(exponent) * z_density / (std::pow(2 * M_PI, 1.0) * sigma_x_mod * sigma_y_mod);
+            }
+        }
+    }
+
+    return result;
+}
+
+
 PYBIND11_MODULE(bunch_density_cpp, m) {
     m.def("density", &density, "Calculate the density of the bunch at given points in the lab frame");
     m.def("density_n_gaussians", &density_n_gaussians, "Calculate density with arbitrary number of Gaussians in the z-direction");
-
+    m.def("density_interpolated_pdf", &density_interpolated_pdf, "Calculate density using interpolated PDF in z");
 }

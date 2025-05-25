@@ -37,6 +37,8 @@ class BunchDensity:
         self.longitudinal_params = {'mu1': 0., 'sigma1': 1., 'a2': 0., 'mu2': 0., 'sigma2': 1.,
                                     'a3': 0., 'mu3': 0., 'sigma3': 1., 'a4': 0., 'mu4': 0., 'sigma4': 1.}
         self.effective_longitudinal_params = self.longitudinal_params.copy()  # Effective params after scaling
+        self.longitudinal_profile_zs = None  # z positions of the longitudinal profile
+        self.longitudinal_profile_densities = None  # densities of the longitudinal profile
         self.longitudinal_width_scaling = 1.  # Scaling factor for the longitudinal beam profile
 
         self.initial_z = 0.  # Initial z distance in um
@@ -127,6 +129,17 @@ class BunchDensity:
         self.effective_longitudinal_params = fit_params.copy()
         self.reset = True
 
+    def read_longitudinal_beam_profile_from_file(self, profile_path):
+        """
+        Read the longitudinal beam profile from a file and set it.
+        :param profile_path: str Path to file with longitudinal profile
+        """
+        data = np.loadtxt(profile_path, skiprows=1)
+
+        self.longitudinal_profile_zs = data[:, 0]  # z positions in um
+        self.longitudinal_profile_densities = data[:, 1]  # densities in um^-3
+        self.reset = True
+
     def set_longitudinal_beam_profile_scaling(self, scaling):
         """
         Set the scaling of the longitudinal beam profile. Scale all fit sigmas by this factor.
@@ -201,11 +214,19 @@ class BunchDensity:
         beta_star_x = self.beta_star_x if self.beta_star_x is not None else 0
         beta_star_y = self.beta_star_y if self.beta_star_y is not None else 0
 
-        if len(self.effective_longitudinal_params.values()) == 11:
-            return bdcpp.density(x, y, z, self.r[0], self.r[1], self.r[2],
-                                 self.transverse_sigma[0], self.transverse_sigma[1],
-                                 self.angle_x, self.angle_y, beta_star_x, beta_star_y,
-                                 * self.effective_longitudinal_params.values())
+        if self.longitudinal_profile_densities is not None and self.longitudinal_profile_zs is not None:
+            return bdcpp.density_interpolated_pdf(  # Use the longitudinal profile if it is set
+                x, y, z,
+                self.r[0], self.r[1], self.r[2],
+                self.transverse_sigma[0], self.transverse_sigma[1],
+                self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+                self.longitudinal_profile_zs, self.longitudinal_profile_densities
+            )
+        # elif len(self.effective_longitudinal_params.values()) == 11:
+        #     return bdcpp.density(x, y, z, self.r[0], self.r[1], self.r[2],
+        #                          self.transverse_sigma[0], self.transverse_sigma[1],
+        #                          self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+        #                          * self.effective_longitudinal_params.values())
         else:
             # Prepare list of [a, b, c] for each Gaussian
             gaussians = extract_gaussian_list(self.effective_longitudinal_params)
@@ -243,6 +264,30 @@ class BunchDensity:
             self.transverse_sigma[0], self.transverse_sigma[1],
             self.angle_x, self.angle_y, beta_star_x, beta_star_y,
             gaussians
+        )
+
+    def density_interpolate(self, x, y, z):
+        """
+        Calculate the density of the bunch at a given point in the lab frame using an arbitrary number of Gaussians
+        in the longitudinal (z) direction, with interpolation.
+
+        :param x: float or np.ndarray of x positions
+        :param y: float or np.ndarray of y positions
+        :param z: float or np.ndarray of z positions
+        :return: float or np.ndarray Density at given positions
+        """
+        if self.reset:
+            self.calculate_r_and_beta()
+
+        beta_star_x = self.beta_star_x if self.beta_star_x is not None else 0
+        beta_star_y = self.beta_star_y if self.beta_star_y is not None else 0
+
+        return bdcpp.density_interpolated_pdf(
+            x, y, z,
+            self.r[0], self.r[1], self.r[2],
+            self.transverse_sigma[0], self.transverse_sigma[1],
+            self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+            self.longitudinal_profile_zs, self.longitudinal_profile_densities
         )
 
     def density_py(self, x, y, z):

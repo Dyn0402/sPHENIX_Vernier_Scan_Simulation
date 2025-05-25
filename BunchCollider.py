@@ -60,6 +60,8 @@ class BunchCollider:
         self.bunch2_longitudinal_fit_parameter_path = None
         self.bunch1_longitudinal_fit_scaling = 1.
         self.bunch2_longitudinal_fit_scaling = 1.
+        self.bunch1_longitudinal_profile_file_path = None
+        self.bunch2_longitudinal_profile_file_path = None
 
         self.x, self.y, self.z = None, None, None
         self.average_density_product_xyz = None
@@ -132,6 +134,12 @@ class BunchCollider:
         self.bunch2_longitudinal_fit_scaling = scale2
         self.bunch1.set_longitudinal_beam_profile_scaling(scale1)
         self.bunch2.set_longitudinal_beam_profile_scaling(scale2)
+
+    def set_longitudinal_profiles_from_file(self, bunch1_path, bunch2_path):
+        self.bunch1_longitudinal_profile_file_path = bunch1_path
+        self.bunch2_longitudinal_profile_file_path = bunch2_path
+        self.bunch1.read_longitudinal_beam_profile_from_file(bunch1_path)
+        self.bunch2.read_longitudinal_beam_profile_from_file(bunch2_path)
 
     def set_grid_size(self, n_points_x=None, n_points_y=None, n_points_z=None, n_points_t=None):
         if n_points_x is not None:
@@ -274,7 +282,6 @@ class BunchCollider:
 
     def get_z_density_dist(self):
         z_vals = (self.z - self.z_shift) / 1e4  # um to cm
-        # z_dist = self.amplitude * np.sum(self.average_density_product_xyz, axis=(0, 1))
         z_dist = self.amplitude * self.z_dist
         if self.gaus_z_efficiency_width is not None:
             z_dist = z_dist * gaus(z_vals, 1, 0, self.gaus_z_efficiency_width)

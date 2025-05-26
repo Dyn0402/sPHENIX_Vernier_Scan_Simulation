@@ -1,5 +1,5 @@
 // slim_tree.C
-// To run: root -l -b -q 'slim_tree.C()'
+// To run: root -l -b -q 'slim_tree.cpp'
 
 #include <TFile.h>
 #include <TTree.h>
@@ -81,9 +81,6 @@ void slim_vernier_scan_root_file() {
     }
 
     // === Create output file ===
-    TString output_path = TString(input_path);
-    output_path.ReplaceAll(".root", "_slimmed.root");
-
     TFile* outfile = TFile::Open(output_path, "RECREATE");
     if (!outfile || outfile->IsZombie()) {
         printf("Error: cannot create output file %s\n", output_path.Data());

@@ -83,7 +83,7 @@ void slim_vernier_scan_root_file() {
     // === Create output file ===
     TFile* outfile = TFile::Open(output_path, "RECREATE");
     if (!outfile || outfile->IsZombie()) {
-        printf("Error: cannot create output file %s\n", output_path.Data());
+        printf("Error: cannot create output file %s\n", output_path);
         infile->Close();
         return;
     }
@@ -102,5 +102,5 @@ void slim_vernier_scan_root_file() {
     outfile->Close();
     infile->Close();
 
-    printf("Slimmed tree written to: %s\n", output_path.Data());
+    printf("Slimmed tree written to: %s\n", output_path);
 }

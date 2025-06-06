@@ -30,7 +30,7 @@ def main():
     print('donzo')
 
 
-def bpm_analysis(bpm_file_path, start_time, end_time, plot=True):
+def bpm_analysis(bpm_file_path, start_time, end_time, plot=True, pre_scan_buffer_seconds=None):
     """
     Read BMP file and extract Vernier scan steps and crossing angles.
     """
@@ -81,7 +81,11 @@ def bpm_analysis(bpm_file_path, start_time, end_time, plot=True):
 
     step_bounds = [(start, end) for start, end in times_above_threshold if start >= start_time and end <= end_time]
 
-    steps = [{'step': 0, 'start': start_time}]
+    if pre_scan_buffer_seconds is not None:
+        steps = [{'step': -1, 'start': start_time, 'end': start_time + pd.Timedelta(seconds=pre_scan_buffer_seconds)},
+                 {'step': 0, 'start': start_time + pd.Timedelta(seconds=pre_scan_buffer_seconds)}]
+    else:
+        steps = [{'step': 0, 'start': start_time}]
     for i, (start, end) in enumerate(step_bounds):
         steps[-1]['end'] = start
         steps.append({'step': i + 1, 'start': end})

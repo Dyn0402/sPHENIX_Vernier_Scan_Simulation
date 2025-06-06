@@ -25,7 +25,7 @@ from vernier_z_vertex_fitting import read_cad_measurement_file
 
 def main():
     err_type = 'conservative'  # 'best'  ''
-    combined_lumi_path = f'run_rcf_jobs_lumi_calc/output/{err_type}_err_combined_lumis.csv'
+    combined_lumi_path = f'run_rcf_jobs_lumi_calc_old/output/{err_type}_err_combined_lumis.csv'
     combined_lumis = pd.read_csv(combined_lumi_path)
 
     # save_path = None

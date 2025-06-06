@@ -21,10 +21,11 @@ from Measure import Measure
 
 
 def main():
-    write_avg_longitudinal_profiles()
+    # write_avg_longitudinal_profiles()
     # fit_longitudinal_profiles()
     # plot_profiles_vs_time()
     # compare_direct_profiles()
+    plot_abort_gaps()
     print('donzo')
 
 
@@ -217,10 +218,13 @@ def compare_direct_profiles():
         base_path = 'C:/Users/Dylan/Desktop/'
     else:
         base_path = '/local/home/dn277127/Bureau/'
-    cad_measurements_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/'
-    beam_color = 'yellow'
-    blue_profiles_test_path = f'{cad_measurements_path}profiles_test/{beam_color}_profile_24_14_12.dat'
-    blue_profile_wcm_path = f'{cad_measurements_path}profiles/{beam_color}_22_14_12.dat'
+    cad_measurements_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    # cad_measurements_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
+    beam_color = 'blue'
+    blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_22_22_10.dat'
+    # blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_14_26_00.dat'
+    # blue_profiles_test_path = f'{cad_measurements_path}profiles_test/{beam_color}_profile_24_14_12.dat'
+    # blue_profile_wcm_path = f'{cad_measurements_path}profiles/{beam_color}_22_14_12.dat'
 
     with open(blue_profiles_test_path, 'r') as f:
         lines = f.readlines()
@@ -247,38 +251,38 @@ def compare_direct_profiles():
     print(f'Baseline: {baseline}')
     data = baseline - data
 
-    with open(blue_profile_wcm_path, 'r') as f:
-        file_content = f.read()
-    lines = file_content.split('\n')
-    times, values = [[]], [[]]
-    for line in lines[1:]:
-        if line == '':
-            continue
-        columns = line.split('\t')
-        time, value = float(columns[0]), float(columns[1])
-        if len(times[-1]) > 0 and time < times[-1][-1]:
-            times.append([])
-            values.append([])
-        times[-1].append(time)
-        values[-1].append(value)
+    # with open(blue_profile_wcm_path, 'r') as f:
+    #     file_content = f.read()
+    # lines = file_content.split('\n')
+    # times, values = [[]], [[]]
+    # for line in lines[1:]:
+    #     if line == '':
+    #         continue
+    #     columns = line.split('\t')
+    #     time, value = float(columns[0]), float(columns[1])
+    #     if len(times[-1]) > 0 and time < times[-1][-1]:
+    #         times.append([])
+    #         values.append([])
+    #     times[-1].append(time)
+    #     values[-1].append(value)
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(data[:len(values[0])], color='blue')
-    ax.plot(np.array(values[0]) / np.max(values[0]) * np.max(data[:len(values[0])]), color='red')
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(data, color='blue')
-    flat_vals = np.concatenate(values)
-    ax.plot(flat_vals / np.max(flat_vals) * np.max(data), color='red')
-    print([len(x) for x in values])
-
-    print(f'Length of data: {len(values[0])}')
-
-    print(f'Number of bunches: {len(data) / len(values[0])}')
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    for i in range(50):
-        ax.plot(data[i * len(values[0]):(i + 1) * len(values[0])], color='blue', alpha=0.2)
+    # fig, ax = plt.subplots(figsize=(12, 6))
+    # ax.plot(data[:len(values[0])], color='blue')
+    # ax.plot(np.array(values[0]) / np.max(values[0]) * np.max(data[:len(values[0])]), color='red')
+    #
+    # fig, ax = plt.subplots(figsize=(12, 6))
+    # ax.plot(data, color='blue')
+    # flat_vals = np.concatenate(values)
+    # ax.plot(flat_vals / np.max(flat_vals) * np.max(data), color='red')
+    # print([len(x) for x in values])
+    #
+    # print(f'Length of data: {len(values[0])}')
+    #
+    # print(f'Number of bunches: {len(data) / len(values[0])}')
+    #
+    # fig, ax = plt.subplots(figsize=(12, 6))
+    # for i in range(50):
+    #     ax.plot(data[i * len(values[0]):(i + 1) * len(values[0])], color='blue', alpha=0.2)
 
     # Parameters
     segment_size = 2131
@@ -322,6 +326,8 @@ def compare_direct_profiles():
     mean_differences = np.diff(gaussian_means)
     mean_differences = mean_differences[mean_differences < 5000]
 
+    mean_differences *= 0.05  # Convert to ns
+
     # Plot histogram
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.hist(mean_differences, bins=30, edgecolor='black')
@@ -329,7 +335,7 @@ def compare_direct_profiles():
     ax.set_ylabel("Frequency")
     ax.set_title("Histogram of Gaussian Peak Differences")
 
-    print(f'Mean of differences: {np.mean(mean_differences)}')
+    print(f'Mean of differences: {np.mean(mean_differences)} +- {np.std(mean_differences)} ns')
 
     time_step = 0.05  # ns
     segment_time = 106.573785  # ns
@@ -354,6 +360,74 @@ def compare_direct_profiles():
         ax.plot(times_i, vals_i / np.max(vals_i), color='blue', alpha=0.1)
 
     print(f'Number of bunches: {len(bunch_times)}')
+
+    plt.show()
+
+
+def plot_abort_gaps():
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+    cad_measurements_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    # cad_measurements_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
+    beam_color = 'blue'
+    blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_22_22_10.dat'
+    # blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_14_26_00.dat'
+    # blue_profiles_test_path = f'{cad_measurements_path}profiles_test/{beam_color}_profile_24_14_12.dat'
+    # blue_profile_wcm_path = f'{cad_measurements_path}profiles/{beam_color}_22_14_12.dat'
+
+    with open(blue_profiles_test_path, 'r') as f:
+        lines = f.readlines()
+    print(len(lines))
+    print(lines[:-1])
+    print(lines[-1][:200].split())
+    data_str_list = lines[-1].split()
+    date = data_str_list[0]
+    time = data_str_list[1]
+    data = np.array([int(x) for x in data_str_list[3:]])
+    print(f'Date: {date}, Time: {time}')
+    print(f'Data: {data[:100]}')
+    print(f'Data length: {len(data)}')
+    print(f'Sample frequency: {len(data) * 1e-6} MHz')
+    print(f'Sample period: {1 / len(data) * 1e9} ns')
+    print(f'Max value: {np.max(data)}')
+
+    fig, ax = plt.subplots()
+    bins = np.arange(70.5, 85.5)
+    ax.hist(data, bins=bins, color='blue', alpha=0.5, label='Blue Profile')
+
+    # Flip
+    baseline = np.percentile(data, 90)
+    print(f'Baseline: {baseline}')
+    data = baseline - data
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(data, color='blue', label='Profile Data')
+    ax.set_xlabel('Index')
+
+    # Parameters
+    segment_size = 2131
+    peak_threshold = 60
+    fit_window = 20  # points to the left and right of the peak
+
+    # Prepare segments
+    num_full_segments = len(data) // segment_size
+    data = data[:num_full_segments * segment_size]  # truncate the end
+    segments = np.split(data, num_full_segments)
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for seg_i, segment in enumerate(segments):
+        peak_index = np.argmax(segment)
+        peak_value = segment[peak_index]
+
+        if peak_value < peak_threshold:
+            left = max(0, peak_index - fit_window)
+            right = min(len(segment), peak_index + fit_window + 1)
+            x = np.arange(left, right) + seg_i * segment_size
+            y = segment[left:right]
+
+            ax.plot(x -  np.min(x), y, color='blue', alpha=0.1, label=f'Segment {seg_i + 1}')
 
     plt.show()
 

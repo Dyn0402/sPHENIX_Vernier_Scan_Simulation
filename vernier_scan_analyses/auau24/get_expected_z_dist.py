@@ -13,13 +13,13 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import minimize, differential_evolution
 from scipy.interpolate import interp1d
 import uproot
 from datetime import datetime, time
 
 from BunchCollider import BunchCollider
-from vernier_z_vertex_fitting_clean import fit_amp_shift
+from z_vertex_fitting_common import fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2
 
 
 def main():
@@ -27,7 +27,11 @@ def main():
     # auau_data_comp()
     # auau_compare_profiles()
     # auau_pull_cad_step_data()
-    auau_plot_all_steps()
+    # auau_plot_all_steps()
+    # auau_tests()
+    # auau_minimization()
+    # auau_manual_simple_minimization()
+    auau_manual_simple_beta_star_minimization()
     # auau_single_dist_bw_min()
     # auau_residuals_vs_beam_width()
     # auau_single_dist_multi_par_opt()
@@ -316,15 +320,26 @@ def auau_plot_all_steps():
 
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
-    z_vertex_data_path = f'{base_path_auau}vertex_data/plot2.root'
-    z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/zdc_mbd_plot2.root'
+    z_vertex_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
+    z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
+    fit_range = [-230, 230]
+
     for scan_type, steps in zip(["horizontal", "vertical"], [range(12), range(12, 24)]):
         fig, axes = plt.subplots(nrows=6, ncols=2, figsize=(13.3, 7.5), sharex=True)
         axes = axes.T.flatten()  # Fill columns first
+
+        collider_sim = BunchCollider()
+        first_fit = True
+
+        # Get nominal dcct ions and emittances
+        step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+        dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+        em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+        em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
 
         for i, scan_step in enumerate(steps):
             print(f'{scan_type.capitalize()} Step {scan_step}')
@@ -332,30 +347,36 @@ def auau_plot_all_steps():
             cad_step_row = cad_df[cad_df['step'] == scan_step].iloc[0]
 
             with uproot.open(z_vertex_data_path) as f:
-                hist = f[f'hist{scan_step}']
+                hist = f[f'step_{scan_step}']
                 centers_no_zdc = hist.axis().centers()
                 counts_no_zdc = hist.counts()
                 count_errs_no_zdc = hist.errors()
                 count_errs_no_zdc[count_errs_no_zdc == 0] = 1
 
             with uproot.open(z_vertex_zdc_data_path) as f:
-                hist = f[f'hist{scan_step}']
+                hist = f[f'step_{scan_step}']
                 centers = hist.axis().centers()
                 counts = hist.counts()
                 count_errs = hist.errors()
                 count_errs[count_errs == 0] = 1
 
-            fit_range = [-230, 230]
-            long_paths = get_profile_path(
-                longitudinal_profiles_dir_path,
-                cad_step_row['start'], cad_step_row['end'],
-                True
-            )
+            # Normalize counts to ZDC rate
+            zdc_raw_rate = cad_step_row['zdc_raw_rate']
+            zdc_hist_counts = np.sum(counts)
+            hist_scaling_factor = zdc_raw_rate / zdc_hist_counts
 
-            beam_width_scale = 0.95
+            counts *= hist_scaling_factor
+            counts_no_zdc *= hist_scaling_factor
+
+            # Scale for dcct
+            step_dcct_blue, step_dcct_yellow = cad_step_row['blue_dcct_ions'], cad_step_row['yellow_dcct_ions']
+            dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (step_dcct_blue * step_dcct_yellow)
+
+            counts *= dcct_scale
+            counts_no_zdc *= dcct_scale
+
+            beam_width_scale = 0.9
             beta_star = 72  # cm
-            blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
-            yellow_offset_x, yellow_offset_y = 0, 0
             bkg = 2.0e-17
             gauss_eff_width = 500
             mbd_resolution = 2.0
@@ -364,33 +385,58 @@ def auau_plot_all_steps():
             yellow_angle_x = -cad_step_row['yellow angle h'] * 1e-3
             yellow_angle_y = -cad_step_row['yellow angle v'] * 1e-3
 
+            collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+
+            em_blue_horiz, em_blue_vert = cad_step_row['blue_horiz_emittance'], cad_step_row['blue_vert_emittance']
+            em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row['yellow_vert_emittance']
+
+            beam_width_x = 205 / np.sqrt(2) * beam_width_scale
+            beam_width_y = 205 / np.sqrt(2) * beam_width_scale
+
+            blue_widths = np.array([beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+                                    beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)])
+            yellow_widths = np.array([beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+                                      beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)])
+
+            collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
+            collider_sim.set_bkg(bkg)
+            collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+            collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+
+            collider_sim.set_bunch_crossing(blue_angle_x, blue_angle_y, yellow_angle_x, yellow_angle_y)
+
+            long_paths = get_profile_path(longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'],
+                                          True)
+
             ax.step(centers_no_zdc, counts_no_zdc, where='mid', linewidth=1, alpha=0.3, color='red', label='Data No ZDC')
             ax.step(centers, counts, where='mid', linewidth=2, label='Data With ZDC')
 
             for longitudinal_profile_path in long_paths:
-                beam_width_x = 175 / np.sqrt(2) * beam_width_scale
-                beam_width_y = 287 / np.sqrt(2) * beam_width_scale
-
-                collider_sim = BunchCollider()
-                collider_sim.set_bunch_beta_stars(beta_star, beta_star)
-                collider_sim.set_bunch_sigmas(np.array([beam_width_x, beam_width_y]), np.array([beam_width_x, beam_width_y]))
-                collider_sim.set_bunch_offsets([blue_offset_x, blue_offset_y], [yellow_offset_x, yellow_offset_y])
-                collider_sim.set_bkg(bkg)
-                collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
-                collider_sim.set_gaus_smearing_sigma(mbd_resolution)
-                collider_sim.set_bunch_crossing(blue_angle_x, blue_angle_y, yellow_angle_x, yellow_angle_y)
-
                 blue_profile_path = longitudinal_profile_path.replace('COLOR_', 'blue_')
                 yellow_profile_path = longitudinal_profile_path.replace('COLOR_', 'yellow_')
                 collider_sim.set_longitudinal_profiles_from_file(blue_profile_path, yellow_profile_path)
 
-                collider_sim.run_sim_parallel()
+                for offset_type in ['set', 'measured']:
+                    if offset_type == 'set':
+                        blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
+                    elif offset_type == 'measured':
+                        blue_offset_x, blue_offset_y = cad_step_row['h_offset_shifted'], cad_step_row['v_offset_shifted']
+                    ls = '-' if offset_type == 'set' else '--'
+                    yellow_offset_x, yellow_offset_y = 0, 0
 
-                fit_mask = (centers > fit_range[0]) & (centers < fit_range[1])
-                fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
+                    collider_sim.set_bunch_offsets([blue_offset_x, blue_offset_y], [yellow_offset_x, yellow_offset_y])
 
-                zs, z_dist = collider_sim.get_z_density_dist()
-                ax.plot(zs, z_dist, linewidth=2)
+                    collider_sim.run_sim_parallel()
+
+                    fit_mask = (centers > fit_range[0]) & (centers < fit_range[1])
+                    if first_fit:  # Fit amplitude on first fit only and fix
+                        fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
+                        first_fit = False
+                    else:
+                        fit_shift_only(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
+
+                    zs, z_dist = collider_sim.get_z_density_dist()
+                    ax.plot(zs, z_dist, linewidth=2, ls=ls)
 
             if scan_type == 'horizontal':
                 ax.annotate(f'Offset: {blue_offset_x:.1f} μm', xy=(0.05, 0.9), xycoords='axes fraction',
@@ -400,7 +446,7 @@ def auau_plot_all_steps():
                             ha='left', va='top', fontsize=12)
 
             ax.set_ylim(bottom=0)
-            ax.set_xlim(fit_range)
+            # ax.set_xlim(fit_range)
             ax.grid()
 
             if i == 0:  # top row
@@ -408,7 +454,7 @@ def auau_plot_all_steps():
             if i == 5 or i == 11:  # bottom row
                 ax.set_xlabel('z (cm)')
             if i < 6:  # left column
-                ax.set_ylabel('Counts')
+                ax.set_ylabel('Rate (Hz)')
 
             # Adjust Y-axis upper limit
             max_y = np.max(counts[(centers < 180) & (centers > -180)]) * 1.2
@@ -422,6 +468,515 @@ def auau_plot_all_steps():
         fig.savefig(f'{save_base}.pdf')
         # plt.show()
         plt.close(fig)
+
+
+def auau_tests():
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+
+    base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
+    z_vertex_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
+    z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
+    combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
+
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    fit_range = [-230, 230]
+    scan_type = 'horizontal'
+    steps = [0, 3]
+
+    collider_sim = BunchCollider()
+    # collider_sim.set_grid_size(25, 25, 51, 21)
+    first_fit = True
+
+    # Get nominal dcct ions and emittances
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+
+    for i, scan_step in enumerate(steps):
+        print(f'{scan_type.capitalize()} Step {scan_step}')
+        fig, ax = plt.subplots()
+        cad_step_row = cad_df[cad_df['step'] == scan_step].iloc[0]
+
+        with uproot.open(z_vertex_data_path) as f:
+            hist = f[f'step_{scan_step}']
+            centers_no_zdc = hist.axis().centers()
+            counts_no_zdc = hist.counts()
+            count_errs_no_zdc = hist.errors()
+            count_errs_no_zdc[count_errs_no_zdc == 0] = 1
+
+        with uproot.open(z_vertex_zdc_data_path) as f:
+            hist = f[f'step_{scan_step}']
+            centers = hist.axis().centers()
+            counts = hist.counts()
+            count_errs = hist.errors()
+            count_errs[count_errs == 0] = 1
+
+        # Normalize counts to ZDC rate
+        zdc_raw_rate = cad_step_row['zdc_raw_rate']
+        zdc_hist_counts = np.sum(counts)
+        hist_scaling_factor = zdc_raw_rate / zdc_hist_counts
+
+        counts *= hist_scaling_factor
+        counts_no_zdc *= hist_scaling_factor
+
+        # Scale for dcct
+        step_dcct_blue, step_dcct_yellow = cad_step_row['blue_dcct_ions'], cad_step_row['yellow_dcct_ions']
+        dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (step_dcct_blue * step_dcct_yellow)
+
+        counts *= dcct_scale
+        counts_no_zdc *= dcct_scale
+
+        beam_width_scale = 0.95
+        beta_star = 72  # cm
+        # beta_star = 59.5  # cm
+        bkg = 2.0e-17
+        gauss_eff_width = 500
+        mbd_resolution = 2.0
+        blue_angle_x = -cad_step_row['blue angle h'] * 1e-3
+        blue_angle_y = -cad_step_row['blue angle v'] * 1e-3
+        yellow_angle_x = -cad_step_row['yellow angle h'] * 1e-3
+        yellow_angle_y = -cad_step_row['yellow angle v'] * 1e-3
+
+        collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+
+        em_blue_horiz, em_blue_vert = cad_step_row['blue_horiz_emittance'], cad_step_row['blue_vert_emittance']
+        em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row['yellow_vert_emittance']
+
+        # beam_width_x = 205 / np.sqrt(2) * beam_width_scale
+        # beam_width_y = 205 / np.sqrt(2) * beam_width_scale
+        beam_width_x = 123.9
+        beam_width_y = 119.7
+
+        blue_widths = np.array([beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+                                beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)])
+        yellow_widths = np.array([beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+                                  beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)])
+
+        collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
+        collider_sim.set_bkg(bkg)
+        collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+        collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+
+        longitudinal_profile_path = get_profile_path(longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'],
+                                      False)
+
+        ax.step(centers_no_zdc, counts_no_zdc, where='mid', linewidth=1, alpha=0.3, color='red', label='Data No ZDC')
+        ax.step(centers, counts, where='mid', linewidth=2, label='Data With ZDC')
+
+        blue_profile_path = longitudinal_profile_path.replace('COLOR_', 'blue_')
+        yellow_profile_path = longitudinal_profile_path.replace('COLOR_', 'yellow_')
+        collider_sim.set_longitudinal_profiles_from_file(blue_profile_path, yellow_profile_path)
+
+        for blue_offset_dx in [-70, 0, 70]:
+            for yellow_angle_dx in [-0.07, 0, 0.07]:
+                collider_sim.set_bunch_crossing(blue_angle_x, blue_angle_y, yellow_angle_x + yellow_angle_dx * 1e-3, yellow_angle_y)
+
+                # for offset_type in ['set', 'measured']:
+                for offset_type in ['set']:
+                    if offset_type == 'set':
+                        blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
+                    elif offset_type == 'measured':
+                        blue_offset_x, blue_offset_y = cad_step_row['h_offset_shifted'], cad_step_row['v_offset_shifted']
+                    ls = '-' if offset_type == 'set' else '--'
+                    yellow_offset_x, yellow_offset_y = 0, 0
+
+                    collider_sim.set_bunch_offsets([blue_offset_x + blue_offset_dx, blue_offset_y], [yellow_offset_x, yellow_offset_y])
+
+                    collider_sim.run_sim_parallel()
+
+                    fit_mask = (centers > fit_range[0]) & (centers < fit_range[1])
+                    if first_fit:  # Fit amplitude on first fit only and fix
+                        fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
+                        first_fit = False
+                    else:
+                        fit_shift_only(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
+
+                    zs, z_dist = collider_sim.get_z_density_dist()
+                    ax.plot(zs, z_dist, linewidth=2, ls=ls)
+
+        if scan_type == 'horizontal':
+            ax.annotate(f'Offset: {blue_offset_x:.1f} μm', xy=(0.05, 0.9), xycoords='axes fraction',
+                        ha='left', va='top', fontsize=12)
+        else:
+            ax.annotate(f'Offset: {blue_offset_y:.1f} μm', xy=(0.05, 0.9), xycoords='axes fraction',
+                        ha='left', va='top', fontsize=12)
+
+        ax.set_ylim(bottom=0)
+        ax.grid()
+
+        ax.legend()
+        ax.set_xlabel('z (cm)')
+        ax.set_ylabel('Rate (Hz)')
+
+        # Adjust Y-axis upper limit
+        max_y = np.max(counts[(centers < 180) & (centers > -180)]) * 1.2
+        ax.set_ylim(top=max_y)
+
+    plt.show()
+
+
+def auau_minimization():
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+
+    base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
+    z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
+    z_vertex_no_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
+    combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
+
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    fit_range = [-200, 200]
+    steps = [0]
+    # steps = [0]
+    # steps = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    # steps = np.arange(0, 24)
+
+    collider_sim = BunchCollider()
+    # collider_sim.set_grid_size(31, 31, 101, 31)
+    collider_sim.set_grid_size(31, 31, 101, 31)
+    bkg = 2.0e-17
+    gauss_eff_width = 500
+    mbd_resolution = 2.0
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+
+    # Get nominal dcct ions and emittances
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+
+    # Preload data and histograms here
+    centers_list, counts_list, count_errs_list = [], [], []
+    for step in steps:
+        with uproot.open(z_vertex_zdc_data_path) as f:
+        # with uproot.open(z_vertex_no_zdc_data_path) as f:
+            hist = f[f'step_{step}']
+            centers = hist.axis().centers()
+            counts = hist.counts()
+            count_errs = hist.errors()
+            count_errs[count_errs == 0] = 1
+
+        cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
+        zdc_raw_rate = cad_step_row['zdc_raw_rate']
+        hist_scaling_factor = zdc_raw_rate / np.sum(counts)
+        dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (
+                cad_step_row['blue_dcct_ions'] * cad_step_row['yellow_dcct_ions'])
+
+        counts *= hist_scaling_factor * dcct_scale
+        count_errs *= hist_scaling_factor * dcct_scale
+
+        centers_list.append(centers)
+        counts_list.append(counts)
+        count_errs_list.append(count_errs)
+
+    sim_settings = {
+        'steps': steps,
+        'fit_range': fit_range,
+        'profiles_path': longitudinal_profiles_dir_path,
+        'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
+        'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
+        'plot': False  # Set to True if you want to plot the results
+    }
+
+    # beam_width_x, beam_width_y, beta_star, yellow_angle_x (mrad), blue_offset_x (microns)
+    # initial_guess = np.array([120.0, 110.0, 72.0, 0.0, 0.0])
+    # initial_guess = np.array([125, 125, 72, 1e-2, -14.91])
+    # initial_guess = np.array([124.1, 125, 72, 1.2e-3, -81.64])
+    initial_guess = '[ 1.286e+02  1.436e+02  6.605e+01  3.833e-04 -6.498e-01 -4.741e-02 -9.745e+00]'
+    initial_guess = np.array([128.6, 143.6, 66.05, 0.0003833, -0.6498, -0.04741, -9.745])
+    # bounds = [(120, 170), (120, 170), (55, 90), (-0.2, +0.2), (-200, 200)]
+    bounds = [(100, 145), (130, 130), (65, 120), (65, 120), (-0.1, 0.1), (-100.0, 100.0), (-0.05, 0.05), (-50.0, 50.0)]
+
+    # result = minimize(
+    #     compute_total_chi2,
+    #     initial_guess,
+    #     args=(collider_sim, cad_df, centers_list, counts_list, count_errs_list, sim_settings),
+    #     # method='Nelder-Mead',  # or 'L-BFGS-B' with bounds
+    #     method='L-BFGS-B',
+    #     bounds=bounds,
+    #     options={'maxiter': 10000}
+    # )
+
+    result = differential_evolution(
+        compute_total_chi2,
+        bounds=bounds,
+        args=(collider_sim, cad_df, centers_list, counts_list, count_errs_list, sim_settings),
+        strategy='best1bin',
+        maxiter=10000,
+        popsize=15,
+        tol=0.01,
+        mutation=(0.5, 1),
+        recombination=0.7,
+        polish=True,
+        updating='deferred',
+        disp=True
+    )
+
+    print('Optimization result:', result)
+
+
+def auau_manual_simple_minimization():
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+
+    base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
+    z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
+    combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
+
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    fit_range = [-230, 230]
+    steps = np.arange(0, 24)
+
+    collider_sim = BunchCollider()
+    collider_sim.set_grid_size(31, 31, 101, 31)
+    bkg = 2.0e-17
+    gauss_eff_width = 500
+    mbd_resolution = 2.0
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+
+    # Get nominal dcct ions and emittances
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+
+    # Preload data and histograms here
+    centers_list, counts_list, count_errs_list = [], [], []
+    for step in steps:
+        with uproot.open(z_vertex_zdc_data_path) as f:
+            hist = f[f'step_{step}']
+            centers = hist.axis().centers()
+            counts = hist.counts()
+            count_errs = hist.errors()
+            count_errs[count_errs == 0] = 1
+
+        cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
+        zdc_raw_rate = cad_step_row['zdc_raw_rate']
+        hist_scaling_factor = zdc_raw_rate / np.sum(counts)
+        dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (
+                cad_step_row['blue_dcct_ions'] * cad_step_row['yellow_dcct_ions'])
+
+        counts *= hist_scaling_factor * dcct_scale
+        count_errs *= hist_scaling_factor * dcct_scale
+
+        centers_list.append(centers)
+        counts_list.append(counts)
+        count_errs_list.append(count_errs)
+
+    sim_settings = {
+        'steps': steps,
+        'fit_range': fit_range,
+        'profiles_path': longitudinal_profiles_dir_path,
+        'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
+        'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
+        'plot': False  # Set to True if you want to plot the results
+    }
+
+    bws_x, bws_y = np.linspace(110, 140, 5), np.linspace(110, 140, 5)
+
+    bwxs, bwys, total_chi2s = [], [], []
+    for beam_width_x in bws_x:
+        for beam_width_y in bws_y:
+            # beam_width_x, beam_width_y, beta_star, yellow_angle_x (mrad), blue_offset_x (microns)
+            initial_guess = np.array([beam_width_x, beam_width_y, 72.0, 0.0, 0.0, 0.0, 0.0])
+
+            chi2 = compute_total_chi2(
+                initial_guess,
+                collider_sim,
+                cad_df,
+                centers_list,
+                counts_list,
+                count_errs_list,
+                sim_settings
+            )
+            bwxs.append(beam_width_x)
+            bwys.append(beam_width_y)
+            total_chi2s.append(chi2)
+
+    bwxs = np.array(bwxs)
+    bwys = np.array(bwys)
+    total_chi2s = np.array(total_chi2s)
+
+    # Reshape the data to 2D grids
+    bws_x_unique = np.unique(bwxs)
+    bws_y_unique = np.unique(bwys)
+    chi2_grid = total_chi2s.reshape(len(bws_x_unique), len(bws_y_unique))
+
+    # Find the minimum chi2 and corresponding parameters
+    min_index = np.argmin(total_chi2s)
+    min_bw_x = bwxs[min_index]
+    min_bw_y = bwys[min_index]
+    min_chi2 = total_chi2s[min_index]
+
+    print(f"Minimum chi2: {min_chi2:.2f} at beam_width_x = {min_bw_x:.2f}, beam_width_y = {min_bw_y:.2f}")
+
+    # Plotting
+    plt.figure(figsize=(8, 6))
+    cp = plt.contourf(bws_x_unique, bws_y_unique, chi2_grid.T, levels=20, cmap="viridis")
+    plt.colorbar(cp, label='Total chi²')
+    plt.plot(min_bw_x, min_bw_y, 'r*', markersize=10, label='Minimum chi²')
+    plt.xlabel('beam_width_x [µm]')
+    plt.ylabel('beam_width_y [µm]')
+    plt.title('Chi² Landscape')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def auau_manual_simple_beta_star_minimization():
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+
+    base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
+    z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
+    combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
+
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    fit_range = [-230, 230]
+    steps = np.arange(0, 24)
+
+    collider_sim = BunchCollider()
+    collider_sim.set_grid_size(31, 31, 101, 31)
+    bkg = 2.0e-17
+    gauss_eff_width = 500
+    mbd_resolution = 2.0
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+
+    # Get nominal dcct ions and emittances
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+
+    # Preload data and histograms here
+    centers_list, counts_list, count_errs_list = [], [], []
+    for step in steps:
+        with uproot.open(z_vertex_zdc_data_path) as f:
+            hist = f[f'step_{step}']
+            centers = hist.axis().centers()
+            counts = hist.counts()
+            count_errs = hist.errors()
+            count_errs[count_errs == 0] = 1
+
+        cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
+        zdc_raw_rate = cad_step_row['zdc_raw_rate']
+        hist_scaling_factor = zdc_raw_rate / np.sum(counts)
+        dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (
+                cad_step_row['blue_dcct_ions'] * cad_step_row['yellow_dcct_ions'])
+
+        counts *= hist_scaling_factor * dcct_scale
+        count_errs *= hist_scaling_factor * dcct_scale
+
+        centers_list.append(centers)
+        counts_list.append(counts)
+        count_errs_list.append(count_errs)
+
+    sim_settings = {
+        'steps': steps,
+        'fit_range': fit_range,
+        'profiles_path': longitudinal_profiles_dir_path,
+        'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
+        'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
+        'plot': False  # Set to True if you want to plot the results
+    }
+
+    beam_width_x, beam_width_y = 130.0, 130.0
+    beta_star_xs, beta_star_ys = np.linspace(60, 110, 20), np.linspace(60, 110, 20)
+
+    bsxs, bsys, total_chi2s, total_log_likes = [], [], [], []
+    for beta_star_x in beta_star_xs:
+        for beta_star_y in beta_star_ys:
+            # beam_width_x, beam_width_y, beta_star, yellow_angle_x (mrad), blue_offset_x (microns)
+            initial_guess = np.array([beam_width_x, beam_width_y, beta_star_x, beta_star_y, 0.0, 0.0, 0.0, 0.0])
+
+            chi2, log_like = compute_total_chi2(
+                initial_guess,
+                collider_sim,
+                cad_df,
+                centers_list,
+                counts_list,
+                count_errs_list,
+                sim_settings,
+                metrics=('chi2', 'log_like')
+            )
+            bsxs.append(beta_star_x)
+            bsys.append(beta_star_y)
+            total_chi2s.append(chi2)
+            total_log_likes.append(log_like)
+
+    bsxs = np.array(bsxs)
+    bsys = np.array(bsys)
+    total_chi2s = np.array(total_chi2s)
+    total_log_likes = np.array(total_log_likes)
+
+    # Reshape the data to 2D grids
+    bs_x_unique = np.unique(bsxs)
+    bs_y_unique = np.unique(bsys)
+    chi2_grid = total_chi2s.reshape(len(bs_x_unique), len(bs_y_unique))
+    log_like_grid = total_log_likes.reshape(len(bs_x_unique), len(bs_y_unique))
+
+    # Find the minimum chi2 and corresponding parameters
+    min_index = np.argmin(total_chi2s)
+    min_bs_x = bsxs[min_index]
+    min_bs_y = bsys[min_index]
+    min_chi2 = total_chi2s[min_index]
+
+    # Print the maximum log likelihood
+    max_index = np.argmax(total_log_likes)
+    max_bs_x = bsxs[max_index]
+    max_bs_y = bsys[max_index]
+    max_log_like = total_log_likes[max_index]
+
+    print(f"Minimum chi2: {min_chi2:.2f} at beta_star_x = {min_bs_x:.2f}, beta_star_y = {min_bs_y:.2f}")
+    print(f"Maximum log likelihood: {max_log_like:.2f} at beta_star_x = {max_bs_x:.2f}, beta_star_y = {max_bs_y:.2f}")
+
+    # Plotting
+    plt.figure(figsize=(8, 6))
+    cp = plt.contourf(bs_x_unique, bs_y_unique, chi2_grid.T, levels=20, cmap="viridis")
+    plt.scatter(bs_x_unique, bs_y_unique, c=total_chi2s, cmap='viridis', marker='o', s=10, alpha=0.5)
+    plt.colorbar(cp, label='Total chi²')
+    plt.plot(min_bs_x, min_bs_y, 'r*', markersize=10, label='Minimum chi²')
+    plt.xlabel('beam_width_x [µm]')
+    plt.ylabel('beam_width_y [µm]')
+    plt.title('Chi² Landscape')
+    plt.legend()
+    plt.tight_layout()
+
+    plt.figure(figsize=(8, 6))
+    cp = plt.contourf(bs_x_unique, bs_y_unique, log_like_grid.T, levels=20, cmap="plasma")
+    plt.scatter(bs_x_unique, bs_y_unique, c=total_log_likes, cmap='plasma', marker='o', s=10, alpha=0.5)
+    plt.colorbar(cp, label='Total Log Likelihood')
+    plt.plot(max_bs_x, max_bs_y, 'r*', markersize=10, label='Maximum Log Likelihood')
+    plt.xlabel('beta_star_x [cm]')
+    plt.ylabel('beta_star_y [cm]')
+    plt.legend()
+    plt.tight_layout()
+
+    plt.show()
 
 
 def auau_single_dist_bw_min():
@@ -899,49 +1454,6 @@ def define_scan_step_dict():
     return scan_steps
 
 
-def get_profile_path(profile_dir_path, start_time, end_time, return_all=False):
-    """
-    Returns a list of full paths to all blue/yellow profile files in the given directory
-    between start_datetime and end_datetime (inclusive),
-    where both a blue_ and yellow_ version exist for the same time.
-    """
-    if isinstance(start_time, str):
-        start_time = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
-    if isinstance(end_time, str):
-        end_time = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
-
-    # Get all files in the directory
-    all_files = [f for f in os.listdir(profile_dir_path) if f.endswith('.dat') and f.startswith('avg_')]
-
-    # Filter files that match the expected pattern
-    blue_files = [f for f in all_files if f.startswith("avg_blue_profile_24_")]
-    blue_times = [datetime.combine(start_time.date(), extract_time_from_filename(f)) for f in blue_files]
-    blue_times, blue_files = zip(*sorted(zip(blue_times, blue_files)))  # Sort blue files and times together by time
-    good_files = []
-    for file_time, file_name in zip(blue_times, blue_files):
-        if file_time < start_time or file_time > end_time:
-            continue
-        if file_name.replace('blue_', 'yellow_') not in all_files:
-            continue
-        good_files.append(os.path.join(profile_dir_path, file_name.replace('blue_', 'COLOR_')))
-
-    if return_all:
-        return good_files
-    else:  # Get middle file in list
-        return good_files[len(good_files) // 2]
-
-
-def extract_time_from_filename(filename):
-    parts = filename.split("_")
-    try:
-        hour = int(parts[-3])
-        minute = int(parts[-2])
-        second = int(parts[-1].split(".")[0])
-        return time(hour=hour, minute=minute, second=second)
-    except ValueError:
-        return None
-
-
 def run_sim(beta_star_x, beta_star_y, beam_width_x, beam_width_y, blue_offset_x, blue_offset_y,
             yellow_offset_x, yellow_offset_y, bkg, blue_angle_x, blue_angle_y,
             yellow_angle_x, yellow_angle_y, longitudinal_fit_path, fit_range,
@@ -1021,63 +1533,6 @@ def residual_wrapper_free_params(free_params, param_names, fixed_params, longitu
         counts=counts,
         return_collider_sim=return_collider_sim
     )
-
-
-def fit_amp_shift(collider_sim, z_dist_data, zs_data, z_dist_errs=None):
-    zs, z_dist = collider_sim.get_z_density_dist()
-    scale = max(z_dist_data) / max(z_dist)
-    z_max_sim = zs[np.argmax(z_dist)]
-    z_max_hist = zs_data[np.argmax(z_dist_data)]
-    # shift = z_max_sim - z_max_hist  # microns  # Pretty sure this is in cm!!!!!
-    # shift = (z_max_sim - z_max_hist) * 1e4  # microns
-    # print(f'Shift guess: {shift:.3f} um')
-    # shift = 0.0  # microns
-    #
-    # res = minimize(amp_shift_residual, np.array([1.0, 0.0]), method='Nelder-Mead',
-    #                args=(collider_sim, scale, shift, z_dist_data, zs_data, z_dist_errs),
-    #                bounds=((0.0, 2.0), (-20e4, 20e4)))
-    # scale = res.x[0] * scale
-    # shift = res.x[1] + shift
-
-    best_result = None
-    best_fun = np.inf
-    best_initial_shift = None
-    initial_shifts = np.linspace(-5e4, 5e4, 5)
-
-    for init_shift in initial_shifts:
-        res = minimize(
-            amp_shift_residual,
-            np.array([1.0, 0.0]),  # initial scale factor and shift delta
-            method='Nelder-Mead',
-            args=(collider_sim, scale, init_shift, z_dist_data, zs_data, z_dist_errs),
-            bounds=((0.0, 2.0), (-50e4, 50e4))
-        )
-
-        if res.fun < best_fun:
-            best_fun = res.fun
-            best_result = res
-            best_initial_shift = init_shift
-
-    # Update scale and shift using best result
-    scale = best_result.x[0] * scale
-    shift = best_result.x[1] + best_initial_shift
-
-    collider_sim.set_amplitude(scale)
-    collider_sim.set_z_shift(shift)
-
-
-def amp_shift_residual(x, collider_sim, scale_0, shift_0, z_dist_data, zs_data, z_dist_errs=None):
-    collider_sim.set_amplitude(x[0] * scale_0)
-    collider_sim.set_z_shift(x[1] + shift_0)
-    sim_zs, sim_z_dist = collider_sim.get_z_density_dist()
-    sim_interp = interp1d(sim_zs, sim_z_dist)
-    # return np.sqrt(np.sum((z_dist_data - sim_interp(zs_data)) ** 2)) / np.mean(z_dist_data)
-    if z_dist_errs is not None:  # Calculate chi2 per degree of freedom
-        resid = np.sum((z_dist_data - sim_interp(zs_data)) ** 2 / z_dist_errs ** 2) / (len(z_dist_data) - 1)
-    else:
-        resid = np.sqrt(np.sum((z_dist_data - sim_interp(zs_data)) ** 2)) / np.mean(z_dist_data)
-    # print(f'Amplitude: {x[0] * scale_0:.3f}, Shift: {x[1] + shift_0:.3f} um, dshift: {x[1]} um, Residual: {resid:.3f}')
-    return resid
 
 
 if __name__ == '__main__':

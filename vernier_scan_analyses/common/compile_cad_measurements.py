@@ -14,6 +14,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from bpm_analysis import bpm_analysis, get_start_end_times
+from analyze_ions import analyze_ions
+from analyze_emittance import add_emittance_info_to_df
+from analyze_sphnx_root_file import get_step_rates
 
 
 def main():
@@ -23,17 +26,32 @@ def main():
         base_path = '/local/home/dn277127/Bureau/'
     scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
 
+    if scan_path.split('/')[-2] == 'auau_oct_16_24':
+        pre_run_buffer = 100  # seconds to remove from the start of the scan
+    else:
+        pre_run_buffer = None
+
     start_time, end_time = get_start_end_times(scan_path)
 
     bpm_file_path = f'{scan_path}bpms.dat'
-    df = bpm_analysis(bpm_file_path, start_time, end_time, plot=False)
+    df = bpm_analysis(bpm_file_path, start_time, end_time, plot=False, pre_scan_buffer_seconds=pre_run_buffer)
 
     # Add wcm and dcct information to the dataframe
+    analyze_ions(scan_path, df)
 
     # Add offsets to the dataframe
     set_offsets_path = f'{scan_path}set_offsets.txt'
     set_offsets_df = get_set_offsets(set_offsets_path)
     df = df.merge(set_offsets_df, on='step', how='left')
+
+    # Add emittance information to the dataframe
+    emittance_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
+    emittance_df = add_emittance_info_to_df(emittance_file_path, times=df['mid_time'])
+    df = df.merge(emittance_df, on='mid_time', how='left')
+
+    # Add rates to the dataframe
+    rates_df = get_step_rates(scan_path, df)
+    df = df.merge(rates_df, on='step', how='left')
 
     # Write the dataframe to a CSV file
     df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)

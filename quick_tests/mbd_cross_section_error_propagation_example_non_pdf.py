@@ -29,7 +29,7 @@ def main():
     your_number_error = 0.5
 
     # Load the MBD cross section pdf
-    cross_section_path = '../run_rcf_jobs_lumi_calc/output/conservative_err_combined_lumis.csv'
+    cross_section_path = '../run_rcf_jobs_lumi_calc_old/output/conservative_err_combined_lumis.csv'
     cross_section_df = pd.read_csv(cross_section_path)
 
     n_samples = 100  # If None use all samples, otherwise use n_samples

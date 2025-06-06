@@ -12,7 +12,7 @@ import numpy as np
 
 
 def main():
-    num_jobs = 50
+    num_jobs = 2000
     memory = '2048MB'
     job_file_name = 'lumi_calc_jobs.list'
 

@@ -17,11 +17,11 @@ printenv
 
 if [ "$condor" = false ]; then
     #=================== Run standalone =========================#
-    python luminosity_calculation_rcf.py "$1"
+    python ../luminosity_calculation_rcf.py "$1"
     #=========================================================#
 
 else
     #=================== Run with condor =========================#
-    python luminosity_calculation_rcf.py "$1"
+    python ../luminosity_calculation_rcf.py "$1"
     #=========================================================#
 fi

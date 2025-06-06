@@ -11,8 +11,9 @@ export HOME=/sphenix/u/${LOGNAME}
 source ${HOME}/.bashrc
 source ${HOME}/Software/dylan_env/bin/activate
 
-# Add parent directory to PYTHONPATH
-export PYTHONPATH="$(cd "$(dirname "$0")/.." && pwd):$PYTHONPATH"
+# Add parent directory and common to PYTHONPATH
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="${script_dir}/..:${script_dir}/../vernier_scan_analyses/common:$PYTHONPATH"
 
 #print the environment - needed for debugging
 printenv

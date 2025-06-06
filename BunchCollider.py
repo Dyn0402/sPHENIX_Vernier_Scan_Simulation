@@ -54,7 +54,7 @@ class BunchCollider:
         self.n_points_x = 61
         self.n_points_y = 61
         self.n_points_z = 151
-        self.n_points_t = 60
+        self.n_points_t = 61
 
         self.bunch1_longitudinal_fit_parameter_path = None
         self.bunch2_longitudinal_fit_parameter_path = None
@@ -96,6 +96,10 @@ class BunchCollider:
     def set_bunch_beta_stars(self, beta_star1_x, beta_star2_x, beta_star1_y=None, beta_star2_y=None):
         self.bunch1.set_beta_star(beta_star1_x, beta_star1_y)
         self.bunch2.set_beta_star(beta_star2_x, beta_star2_y)
+
+    def set_bunch_beta_star_shifts(self, beta_star1_shift_x, beta_star2_shift_x, beta_star1_shift_y=None, beta_star2_shift_y=None):
+        self.bunch1.set_beta_star_shift(beta_star1_shift_x, beta_star1_shift_y)
+        self.bunch2.set_beta_star_shift(beta_star2_shift_x, beta_star2_shift_y)
 
     def set_bunch_crossing(self, crossing_angle1_x, crossing_angle1_y, crossing_angle2_x, crossing_angle2_y):
         self.bunch1.set_angles(crossing_angle1_x, crossing_angle1_y)

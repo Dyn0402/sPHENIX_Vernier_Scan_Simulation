@@ -32,6 +32,8 @@ class BunchDensity:
         self.angle_y = 0.  # Rotation angle in x-z plane in radians
         self.beta_star_x = None  # cm Beta star value for the bunch in the x plane
         self.beta_star_y = None  # cm Beta star value for the bunch in the y plane
+        self.beta_star_shift_x = 0.  # cm Shift of the beta star in the x plane
+        self.beta_star_shift_y = 0.  # cm Shift of the beta star in the y plane
         self.delay = 0.  # ns Time delay of the bunch
 
         self.longitudinal_params = {'mu1': 0., 'sigma1': 1., 'a2': 0., 'mu2': 0., 'sigma2': 1.,
@@ -86,6 +88,19 @@ class BunchDensity:
             self.beta_star_y = beta_star_x
         else:
             self.beta_star_y = beta_star_y
+        self.reset = True
+
+    def set_beta_star_shift(self, beta_star_shift_x, beta_star_shift_y=None):
+        """
+        Set the beta star shift for the bunch. If no beta_star_shift_y, assume the same as beta_star_shift_x
+        :param beta_star_shift_x: float Beta star shift value in cm
+        :param beta_star_shift_y: float Beta star shift value in cm
+        """
+        self.beta_star_shift_x = beta_star_shift_x
+        if beta_star_shift_y is None:
+            self.beta_star_shift_y = beta_star_shift_x
+        else:
+            self.beta_star_shift_y = beta_star_shift_y
         self.reset = True
 
     def set_sigma(self, x, y, z=None):
@@ -219,7 +234,7 @@ class BunchDensity:
                 x, y, z,
                 self.r[0], self.r[1], self.r[2],
                 self.transverse_sigma[0], self.transverse_sigma[1],
-                self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+                self.angle_x, self.angle_y, beta_star_x, beta_star_y, self.beta_star_shift_x, self.beta_star_shift_y,
                 self.longitudinal_profile_zs, self.longitudinal_profile_densities
             )
         # elif len(self.effective_longitudinal_params.values()) == 11:
@@ -235,7 +250,7 @@ class BunchDensity:
                 x, y, z,
                 self.r[0], self.r[1], self.r[2],
                 self.transverse_sigma[0], self.transverse_sigma[1],
-                self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+                self.angle_x, self.angle_y, beta_star_x, beta_star_y, self.beta_star_shift_x, self.beta_star_shift_y,
                 gaussians
             )
 
@@ -262,7 +277,7 @@ class BunchDensity:
             x, y, z,
             self.r[0], self.r[1], self.r[2],
             self.transverse_sigma[0], self.transverse_sigma[1],
-            self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+            self.angle_x, self.angle_y, beta_star_x, beta_star_y, self.beta_star_shift_x, self.beta_star_shift_y,
             gaussians
         )
 
@@ -286,7 +301,7 @@ class BunchDensity:
             x, y, z,
             self.r[0], self.r[1], self.r[2],
             self.transverse_sigma[0], self.transverse_sigma[1],
-            self.angle_x, self.angle_y, beta_star_x, beta_star_y,
+            self.angle_x, self.angle_y, beta_star_x, beta_star_y, self.beta_star_shift_x, self.beta_star_shift_y,
             self.longitudinal_profile_zs, self.longitudinal_profile_densities
         )
 
@@ -333,8 +348,8 @@ class BunchDensity:
         else:
             # Calculate distance to IP along the axis of travel, based on z and the angles
             distance_to_IP = z * np.sqrt(1 + np.tan(self.angle_x) ** 2 + np.tan(self.angle_y) ** 2)
-            sigma_x = self.transverse_sigma[0] * np.sqrt(1 + distance_to_IP ** 2 / (self.beta_star_x * 1e4) ** 2)
-            sigma_y = self.transverse_sigma[1] * np.sqrt(1 + distance_to_IP ** 2 / (self.beta_star_y * 1e4) ** 2)
+            sigma_x = self.transverse_sigma[0] * np.sqrt(1 + (distance_to_IP - self.beta_star_shift_x) ** 2 / (self.beta_star_x * 1e4) ** 2)
+            sigma_y = self.transverse_sigma[1] * np.sqrt(1 + (distance_to_IP - self.beta_star_shift_y) ** 2 / (self.beta_star_y * 1e4) ** 2)
 
         # Calculate the density using the modified sigma_x, sigma_y, and rotated coordinates
         density = np.exp(
@@ -379,10 +394,12 @@ class BunchDensity:
                 f'Time: {self.t} ns\n'
                 f'Timestep: {self.dt} ns\n'
                 f'Delay: {self.delay} ns\n'
-                f'Beta Star: ({self.beta_star_x:.1f}, {self.beta_star_y:.1f}) cm'
-                f'Longitudinal Parameters: {self.longitudinal_params}'
-                f'Effective Longitudinal Parameters: {self.effective_longitudinal_params}'
-                f'Longitudinal Width Scaling: {self.longitudinal_width_scaling}')
+                f'Beta Star: ({self.beta_star_x:.1f}, {self.beta_star_y:.1f}) cm\n'
+                f'Beta Star Shift: ({self.beta_star_shift_x:.1f}, {self.beta_star_shift_y:.1f}) cm\n'
+                f'Longitudinal Parameters: {self.longitudinal_params}\n'
+                f'Effective Longitudinal Parameters: {self.effective_longitudinal_params}\n'
+                f'Longitudinal Width Scaling: {self.longitudinal_width_scaling}\n'
+                f'Longitudinal Profile Zs: {self.longitudinal_profile_zs}\n')
 
 
 def read_longitudinal_beam_profile_fit_parameters(fit_out_path):

@@ -36,6 +36,7 @@ py::array_t<double> density(
     py::array_t<double> x, py::array_t<double> y, py::array_t<double> z,
     double r_x, double r_y, double r_z, double sigma_x, double sigma_y,
     double angle_x, double angle_y, double beta_star_x, double beta_star_y,
+    double beta_star_shift_x, double beta_star_shift_y,
     // Parameters for quad_gaus_pdf
     double b1, double c1, double a2, double b2, double c2,
     double a3, double b3, double c3, double a4, double b4, double c4
@@ -74,8 +75,8 @@ py::array_t<double> density(
                 double z_rot_yz = y_rel * sin_angle_yz + z_rot_xz * cos_angle_yz;
 
                 // Compute the modified sigmas
-                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k), beta_star_x, angle_x, angle_y);
-                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k), beta_star_y, angle_x, angle_y);
+                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k) - beta_star_shift_x, beta_star_x, angle_x, angle_y);
+                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k) - beta_star_shift_y, beta_star_y, angle_x, angle_y);
 
                 // Calculate the density using the quad Gaussian in the z-direction
                 double z_density = quad_gaus_pdf(z_rot_yz, b1, c1, a2, b2, c2, a3, b3, c3, a4, b4, c4);
@@ -114,6 +115,7 @@ py::array_t<double> density_n_gaussians(
     py::array_t<double> x, py::array_t<double> y, py::array_t<double> z,
     double r_x, double r_y, double r_z, double sigma_x, double sigma_y,
     double angle_x, double angle_y, double beta_star_x, double beta_star_y,
+    double beta_star_shift_x, double beta_star_shift_y,
     std::vector<std::array<double, 3>> gaussians_z  // <-- changed from tuple to array
 ) {
     auto buf_x = x.unchecked<3>();
@@ -141,8 +143,8 @@ py::array_t<double> density_n_gaussians(
                 double y_rot = y_rel * cos_angle_yz - z_rot_xz * sin_angle_yz;
                 double z_rot_yz = y_rel * sin_angle_yz + z_rot_xz * cos_angle_yz;
 
-                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k), beta_star_x, angle_x, angle_y);
-                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k), beta_star_y, angle_x, angle_y);
+                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k) - beta_star_shift_x, beta_star_x, angle_x, angle_y);
+                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k) - beta_star_shift_y, beta_star_y, angle_x, angle_y);
 
                 double z_density = n_gaus_pdf(z_rot_yz, gaussians_z);
 
@@ -158,18 +160,22 @@ py::array_t<double> density_n_gaussians(
 }
 
 
-// Linearly interpolated PDF using (z_vals, pdf_vals)
+// Linearly interpolated PDF using (z_vals, pdf_vals), assuming z_vals is equally spaced
 double interp_pdf(double z, const std::vector<double>& z_vals, const std::vector<double>& pdf_vals) {
     if (z_vals.empty() || pdf_vals.empty() || z_vals.size() != pdf_vals.size())
         return 0.0;
 
-    // Out-of-bounds
-    if (z <= z_vals.front()) return pdf_vals.front();
-    if (z >= z_vals.back()) return pdf_vals.back();
+    double z_min = z_vals.front();
+    double z_max = z_vals.back();
 
-    // Binary search for interval
-    auto upper = std::upper_bound(z_vals.begin(), z_vals.end(), z);
-    size_t idx = std::distance(z_vals.begin(), upper) - 1;
+    // Out-of-bounds
+    if (z <= z_min || z >= z_max) return 0.0;
+
+    double dz = z_vals[1] - z_vals[0];  // assumes at least two points and uniform spacing
+    size_t idx = static_cast<size_t>((z - z_min) / dz);
+
+    if (idx >= z_vals.size() - 1)
+        return 0.0;  // safety check in case of numerical precision issues
 
     double z0 = z_vals[idx], z1 = z_vals[idx + 1];
     double p0 = pdf_vals[idx], p1 = pdf_vals[idx + 1];
@@ -183,6 +189,7 @@ py::array_t<double> density_interpolated_pdf(
     py::array_t<double> x, py::array_t<double> y, py::array_t<double> z,
     double r_x, double r_y, double r_z, double sigma_x, double sigma_y,
     double angle_x, double angle_y, double beta_star_x, double beta_star_y,
+    double beta_star_shift_x, double beta_star_shift_y,
     std::vector<double> z_vals, std::vector<double> pdf_vals
 ) {
     auto buf_x = x.unchecked<3>();
@@ -198,6 +205,9 @@ py::array_t<double> density_interpolated_pdf(
     double cos_angle_yz = std::cos(angle_y);
     double sin_angle_yz = std::sin(angle_y);
 
+    const double two_pi = 2.0 * M_PI;  // Speed up slightly by avoiding repeated calculation
+    const double norm_factor = 1.0 / two_pi;
+
     for (py::ssize_t i = 0; i < buf_x.shape(0); i++) {
         for (py::ssize_t j = 0; j < buf_x.shape(1); j++) {
             for (py::ssize_t k = 0; k < buf_x.shape(2); k++) {
@@ -210,15 +220,15 @@ py::array_t<double> density_interpolated_pdf(
                 double y_rot = y_rel * cos_angle_yz - z_rot_xz * sin_angle_yz;
                 double z_rot_yz = y_rel * sin_angle_yz + z_rot_xz * cos_angle_yz;
 
-                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k), beta_star_x, angle_x, angle_y);
-                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k), beta_star_y, angle_x, angle_y);
+                double sigma_x_mod = calculate_sigma(sigma_x, buf_z(i, j, k) - beta_star_shift_x, beta_star_x, angle_x, angle_y);
+                double sigma_y_mod = calculate_sigma(sigma_y, buf_z(i, j, k) - beta_star_shift_y, beta_star_y, angle_x, angle_y);
 
                 double z_density = interp_pdf(z_rot_yz, z_vals, pdf_vals);
 
                 double exponent = -0.5 * (x_rot * x_rot / (sigma_x_mod * sigma_x_mod) +
                                           y_rot * y_rot / (sigma_y_mod * sigma_y_mod));
 
-                buf_result(i, j, k) = std::exp(exponent) * z_density / (std::pow(2 * M_PI, 1.0) * sigma_x_mod * sigma_y_mod);
+                buf_result(i, j, k) = std::exp(exponent) * z_density * norm_factor / (sigma_x_mod * sigma_y_mod);
             }
         }
     }

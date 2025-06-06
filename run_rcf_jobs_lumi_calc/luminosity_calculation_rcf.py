@@ -28,7 +28,7 @@ def main():
 
     scan_step = 0  # Step in the scan to use for the luminosity estimation
 
-    output_dir = f'output/{vernier_scan}/'
+    output_dir = f'{base_path}{vernier_scan}/lumi_samples/'
     create_dir(output_dir)
     output_path = f'{output_dir}Scan_Step_{scan_step}/'
     create_dir(output_path)

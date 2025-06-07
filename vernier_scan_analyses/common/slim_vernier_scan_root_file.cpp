@@ -9,7 +9,7 @@
 
 void slim_vernier_scan_root_file() {
     // === Open input file ===
-    const char* input_path = "/sphenix/u/takakiku/user_takakiku/auau_vernierscan/gl1p_rootfiles/54733.root";
+    const char* input_path = "/sphenix/u/takakiku/user_takakiku/coldqcd/sphnxuser_auau_vernierscan/macros/rootfiles/54733.root";
     const char* output_path = "/sphenix/u/dneffsph/gpfs/vernier_scan_root_files/54733_slimmed.root";
     TFile* infile = TFile::Open(input_path, "READ");
     if (!infile || infile->IsZombie()) {
@@ -37,6 +37,13 @@ void slim_vernier_scan_root_file() {
         "zdc_SN_trigger",
         "zdc_S_trigger",
         "zdc_N_trigger",
+        "mbd_SN_live_trigger",
+        "mbd_S_live_trigger",
+        "mbd_N_live_trigger",
+        "mbd_zvtx_live_trigger",
+        "zdc_SN_live_trigger",
+        "zdc_S_live_trigger",
+        "zdc_N_live_trigger",
         "zdc_raw_count",
         "zdc_live_count",
         "zdc_scaled_count",

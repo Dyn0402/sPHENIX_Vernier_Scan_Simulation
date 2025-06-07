@@ -9,7 +9,7 @@
 
 void slim_vernier_scan_root_file() {
     // === Open input file ===
-    const char* input_path = "/sphenix/u/takakiku/user_takakiku/coldqcd/sphnxuser_auau_vernierscan/macros/rootfiles/54733.root";
+    const char* input_path = "/sphenix/user/takakiku/u_takakiku/tg_takakiku/coldqcd/sphnxuser_auau_vernierscan/macros/rootfiles/54733.root";
     const char* output_path = "/sphenix/u/dneffsph/gpfs/vernier_scan_root_files/54733_slimmed.root";
     TFile* infile = TFile::Open(input_path, "READ");
     if (!infile || infile->IsZombie()) {

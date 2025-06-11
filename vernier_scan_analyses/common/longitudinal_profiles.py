@@ -21,11 +21,11 @@ from Measure import Measure
 
 
 def main():
-    # write_avg_longitudinal_profiles()
+    write_avg_longitudinal_profiles()
     # fit_longitudinal_profiles()
     # plot_profiles_vs_time()
     # compare_direct_profiles()
-    plot_abort_gaps()
+    # plot_abort_gaps()
     print('donzo')
 
 

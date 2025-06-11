@@ -11,22 +11,25 @@ Created as sPHENIX_Vernier_Scan_Simulation/z_vertex_fitting_common
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 from datetime import datetime, time
 import uproot
 
 
-def load_vertex_distributions(z_vertex_data_path, steps, cad_df, dcct_blue_nom, dcct_yellow_nom):
+def load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column='zdc_raw_rate'):
     """
     Load vertex data from a ROOT file for the specified steps.
     :param z_vertex_data_path: Path to the ROOT file containing vertex distributions.
     :param steps: List of steps to load data for.
     :param cad_df: DataFrame containing CAD step data.
-    :param dcct_blue_nom: Nominal DCCT ions for blue.
-    :param dcct_yellow_nom: Nominal DCCT ions for yellow.
+    :param rate_column: Column name in cad_df for the rate to scale the histograms.
     :return: Dictionary with step as key and (centers, counts, count_errs) as values.
     """
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+
     vertex_data = {}
     with uproot.open(z_vertex_data_path) as f:
         for step in steps:
@@ -37,8 +40,8 @@ def load_vertex_distributions(z_vertex_data_path, steps, cad_df, dcct_blue_nom, 
             count_errs[count_errs == 0] = 1  # Avoid division by zero
 
             cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
-            zdc_raw_rate = cad_step_row['zdc_raw_rate']
-            hist_scaling_factor = zdc_raw_rate / np.sum(counts)
+            raw_rate = cad_step_row[rate_column]
+            hist_scaling_factor = raw_rate / np.sum(counts)
             dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (
                     cad_step_row['blue_dcct_ions'] * cad_step_row['yellow_dcct_ions'])
 
@@ -47,6 +50,19 @@ def load_vertex_distributions(z_vertex_data_path, steps, cad_df, dcct_blue_nom, 
 
             vertex_data[step] = (centers, counts, count_errs)
     return vertex_data
+
+
+def merge_cad_rates_df(cad_df, rates_df):
+    """
+    Merge CAD DataFrame with rates DataFrame on 'step' column. Calculate the corrected raw MBD rate.
+    :param cad_df: DataFrame containing CAD step data.
+    :param rates_df: DataFrame containing rates data.
+    :return: Merged DataFrame.
+    """
+    rates_df['corrected_raw_mbd_rate'] = rates_df['mbd_raw_rate_mean'] * (1 - rates_df['mbd_cut_correction_fraction'] / 100)
+    rates_df['corrected_raw_mbd_rate_err'] = np.sqrt(rates_df['mbd_raw_rate_std']**2 + (rates_df['mbd_raw_rate_mean'] * (rates_df['simulated_cut_fraction'] / 100)**2))
+    merged_df = pd.merge(cad_df, rates_df, on='step', how='inner')
+    return merged_df
 
 
 def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, count_errs_list, sim_settings,
@@ -113,7 +129,8 @@ def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, 
         count_errs = count_errs_list[data_index]
         fit_mask = (centers > sim_settings['fit_range'][0]) & (centers < sim_settings['fit_range'][1])
 
-        if data_index == 0:  # Fix the amplitude in the first head-on step
+        # if data_index == 0:  # Fix the amplitude in the first head-on step
+        if True:  # Fix the amplitude in the first head-on step
             fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
         else:
             # fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])

@@ -22,7 +22,7 @@ def main():
     job_num = int(sys.argv[1])  # Get system arguments, should just be an integer for the job number
     base_path = '/sphenix/u/dneffsph/gpfs/Vernier_Scans/'
     vernier_scan = 'auau_oct_16_24'
-    longitudinal_fit_path = f'{base_path}{vernier_scan}/profiles/'
+    longitudinal_profile_path = f'{base_path}{vernier_scan}/profiles/'
     combined_cad_step_data_csv_path = f'{base_path}{vernier_scan}/combined_cad_step_data.csv'
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
@@ -30,10 +30,10 @@ def main():
 
     output_dir = f'{base_path}{vernier_scan}/lumi_samples/'
     create_dir(output_dir)
-    output_path = f'{output_dir}Scan_Step_{scan_step}/'
-    create_dir(output_path)
+    output_dir = f'{output_dir}Scan_Step_{scan_step}/'
+    create_dir(output_dir)
 
-    estimate_final_luminosity(longitudinal_fit_path, cad_df, job_num, output_dir)
+    estimate_final_luminosity(longitudinal_profile_path, cad_df, job_num, output_dir)
     print('donzo')
 
 
@@ -55,8 +55,8 @@ def estimate_final_luminosity(longitudinal_profiles_path, cad_df, job_num, outpu
     beta_star = 76.7  # Use same for all 4 components
     beam_width_x, beam_width_y = 129.2, 125.7
     bkg = 0.0e-17
-    gauss_eff_width = 500
-    mbd_resolution = 1.0
+    gauss_eff_width = 500  # cm
+    mbd_resolution = 1.0  # cm
 
     if err_estimates == 'best':  # Best err estimates
         bw_x_err, bw_y_err, beta_star_err = 2.1, 2.9, 1.1  # um, um, cm

@@ -23,32 +23,43 @@ def main():
     else:
         base_path = '/local/home/dn277127/Bureau/'
 
+    sub_dir = 'vertex_data/'
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    out_root_file_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
-    out_root_file_path_no_zdc_coinc = f'{base_path_auau}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
-    out_root_file_path_bbb = f'{base_path_auau}vertex_data/54733_vertex_distributions_bunch_by_bunch.root'
-    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_auau}vertex_data/54733_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
+    out_root_file_path = f'{base_path_auau}{sub_dir}54733_vertex_distributions.root'
+    out_root_file_path_no_zdc_coinc = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc.root'
+    out_root_file_path_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_bunch_by_bunch.root'
+    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
     cad_data_path = f'{base_path_auau}combined_cad_step_data.csv'
 
     cad_df = pd.read_csv(cad_data_path, sep=',')
     print(cad_df)
 
-    data, time = get_root_data_time(base_path_auau, root_file_name='54733_slimmed.root', tree_name='calo_tree',
+    data, time = get_root_data_time(base_path_auau, root_file_name='54733_slimmed.root', tree_name='calo_tree', sub_dir=sub_dir,
                                     branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
+                                              'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
+                                              'GL1_clock_count', 'GL1_live_count',
                                               'mbd_raw_count', 'zdc_raw_count', 'mbd_live_count', 'zdc_live_count',
                                               'bunch'])
+    print(data.columns)
 
     # plot_rates(data, time, cad_df)
     # more_rate_plotting(data, time, cad_df)
     # get_step_z_vertex_dists(data, time, cad_df, plot=False, out_path=out_root_file_path)
     # get_step_z_vertex_dists(data, time, cad_df, plot=False, out_path=out_root_file_path_no_zdc_coinc, zdc_coincidence=False)
-    get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path=out_root_file_path_bbb)
-    get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path=out_root_file_path_no_zdc_coinc_bbb, zdc_coincidence=False)
+    # get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path=out_root_file_path_bbb)
+    # get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path=out_root_file_path_no_zdc_coinc_bbb, zdc_coincidence=False)
+    # check_unreconstructed_z_vtx(data, time, cad_df, zdc_coincidence=False)
+    # compare_scaled_live_triggers(data, time, cad_df)
+    # compare_scaled_live_triggers_steps(data, time, cad_df)
+    # write_step_raw_rates(data, time, cad_df, out_path=f'{base_path_auau}step_raw_rates.csv')
+    # compare_new_old_root_file(base_path, data, time)
+    compare_avg_total_step_rates(data, time, cad_df)
+    plt.show()
 
     print('donzo')
 
 
-def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name='calo_tree', branches=None):
+def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name='calo_tree', branches=None, sub_dir='vertex_data/'):
     """
     Get the data and time from the ROOT file.
     :param scan_path: Path to the directory with the ROOT file.
@@ -61,7 +72,7 @@ def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name
         branches = ['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger', 'mbd_raw_count', 'zdc_raw_count',
                     'mbd_live_count', 'zdc_live_count']
 
-    root_file_path = f'{scan_path}vertex_data/{root_file_name}'
+    root_file_path = f'{scan_path}{sub_dir}{root_file_name}'
 
     with uproot.open(root_file_path) as root_file:
         tree = root_file[tree_name]
@@ -90,6 +101,9 @@ def plot_rates(data, time, cad_df):
     for index, row in cad_df.iterrows():
         ax_1s.axvline(x=(row['start'] - start_datetime).total_seconds(), color='r', linestyle='-')
         ax_1s.axvline(x=(row['end'] - start_datetime).total_seconds(), color='r', linestyle='-')
+        avg_time = (row['start'] + (row['end'] - row['start']) / 2 - start_datetime).total_seconds()
+        ax_1s.annotate(row['step'], xy=(avg_time, 20000), ha='center',
+                       xytext=(0, 10), textcoords='offset points', color='black', fontsize=8)
     ax_1s.plot(time_avgs, mbd_rates)
     plt.show()
 
@@ -247,6 +261,7 @@ def get_step_z_vertex_dists(data, time, cad_df, plot=True, out_path="output_hist
         mask = (time >= start_time) & (time <= end_time)
         step_data = data[mask]
         step_duration = end_time - start_time
+        step_num = row['step']
 
         raw_mbd_zvtx = step_data['mbd_zvtx']
         zdc_ns_trigger = step_data['zdc_SN_trigger']
@@ -263,8 +278,8 @@ def get_step_z_vertex_dists(data, time, cad_df, plot=True, out_path="output_hist
         bin_errors = np.sqrt(raw_counts) / step_duration
 
         # Create and fill ROOT histogram
-        hist_name = f"step_{index}"
-        hist = ROOT.TH1F(hist_name, f"Step {index} MBD+ZDC Coincidence Rate;MBD Z Vertex (cm);Rate (Hz)",
+        hist_name = f"step_{step_num}"
+        hist = ROOT.TH1F(hist_name, f"Step {step_num} MBD+ZDC Coincidence Rate;MBD Z Vertex (cm);Rate (Hz)",
                          nbins, binning[0], binning[-1])
 
         for i in range(nbins):
@@ -273,7 +288,7 @@ def get_step_z_vertex_dists(data, time, cad_df, plot=True, out_path="output_hist
 
         hist.Write()  # Write to file
 
-        print(f"Step {index}: Start Time: {start_time}, End Time: {end_time}, Duration: {step_duration:.2f} s, "
+        print(f"Step {step_num}: Start Time: {start_time}, End Time: {end_time}, Duration: {step_duration:.2f} s, "
               f"Data Points: {len(step_data)}, Rate: {len(step_data) / step_duration:.2f} Hz")
 
         if plot:
@@ -357,6 +372,318 @@ def get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path="output_
               f"Data Points: {len(step_data)}, Rate: {len(step_data) / step_duration:.2f} Hz")
 
     root_file.Close()
+
+
+def check_unreconstructed_z_vtx(data, time, cad_df, zdc_coincidence=True):
+    """
+    Get the steps from the data and cad_df, plot and save histograms to a ROOT file.
+    :param data: Data from the root file.
+    :param time: Time array.
+    :param cad_df: Dataframe with CAD step data.
+    :param zdc_coincidence: Whether to include ZDC coincidence in the histograms.
+    :return: None
+    """
+    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+    binning = np.linspace(-300, 300, 201)
+
+    # Get the start and end times of each step
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+
+    for index, row in cad_df.iterrows():
+        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+        mask = (time >= start_time) & (time <= end_time)
+        step_data = data[mask]
+
+        raw_mbd_zvtx = step_data['mbd_zvtx']
+        zdc_ns_trigger = step_data['zdc_SN_trigger']
+        mbd_ns_trigger = step_data['mbd_SN_trigger']
+        mbd_zvtx_mbd_coinc = raw_mbd_zvtx[(mbd_ns_trigger == 1)]
+        mbd_zvtx_mbd_zdc_coinc = raw_mbd_zvtx[(zdc_ns_trigger == 1) & (mbd_ns_trigger == 1)]
+
+        # Raw counts for error calculation
+        if zdc_coincidence:
+            raw_counts, _ = np.histogram(mbd_zvtx_mbd_zdc_coinc, bins=binning)
+        else:
+            raw_counts, _ = np.histogram(mbd_zvtx_mbd_coinc, bins=binning)
+            print(f'Step {index}:')
+            print(f'Sum of raw counts: {raw_counts.sum()}')
+            print(f'Length of data: {len(mbd_zvtx_mbd_coinc)}')
+            print(f'Number of values within binning: {np.sum((mbd_zvtx_mbd_coinc >= binning[0]) & (mbd_zvtx_mbd_coinc <= binning[-1]))}')
+            print(f'Number of values outside binning: {np.sum((mbd_zvtx_mbd_coinc < binning[0]) | (mbd_zvtx_mbd_coinc > binning[-1]))}')
+            print(f'Fraction of values outside binning: {np.sum((mbd_zvtx_mbd_coinc < binning[0]) | (mbd_zvtx_mbd_coinc > binning[-1])) / len(mbd_zvtx_mbd_coinc) * 100:.2f}%')
+            print(f'Fraction MBD + ZDC outside binning: {np.sum((mbd_zvtx_mbd_zdc_coinc < binning[0]) | (mbd_zvtx_mbd_zdc_coinc > binning[-1])) / len(mbd_zvtx_mbd_zdc_coinc) * 100:.2f}%')
+            print()
+
+
+def write_step_raw_rates(data, time, cad_df, out_path='step_raw_rates.csv'):
+    """
+    Get the mean and standard deviations of the raw rates at each step from the data, using step boundaries from cad_df.
+    """
+    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+
+    rates = []
+    fig, ax = plt.subplots()
+    for index, row in cad_df.iterrows():
+        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+        mask = (time >= start_time) & (time <= end_time)
+        step_data = data[mask]
+        step_times = time[mask]
+
+        detectors = ['zdc', 'mbd']
+        types = ['raw', 'live']
+
+        step_rates = {'step': row['step']}
+        for detector in detectors:
+            for count_type in types:
+                col_name = f'{detector}_{count_type}_count'
+
+                step_counts = step_data[col_name].diff().fillna(0)
+                step_time_diffs = step_times.diff().fillna(0)
+                step_rate = step_counts / step_time_diffs
+                avg_step_times, avg_step_rates = average_counts_in_time_windows(
+                    np.array(step_times),
+                    np.array(step_rate),
+                    window_size=1
+                )
+                if detector == 'zdc' and count_type == 'raw':
+                    ax.plot(avg_step_times, avg_step_rates, 'o-', markersize=1, label=f'Step {row["step"]}')
+
+                # Count number of nans in avg_step_rates
+                nan_entries = np.sum(np.isnan(avg_step_rates))
+
+                avg_step_rate = np.nanmean(avg_step_rates)
+                std_step_rate = np.nanstd(avg_step_rates)
+
+                step_rates[f'{detector}_{count_type}_rate_mean'] = avg_step_rate
+                step_rates[f'{detector}_{count_type}_rate_std'] = std_step_rate
+
+        rates.append(step_rates)
+
+    # Save rates to CSV
+    rates_df = pd.DataFrame(rates)
+    rates_df.to_csv(out_path, index=False)
+    print(f'Saved step raw rates to {out_path}')
+
+
+def compare_avg_total_step_rates(data, time, cad_df, out_path='step_raw_rates.csv'):
+    """
+    Get the mean and standard deviations of the raw rates at each step from the data, using step boundaries from cad_df.
+    """
+    fig, ax = plt.subplots()
+    ax.plot(time, data['GL1_clock_count'] / 1e7, label='Gl1_clock_count')
+    ax.plot(time, data['GL1_live_count'] / 1e7, label='Gl1_live_count')
+    ax.legend()
+
+    # fig, ax = plt.subplots()
+    # mbd_live_diffs = data['mbd_live_count'].diff().fillna(0)
+    # clock_live_diffs = data['GL1_live_count'].diff().fillna(0)
+    # clock_raw_diffs = data['GL1_clock_count'].diff().fillna(0)
+    # mbd_live_rate = mbd_live_diffs / clock_raw_diffs
+    # mbd_raw_rate_gl1 = mbd_live_rate / (clock_live_diffs / clock_raw_diffs)
+    # clock_bins = np.arange(data['GL1_clock_count'].min(), data['GL1_clock_count'].max(), 1e7)
+    # avg_mbd_live_rate = []
+    # for i in range(len(clock_bins) - 1):
+    #     bin_mask = (data['GL1_clock_count'] >= clock_bins[i]) & (data['GL1_clock_count'] < clock_bins[i + 1])
+    #     bin_mbd_live_counts = data['mbd_live_count'][bin_mask]
+    #     bin_mbd_raw_counts = data['mbd_raw_count'][bin_mask]
+    #     bin_clock_raw_counts = data['GL1_clock_count'][bin_mask]
+    #     bin_clock_live_counts = data['GL1_clock_count'][bin_mask]
+    #     print(f'Bin {i}: MBD Live Counts: {bin_mbd_live_counts.values}, Clock Counts: {bin_clock_counts.values}')
+    #     avg_mbd_live_rate.append((bin_mbd_live_counts.iloc[-1] - bin_mbd_live_counts.iloc[0]) /
+    #                              (bin_clock_counts.iloc[1] - bin_clock_counts.iloc[0]) if len(bin_mbd_live_counts) > 1 else 0)
+    # clock_bin_centers = (clock_bins[:-1] + clock_bins[1:]) / 2
+    # ax.plot(clock_bin_centers / 1e7, avg_mbd_live_rate, 'o-', markersize=1, label='Avg MBD Live Rate (Binned by GL1 Clock Count)')
+
+    def compute_rate_sliding_window(data, clock_col, count_col, clock_freq_hz=10_000_000):
+        clock_counts = data[clock_col].values
+        detector_counts = data[count_col].values
+
+        start_idx = 0
+        result = []
+
+        for start_idx in range(len(data)):
+            # Current clock and count
+            start_clock = clock_counts[start_idx]
+            target_clock = start_clock + clock_freq_hz
+
+            # Find the first index where the clock exceeds the 1-second mark
+            end_idx = np.searchsorted(clock_counts, target_clock, side='left')
+
+            if end_idx >= len(clock_counts):
+                break  # no more data beyond 1 second
+
+            delta_clock = clock_counts[end_idx] - clock_counts[start_idx]
+            delta_count = detector_counts[end_idx] - detector_counts[start_idx]
+
+            rate = delta_count / (delta_clock / clock_freq_hz)
+            mid_time = (clock_counts[start_idx] + clock_counts[end_idx]) / 2 / clock_freq_hz  # optional, for x-axis
+
+            result.append((mid_time, rate))
+
+        # Convert to DataFrame
+        return pd.DataFrame(result, columns=['time_sec', 'rate_hz'])
+
+    mbd_live_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'mbd_live_count')
+    mbd_raw_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'mbd_raw_count')
+    clock_live_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'GL1_live_count')
+    fig, ax = plt.subplots()
+    ax.plot(mbd_raw_rate_df['time_sec'], mbd_raw_rate_df['rate_hz'], 'o-', markersize=1, label='MBD Raw Rate')
+    ax.plot(mbd_live_rate_df['time_sec'], mbd_live_rate_df['rate_hz'], 'o-', markersize=1, label='MBD Live Rate')
+    ax.plot(clock_live_rate_df['time_sec'], mbd_live_rate_df['rate_hz'] / (clock_live_rate_df['rate_hz'] / 1e7), 'o-', markersize=1, label='MBD Live->Raw Rate')
+    ax.set_xlabel('Time (s)')
+    ax.legend()
+
+    plt.show()
+
+    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+
+    rates = []
+    fig, ax = plt.subplots()
+    for index, row in cad_df.iterrows():
+        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+        mask = (time >= start_time) & (time <= end_time)
+        step_duration = end_time - start_time
+        step_data = data[mask]
+        step_times = time[mask]
+
+        # detectors = ['zdc', 'mbd']
+        # types = ['raw', 'live']
+        detectors = ['zdc']
+        types = ['raw']
+
+        step_rates = {'step': row['step']}
+        col_name = f'zdc_raw_count'
+
+        clock_diffs = step_data['clock_raw_count'].diff().fillna(0)
+
+        step_counts = step_data[col_name].diff().fillna(0)
+        step_time_diffs = step_times.diff().fillna(0)
+        step_rate = step_counts / step_time_diffs
+        avg_step_times, avg_step_rates = average_counts_in_time_windows(
+            np.array(step_times),
+            np.array(step_rate),
+            window_size=1
+        )
+        # if detector == 'zdc' and count_type == 'raw':
+        #     ax.plot(avg_step_times, avg_step_rates, 'o-', markersize=1, label=f'Step {row["step"]}')
+
+        print(f'avg_step_rates: {avg_step_rates}')
+        print(f'avg_avg_step_rate: {np.nanmean(avg_step_rates)}')
+        print(f'last step count minus first step count: {(step_data[col_name].iloc[-1] - step_data[col_name].iloc[0]) / step_duration}')
+        print(f'last step count minus first step count clock: '
+              f'{(step_data[col_name].iloc[-1] - step_data[col_name].iloc[0]) / step_data["clock_raw_count"].iloc[-1] - step_data["clock_raw_count"].iloc[0]}')
+
+        avg_step_rate = np.nanmean(avg_step_rates)
+        std_step_rate = np.nanstd(avg_step_rates)
+
+
+def compare_scaled_live_triggers_steps(data, time, cad_df):
+    """
+    Compare the scaled live triggers of ZDC and MBD.
+    """
+    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+
+    for index, row in cad_df.iterrows():
+        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+        mask = (time >= start_time) & (time <= end_time)
+        step_data = data[mask]
+        step_times = time[mask]
+
+        step_zdc_live_trigger = step_data['zdc_SN_live_trigger']
+        step_mbd_live_trigger = step_data['mbd_SN_live_trigger']
+        step_mbd_scaled_trigger = step_data['mbd_SN_trigger']
+        step_zdc_scaled_trigger = step_data['zdc_SN_trigger']
+
+        print(f'Step {row["step"]}:')
+        print(f'Number of ZDC live triggers: {step_zdc_live_trigger.sum()}')
+        print(f'Number of scaled ZDC triggers: {step_zdc_scaled_trigger.sum()}')
+        print(f'Number of MBD live triggers: {step_mbd_live_trigger.sum()}')
+        print(f'Number of scaled MBD triggers: {step_mbd_scaled_trigger.sum()}')
+        print(f'ZDC scaled to live trigger ratio: {step_zdc_scaled_trigger.sum() / step_zdc_live_trigger.sum() * 100}%')
+        print(f'MBD scaled to live trigger ratio: {step_mbd_scaled_trigger.sum() / step_mbd_live_trigger.sum() * 100}%')
+
+
+def compare_scaled_live_triggers(data, time, cad_df):
+    """
+    Compare the scaled live triggers of ZDC and MBD.
+    """
+    # Iterate through data:
+    for i in range(100):
+        zdc_scaled_trigger = data['zdc_SN_trigger'].iloc[i]
+        zdc_live_trigger = data['zdc_SN_live_trigger'].iloc[i]
+        mbd_scaled_trigger = data['mbd_SN_trigger'].iloc[i]
+        mbd_live_trigger = data['mbd_SN_live_trigger'].iloc[i]
+        print(f'MBD Scaled: {mbd_scaled_trigger}, MBD Live: {mbd_live_trigger}, ZDC Scaled: {zdc_scaled_trigger}, ZDC Live: {zdc_live_trigger}')
+
+
+def compare_new_old_root_file(base_path, data, time):
+
+    data_old, time_old = get_root_data_time(f'{base_path}Vernier_Scans/auau_oct_16_24/',
+                                            root_file_name='54733_slimmed.root', tree_name='calo_tree',
+                                            sub_dir='vertex_data_old/',
+                                            branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
+                                                      'bunch'])
+
+    indices = np.arange(159751, 159762)
+    last_vtx = 0
+    for i in indices:
+        print(f'Index {i}:')
+        print(f'Data New: BCO: {data.iloc[i]["BCO"]}, MBD Z Vtx: {data.iloc[i]["mbd_zvtx"]}, MBD Scaled: {data.iloc[i]["mbd_SN_trigger"]}, ZDC Scaled: {data.iloc[i]["zdc_SN_trigger"]}, Bunch: {data.iloc[i]["bunch"]}')
+        print(f'Data Old: BCO: {data_old.iloc[i]["BCO"]}, MBD Z Vtx: {data_old.iloc[i]["mbd_zvtx"]}, MBD Scaled: {data_old.iloc[i]["mbd_SN_trigger"]}, ZDC Scaled: {data_old.iloc[i]["zdc_SN_trigger"]}, Bunch: {data_old.iloc[i]["bunch"]}\n')
+        print(f'Is the same vertex? {data.iloc[i]["mbd_zvtx"] == last_vtx}')
+        last_vtx = data.iloc[i]["mbd_zvtx"]
+    input('Press Enter to continue...')
+
+    last_mvtx, streak, streak_indices, ring_streak_index, ring_streaks = None, 0, [], [], []
+    for i in range(len(data)):
+        if not data.iloc[i]['mbd_SN_trigger']:
+            continue
+        if data.iloc[i]['mbd_zvtx'] == last_mvtx:
+            streak += 1
+        else:
+            if streak > 0:
+                ring_streak_index.append(i - streak)
+                ring_streaks.append(streak)
+                print(f'Streak of {streak} at index {i - streak} of {len(data)}')
+                for j in streak_indices:  # Print the previous streak entries
+                    print(f'Index {j}: BCO: {data.iloc[j]["BCO"]}, MBD Z Vtx: {data.iloc[j]["mbd_zvtx"]}, MBD Scaled: {data.iloc[j]["mbd_SN_trigger"]}, ZDC Scaled: {data.iloc[j]["zdc_SN_trigger"]}, Bunch: {data.iloc[j]["bunch"]}')
+                streak = 0
+            streak_indices = []
+        last_mvtx = data.iloc[i]['mbd_zvtx']
+        streak_indices.append(i)
+
+    print(f'Found {len(ring_streaks)} streaks')
+    print(f'Longest streak: {max(ring_streaks)}')
+    print(f'Average streak length: {np.mean(ring_streaks)}')
+    print(f'Streaks: {ring_streaks}')
+    print(f'Streak indices: {ring_streak_index}')
+
+    for i in range(len(data)):
+        if i % 1000000 == 0:
+            print(f'Index {i}/{len(data)}')
+        mbd_scaled_trigger = data['mbd_SN_trigger'].iloc[i]
+        mbd_scaled_trigger_old = data_old['mbd_SN_trigger'].iloc[i]
+        mbd_z_vtx = data['mbd_zvtx'].iloc[i]
+        mbd_z_vtx_old = data_old['mbd_zvtx'].iloc[i]
+        if mbd_scaled_trigger != mbd_scaled_trigger_old:
+            print(f'Index {i}: New MBD Scaled: {mbd_scaled_trigger}, Old MBD Scaled: {mbd_scaled_trigger_old}')
+        if mbd_z_vtx != mbd_z_vtx_old:
+            print(f'Index {i}: New MBD Z Vtx: {mbd_z_vtx}, Old MBD Z Vtx: {mbd_z_vtx_old}')
 
 
 def get_step_rates(scan_path, cad_df):

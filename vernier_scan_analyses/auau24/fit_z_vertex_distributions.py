@@ -20,7 +20,7 @@ from datetime import datetime, time
 
 from BunchCollider import BunchCollider
 from z_vertex_fitting_common import (fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2,
-                                     load_vertex_distributions)
+                                     load_vertex_distributions, merge_cad_rates_df)
 from Measure import Measure
 
 
@@ -36,7 +36,7 @@ def main():
     # fit_beta_stars_bws_to_all_steps(base_path)
     # fit_beam_widths(base_path)
     plot_beta_star_head_on_fit_results(base_path)
-    plot_beam_width_fit_results(base_path)
+    # plot_beam_width_fit_results(base_path)
     plt.show()
     print('donzo')
 
@@ -161,10 +161,18 @@ def fit_beta_star_to_head_on_steps(base_path):
     """
 
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
-    z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
+    z_vertex_zdc_data_path = f'{base_path}vertex_data_old/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    rates_path = f'{base_path}step_raw_rates.csv'
+    # out_name = 'beta_star_fit_results.csv'
+    # out_name = 'beta_star_fit_results_mbd_cor.csv'
+    out_name = 'beta_star_fit_results_mbd_cor_fit_all_amps.csv'
+    rate_column = 'corrected_raw_mbd_rate'  # 'zdc_raw_rate' or 'corrected_raw_mbd_rate'
+    # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate' or 'corrected_raw_mbd_rate'
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+    rates_df = pd.read_csv(rates_path)
+    cad_df = merge_cad_rates_df(cad_df, rates_df)
 
     fit_range = [-200, 200]
     steps = [0, 6, 12, 18, 24]
@@ -181,12 +189,11 @@ def fit_beta_star_to_head_on_steps(base_path):
 
     # Get nominal dcct ions and emittances
     step_0 = cad_df[cad_df['step'] == 0].iloc[0]
-    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
     em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
     em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
 
     # Preload data and histograms here
-    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, dcct_blue_nom, dcct_yellow_nom)
+    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column)
 
     sim_settings = {
         'steps': steps,
@@ -220,7 +227,7 @@ def fit_beta_star_to_head_on_steps(base_path):
 
     # Write results to a CSV file
     results_df = pd.DataFrame(results)
-    results_df.to_csv(f'{base_path}beta_star_fit_results.csv', index=False)
+    results_df.to_csv(f'{base_path}{out_name}', index=False)
 
     plt.show()
 
@@ -235,8 +242,11 @@ def fit_beam_widths(base_path):
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    rates_path = f'{base_path}step_raw_rates.csv'
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+    rates_df = pd.read_csv(rates_path)
+    cad_df = merge_cad_rates_df(cad_df, rates_df)
 
     fit_range = [-200, 200]
     # steps = np.arange(0, 25)
@@ -255,12 +265,11 @@ def fit_beam_widths(base_path):
 
     # Get nominal dcct ions and emittances
     step_0 = cad_df[cad_df['step'] == 0].iloc[0]
-    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
     em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
     em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
 
     # Preload data and histograms here
-    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, dcct_blue_nom, dcct_yellow_nom)
+    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df)
 
     sim_settings = {
         'steps': steps,
@@ -305,8 +314,10 @@ def plot_beta_star_head_on_fit_results(base_path):
     """
     Plot the results of the beta star head-on fit.
     """
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_130bw.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_130bw.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_cor.csv')
+    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_cor_fit_all_amps.csv')
 
     # Plot chi2 vs beta star for each step
     fig, axs = plt.subplots(figsize=(10, 6), nrows=3, sharex='all')
@@ -348,8 +359,9 @@ def plot_beta_star_head_on_fit_results(base_path):
                    alpha=0.2)
 
     axs[2].annotate(f'Minimum Scaled Residual at {opt_beta_star} cm',
-                    xy=(min_resid_avg_beta_star, 0), xytext=(min_resid_avg_beta_star + 4, 2.5),
-                   arrowprops=dict(arrowstyle='->', color='black'), fontsize=10, color='black')
+                    xy=(min_resid_avg_beta_star, step_avg_df['resids'].min()),
+                    xytext=(min_resid_avg_beta_star + 4, 1.6),
+                    arrowprops=dict(arrowstyle='->', color='black'), fontsize=10, color='black')
 
     axs[2].set_xlabel('Beta Star (cm)')
     axs[0].set_ylabel('Chi2')

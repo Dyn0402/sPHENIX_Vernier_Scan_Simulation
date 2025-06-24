@@ -32,10 +32,10 @@ def main():
 
     base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
 
-    # fit_beta_star_to_head_on_steps(base_path)
+    fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
     # fit_beam_widths(base_path)
-    plot_beta_star_head_on_fit_results(base_path)
+    # plot_beta_star_head_on_fit_results(base_path)
     # plot_beam_width_fit_results(base_path)
     plt.show()
     print('donzo')
@@ -161,14 +161,19 @@ def fit_beta_star_to_head_on_steps(base_path):
     """
 
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
-    z_vertex_zdc_data_path = f'{base_path}vertex_data_old/54733_vertex_distributions.root'
+    z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     rates_path = f'{base_path}step_raw_rates.csv'
     # out_name = 'beta_star_fit_results.csv'
-    # out_name = 'beta_star_fit_results_mbd_cor.csv'
-    out_name = 'beta_star_fit_results_mbd_cor_fit_all_amps.csv'
-    rate_column = 'corrected_raw_mbd_rate'  # 'zdc_raw_rate' or 'corrected_raw_mbd_rate'
-    # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate' or 'corrected_raw_mbd_rate'
+    # out_name = 'beta_star_fit_results_zdc_cor_rate_bw130.csv'
+    # out_name = 'beta_star_fit_results_zdc_raw_rate_bw130.csv'
+    out_name_base = 'beta_star_fit_results_.csv'
+    # out_name = 'beta_star_fit_results_mbd_z200_rate_bw110.csv'
+    # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
+    # rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
+
+    rate_cols = ['zdc_raw_rate', 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', 'mbd_bkg_cor_rate']
+    bws = [110, 130]
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
     rates_df = pd.read_csv(rates_path)
@@ -185,49 +190,54 @@ def fit_beta_star_to_head_on_steps(base_path):
     collider_sim.set_bkg(bkg)
     collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
     collider_sim.set_gaus_smearing_sigma(mbd_resolution)
-    beam_width_x, beam_width_y = 130.0, 130.0
 
     # Get nominal dcct ions and emittances
     step_0 = cad_df[cad_df['step'] == 0].iloc[0]
     em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
     em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
 
-    # Preload data and histograms here
-    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column)
+    for rate_column in rate_cols:
+        # Preload data and histograms here
+        vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column)
 
-    sim_settings = {
-        'steps': steps,
-        'fit_range': fit_range,
-        'profiles_path': longitudinal_profiles_dir_path,
-        'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
-        'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
-        'plot': False  # Set to True if you want to plot the results
-    }
+        for bw in bws:
+            # beam_width_x, beam_width_y = 130.0, 130.0
+            beam_width_x, beam_width_y = bw, bw
+            out_name = f'{out_name_base}{rate_column}_bw{bw}.csv'
 
-    beta_stars = np.linspace(60, 95, 150)
+            sim_settings = {
+                'steps': steps,
+                'fit_range': fit_range,
+                'profiles_path': longitudinal_profiles_dir_path,
+                'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
+                'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
+                'plot': False  # Set to True if you want to plot the results
+            }
 
-    results = []
-    for beta_star in beta_stars:  # For given beta_star, amplitude is fixed at step=0 and stays there.
-        for step in steps:
-            sim_settings['steps'] = [step]
-            centers, counts, count_errs = vertex_data[step]
-            initial_guess = np.array([beam_width_x, beam_width_y, beta_star, beta_star, 0.0, 0.0, 0.0, 0.0])
+            beta_stars = np.linspace(60, 95, 150)
 
-            chi2, log_like, resid = compute_total_chi2(
-                initial_guess,
-                collider_sim,
-                cad_df,
-                {step: centers},
-                {step: counts},
-                {step: count_errs},
-                sim_settings,
-                metrics=('chi2', 'log_like', 'scaled_resid')
-            )
-            results.append({'step': step, 'beta_star': beta_star, 'chi2': chi2, 'log_like': log_like, 'resids': resid})
+            results = []
+            for beta_star in beta_stars:  # For given beta_star, amplitude is fixed at step=0 and stays there.
+                for step in steps:
+                    sim_settings['steps'] = [step]
+                    centers, counts, count_errs = vertex_data[step]
+                    initial_guess = np.array([beam_width_x, beam_width_y, beta_star, beta_star, 0.0, 0.0, 0.0, 0.0])
 
-    # Write results to a CSV file
-    results_df = pd.DataFrame(results)
-    results_df.to_csv(f'{base_path}{out_name}', index=False)
+                    chi2, log_like, resid = compute_total_chi2(
+                        initial_guess,
+                        collider_sim,
+                        cad_df,
+                        {step: centers},
+                        {step: counts},
+                        {step: count_errs},
+                        sim_settings,
+                        metrics=('chi2', 'log_like', 'scaled_resid')
+                    )
+                    results.append({'step': step, 'beta_star': beta_star, 'chi2': chi2, 'log_like': log_like, 'resids': resid})
+
+            # Write results to a CSV file
+            results_df = pd.DataFrame(results)
+            results_df.to_csv(f'{base_path}{out_name}', index=False)
 
     plt.show()
 
@@ -242,19 +252,17 @@ def fit_beam_widths(base_path):
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
-    rates_path = f'{base_path}step_raw_rates.csv'
+    rate_column = 'zdc_cor_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
-    rates_df = pd.read_csv(rates_path)
-    cad_df = merge_cad_rates_df(cad_df, rates_df)
 
     fit_range = [-200, 200]
     # steps = np.arange(0, 25)
-    steps = [i for i in np.arange(0, 24) if (i % 6 or i == 0)]  # Only first head on to fix amplitude
+    steps = [i for i in np.arange(0, 24) if (i % 6 or i == 0)]  # Only first head-on to fix amplitude
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
-    beta_star = 76.7  # cm
+    beta_star = 77.4  # cm
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
@@ -269,7 +277,7 @@ def fit_beam_widths(base_path):
     em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
 
     # Preload data and histograms here
-    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df)
+    vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column)
 
     sim_settings = {
         'steps': steps,
@@ -316,8 +324,12 @@ def plot_beta_star_head_on_fit_results(base_path):
     """
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_130bw.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results.csv')
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_cor.csv')
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_cor_fit_all_amps.csv')
+
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw110.csv')
+    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw130.csv')  # Nominal
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw110.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw130.csv')
 
     # Plot chi2 vs beta star for each step
     fig, axs = plt.subplots(figsize=(10, 6), nrows=3, sharex='all')
@@ -379,7 +391,7 @@ def plot_beam_width_fit_results(base_path):
     """
     Plot the results of the beam width fit.
     """
-    all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results.csv')
+    all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results_new_hold.csv')
     skip_steps = [1, 7, 13, 19]  # Skip steps at 100 microns, less sensitive to beam width
 
     orientations = ['horizontal', 'vertical']

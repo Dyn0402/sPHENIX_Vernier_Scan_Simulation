@@ -52,8 +52,8 @@ class PlotSimulatorApp:
         self.em_yel_horiz_nom, self.em_yel_vert_nom = self.step_0['yellow_horiz_emittance'], self.step_0['yellow_vert_emittance']
 
         # Steps: fill this with your real data
-        # self.steps = [0, 2, 4, 5, 6]
-        self.steps = [0, 6, 12, 18, 24]
+        self.steps = [0, 2, 4, 5, 6]
+        # self.steps = [0, 6, 12, 18, 24]
         self.raw_data = {}  # Map from step -> (centers_no_zdc, counts_no_zdc, centers, counts)
 
         self.last_sim_zs = {step: None for step in self.steps}

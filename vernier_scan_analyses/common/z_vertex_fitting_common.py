@@ -40,11 +40,14 @@ def load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column='zd
             count_errs[count_errs == 0] = 1  # Avoid division by zero
 
             cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
-            raw_rate = cad_step_row[rate_column]
-            hist_scaling_factor = raw_rate / np.sum(counts)
+            if rate_column:
+                raw_rate = cad_step_row[rate_column]
+                hist_scaling_factor = raw_rate / np.sum(counts)
+            else:
+                hist_scaling_factor = 1
+
             dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (
                     cad_step_row['blue_dcct_ions'] * cad_step_row['yellow_dcct_ions'])
-
             counts *= hist_scaling_factor * dcct_scale
             count_errs *= hist_scaling_factor * dcct_scale
 

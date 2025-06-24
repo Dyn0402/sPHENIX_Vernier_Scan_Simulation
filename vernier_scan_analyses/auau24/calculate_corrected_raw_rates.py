@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on June 07 04:50 2025
+Created in PyCharm
+Created as sPHENIX_Vernier_Scan_Simulation/calculate_raw_rates
+
+@author: Dylan Neff, dn277127
+"""
+
+import platform
+import numpy as np
+import matplotlib.pyplot as plt
+from IPython.core.pylabtools import figsize
+from scipy.interpolate import interp1d
+import pandas as pd
+
+from BunchCollider import BunchCollider
+from z_vertex_fitting_common import load_vertex_distributions, get_profile_path, fit_amp_shift, merge_cad_rates_df
+
+
+def main():
+    if platform.system() == 'Windows':
+        base_path = 'C:/Users/Dylan/Desktop/'
+    else:
+        base_path = '/local/home/dn277127/Bureau/'
+
+    base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+
+    longitudinal_profiles_dir_path = f'{base_path}profiles/'
+    z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
+    z_vertex_no_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
+    combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    plot_out_path = f'{base_path}Figures/zvertex_cut_plots/'
+
+    # get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
+    add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)
+    # compare_mbd_corrected_to_zdc(base_path)
+
+    print('donzo')
+
+
+def add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path):
+    """
+    Add the background corrected MBD rate to the combined CAD step data CSV.
+    """
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    # Calculate the background corrected MBD rate
+    cad_df['mbd_bkg_cor_rate'] = cad_df['mbd_raw_rate'] * (1 - cad_df['mbd_cut_correction_fraction'] / 100)
+    cad_df['mbd_z200_rate'] = cad_df['mbd_raw_rate'] * (1 - (cad_df['mbd_cut_correction_fraction'] + cad_df['simulated_cut_fraction']) / 100)
+
+    # Save the updated DataFrame back to the CSV file
+    cad_df.to_csv(combined_cad_step_data_csv_path, index=False)
+    print(f'Saved updated cad_df with mbd_bkg_cor_rate to {combined_cad_step_data_csv_path}')
+
+
+def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path=None):
+    """
+    Calculate the raw rates for the MBD cuts.
+    """
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+    fit_range = [-200, 200]
+    z_cut = 200  # cm, cut for the MBD
+    steps = [5]
+    # steps = [0, 6, 12, 18]
+    # steps = np.arange(0, 25)
+    # plot_out_path = None
+
+    # Get the vz fraction outside of the cut for data from no ZDC coincidence and from simulation with ZDC coincidence
+    vertex_data = load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column=None)
+    vertex_data_with_zdc = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column=None)
+
+    collider_sim = BunchCollider()
+    collider_sim.set_grid_size(71, 71, 1001, 81)
+    # collider_sim.set_grid_size(71, 71, 101, 81)
+    z_sim_range = np.array([-805., 805.])
+    collider_sim.set_z_bounds(z_sim_range * 1e4)
+    beta_star = 76.7  # cm
+    beam_width_x, beam_width_y = 129.2, 125.7
+    bkg = 0.0e-17
+    gauss_eff_width = 500
+    mbd_resolution = 1.0
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+
+    for step in steps:
+        centers, counts, count_errs = vertex_data[step]
+        centers_zdc, counts_zdc, count_errs_zdc = vertex_data_with_zdc[step]
+
+        cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
+
+        em_blue_horiz, em_blue_vert = cad_step_row['blue_horiz_emittance'], cad_step_row['blue_vert_emittance']
+        em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row['yellow_vert_emittance']
+
+        # Get nominal emittances
+        step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+        em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+        em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+
+        blue_widths = np.array([
+            beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+            beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+        ])
+        yellow_widths = np.array([
+            beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+            beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+        ])
+
+        blue_angle_x = -cad_step_row['blue angle h'] * 1e-3
+        blue_angle_y = -cad_step_row['blue angle v'] * 1e-3
+        yellow_angle_x = -cad_step_row['yellow angle h'] * 1e-3
+        yellow_angle_y = -cad_step_row['yellow angle v'] * 1e-3
+
+        blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
+        yellow_offset_x, yellow_offset_y = 0, 0
+
+        profile_path = get_profile_path(
+            longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], False
+        )
+
+        collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+        collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
+        collider_sim.set_bunch_crossing(blue_angle_x, blue_angle_y, yellow_angle_x, yellow_angle_y)
+        collider_sim.set_bunch_offsets([blue_offset_x, blue_offset_y], [yellow_offset_x, yellow_offset_y])
+        collider_sim.set_longitudinal_profiles_from_file(
+            profile_path.replace('COLOR_', 'blue_'),
+            profile_path.replace('COLOR_', 'yellow_')
+        )
+
+        collider_sim.run_sim_parallel()
+
+        fit_mask = (centers > fit_range[0]) & (centers < fit_range[1])
+
+        # fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
+        fit_amp_shift(collider_sim, counts_zdc[fit_mask], centers_zdc[fit_mask], count_errs_zdc[fit_mask])
+
+        zs, z_dist = collider_sim.get_z_density_dist()
+        center_steps = centers[1] - centers[0]  # Uniform step size
+        sim_zs = np.arange(z_sim_range[0], z_sim_range[1] + center_steps, center_steps)
+        interp_sim = interp1d(zs, z_dist, bounds_error=False, fill_value=0)(sim_zs)
+
+        # Get fraction of counts where |z| > z_cut
+        z_cut_mask = np.abs(centers) > z_cut
+        total_counts = counts.sum()
+        cut_counts = counts[z_cut_mask].sum()
+        cut_fraction = cut_counts / total_counts if total_counts > 0 else 0
+
+        # Do the same for the simulation
+        zim_z_cut_mask = np.abs(sim_zs) > z_cut
+        sim_cut_counts = interp_sim[zim_z_cut_mask].sum()
+        sim_cut_fraction = sim_cut_counts / interp_sim.sum() if interp_sim.sum() > 0 else 0
+
+        # Get bounds for plotting
+        sim_cdf = np.cumsum(interp_sim)
+        sim_cdf /= sim_cdf[-1]  # Normalize to 1
+        lower_idx = np.searchsorted(sim_cdf, 0.002)
+        upper_idx = np.searchsorted(sim_cdf, 0.998)
+        plot_z_min = min(sim_zs[lower_idx], -305)
+        plot_z_max = max(sim_zs[upper_idx], 305)
+
+        cut_fraction, sim_cut_fraction = cut_fraction * 100, sim_cut_fraction * 100
+        print(f'Step {step}: MBD cut fraction = {cut_fraction:.2f}%, Simulated cut fraction = {sim_cut_fraction:.2f}%')
+
+        correction_fraction = cut_fraction - sim_cut_fraction
+
+        # Save correction fraction and sim_cut_fraction to rates_df
+        # rates_df.loc[rates_df['step'] == step, 'mbd_cut_correction_fraction'] = correction_fraction
+        # rates_df.loc[rates_df['step'] == step, 'simulated_cut_fraction'] = sim_cut_fraction
+        cad_df.loc[cad_df['step'] == step, 'mbd_cut_correction_fraction'] = correction_fraction
+        cad_df.loc[cad_df['step'] == step, 'simulated_cut_fraction'] = sim_cut_fraction
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.errorbar(centers, counts, yerr=count_errs, fmt='o', label='MBD Trigger', color='black', markersize=3)
+        ax.errorbar(centers_zdc, counts_zdc, yerr=count_errs_zdc, fmt='o', label='MBD+ZDC', color='gray', markersize=2,
+                    alpha=0.5)
+        ax.plot(sim_zs, interp_sim, label='Simulation', color='blue')
+        ax.axvline(-z_cut, color='red', ls='--', label=f'|z| = {z_cut} cm')
+        ax.axvline(z_cut, color='red', ls='--')
+        ax.axhline(0, color='black', ls='-', lw=0.5, zorder=-1)
+        ax.set_ylabel('Counts')
+        ax.set_xlabel('MBD z Vertex Position (cm)')
+        ax.set_ylim(bottom=0, top=np.max(counts[fit_mask]) * 1.2)
+        ax.set_xlim(left=plot_z_min, right=plot_z_max)
+        ax.legend()
+        ax.annotate(f'Step {step}\nMBD vz outside of cut: {cut_fraction:.2f}%\n'
+                    f'Simulated vz outside of cut: {sim_cut_fraction:.2f}%\n'
+                    f'MBD fraction - Sim fraction: {correction_fraction:.2f}%',
+                xy=(0.02, 0.98), xycoords='axes fraction', fontsize=12, va='top', ha='left',
+                bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
+
+        fig.tight_layout()
+        if plot_out_path:
+            fig.savefig(f'{plot_out_path}mbd_cut_step_{step}.png')
+            fig.savefig(f'{plot_out_path}mbd_cut_step_{step}.pdf')
+    if not plot_out_path:
+        plt.show()
+
+    # Save rates_df to rates_path
+    # rates_df.to_csv(rates_path, index=False)
+    # print(f'Saved updated rates to {rates_path}')
+    # Update the cad_df with the new rates
+    cad_df.to_csv(combined_cad_step_data_csv_path, index=False)
+    print(f'Saved updated cad_df to {combined_cad_step_data_csv_path}')
+
+
+def compare_mbd_corrected_to_zdc(base_path):
+    z_vertex_zdc_data_path = f'{base_path}vertex_data_old/54733_vertex_distributions.root'
+    combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    rates_path = f'{base_path}step_raw_rates.csv'
+    out_name = 'beta_star_fit_results_mbd_cor_fit_all_amps.csv'
+    rate_column = 'corrected_raw_mbd_rate'  # 'zdc_raw_rate' or 'corrected_raw_mbd_rate'
+    # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate' or 'corrected_raw_mbd_rate'
+
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+    # rates_df = pd.read_csv(rates_path)
+    # cad_df = merge_cad_rates_df(cad_df, rates_df)
+
+    print(cad_df.head())
+    print(cad_df.columns)
+
+    fig, ax = plt.subplots()
+    ax.plot(cad_df['step'], cad_df['zdc_raw_rate'], 's-', color='orange', alpha=0.8, label='ZDC Raw Rate')
+    ax.plot(cad_df['step'], cad_df['zdc_cor_rate'], 's-', color='blue', alpha=0.8, label='ZDC Raw Rate from Live')
+    ax.plot(cad_df['step'], cad_df['mbd_raw_rate'], 'o-', color='salmon', alpha=0.8, label='MBD Raw Rate')
+    ax.plot(cad_df['step'], cad_df['mbd_cor_rate'], 'o-', color='purple', alpha=0.8, label='MBD Raw Rate from Live')
+    bkg_cor_mbd = cad_df['mbd_cor_rate'] * (1 - cad_df['mbd_cut_correction_fraction'] / 100)
+    z200_cor_mbd = cad_df['mbd_cor_rate'] * (1 - (cad_df['mbd_cut_correction_fraction'] + cad_df['simulated_cut_fraction']) / 100)
+    ax.plot(cad_df['step'], z200_cor_mbd, 'o-', color='green', alpha=0.8, label='MBD Rate |z|<200cm')
+    ax.plot(cad_df['step'], bkg_cor_mbd, 'o-', color='red', alpha=0.8, label='MBD Rate Corrected for Background')
+    ax.axhline(0, color='black', ls='-', lw=0.5, zorder=-1)
+    ax.set_ylim(top=63000)
+    ax.legend()
+    ax.set_xlabel('Step')
+    ax.set_ylabel('Rate (Hz)')
+    fig.tight_layout()
+    fig.subplots_adjust(left=0.12, right=0.995, bottom=0.1, top=0.995)
+
+    # Scale bkg_cor_mbd to match the ZDC rates
+    bkg_cor_mbd_scaled = bkg_cor_mbd * (cad_df['zdc_cor_rate'].iloc[1] / bkg_cor_mbd.iloc[1])
+    z200_cor_mbd_scaled = z200_cor_mbd * (cad_df['zdc_cor_rate'].iloc[1] / z200_cor_mbd.iloc[1])
+    mbd_scaled = cad_df['mbd_cor_rate'] * (cad_df['zdc_cor_rate'].iloc[1] / cad_df['mbd_cor_rate'].iloc[1])
+    fig, ax = plt.subplots()
+    ax.plot(cad_df['step'], mbd_scaled, 'o-', color='gray', alpha=0.5, label='MBD Raw Rate from Live (Scaled)')
+    ax.plot(cad_df['step'], cad_df['zdc_cor_rate'], 's-', color='blue', alpha=0.8, label='ZDC Raw Rate from Live')
+    ax.plot(cad_df['step'], z200_cor_mbd_scaled, 'o-', color='green', alpha=0.8, label='MBD Rate |z|<200cm (Scaled)')
+    ax.plot(cad_df['step'], bkg_cor_mbd_scaled, 'o-', color='red', alpha=0.8, label='MBD Rate Corrected for Background (Scaled)')
+    ax.axhline(0, color='black', ls='-', lw=0.5, zorder=-1)
+    ax.legend()
+    ax.set_ylim(top=59000)
+    ax.set_xlabel('Step')
+    ax.set_ylabel('Rate (Hz)')
+    fig.tight_layout()
+    fig.subplots_adjust(left=0.12, right=0.995, bottom=0.1, top=0.995)
+
+    plt.show()
+
+
+if __name__ == '__main__':
+    main()

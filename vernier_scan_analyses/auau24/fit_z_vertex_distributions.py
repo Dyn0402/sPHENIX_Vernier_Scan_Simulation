@@ -30,9 +30,9 @@ def main():
 
     # fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
-    # fit_beam_widths(base_path)
-    plot_beta_star_head_on_fit_results(base_path)
-    # plot_beam_width_fit_results(base_path)
+    fit_beam_widths(base_path)
+    # plot_beta_star_head_on_fit_results(base_path)
+    plot_beam_width_fit_results(base_path)
     plt.show()
     print('donzo')
 
@@ -167,7 +167,7 @@ def fit_beta_star_to_head_on_steps(base_path):
     # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
     # rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
 
-    rate_cols = ['zdc_raw_rate', 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', 'mbd_bkg_cor_rate']
+    rate_cols = ['zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', 'mbd_bkg_cor_rate']
     bws = [110, 130]
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
@@ -245,7 +245,8 @@ def fit_beam_widths(base_path):
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
-    rate_column = 'zdc_cor_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
+    # rate_column = 'zdc_cor_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
+    rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
@@ -255,7 +256,7 @@ def fit_beam_widths(base_path):
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
-    beta_star = 77.4  # cm
+    beta_star = 77.15  # cm
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
@@ -319,10 +320,13 @@ def plot_beta_star_head_on_fit_results(base_path):
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results.csv')
 
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw110.csv')
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw130.csv')  # Nominal
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw110.csv')
+    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw130.csv')  # Nominal
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw110.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw130.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_bkg_cor_rate_bw110.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_bkg_cor_rate_bw130.csv')
 
     # Plot chi2 vs beta star for each step
     fig, axs = plt.subplots(figsize=(10, 6), nrows=3, sharex='all')
@@ -384,18 +388,20 @@ def plot_beam_width_fit_results(base_path):
     """
     Plot the results of the beam width fit.
     """
-    all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results_new_hold.csv')
+    all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results.csv')
     skip_steps = [1, 7, 13, 19]  # Skip steps at 100 microns, less sensitive to beam width
+    bw_range = (110, 150)  # Range of beam widths in micrometers
 
     orientations = ['horizontal', 'vertical']
     # orientations = ['horizontal']
-    fig_avgs, ax_avgs = plt.subplots(figsize=(10, 6), nrows=2, sharex='all')
+    fig_avgs, ax_avgs = plt.subplots(figsize=(10, 7), nrows=2, sharex='all')
     ax_avgs = dict(zip(orientations, ax_avgs))
     for orientation in orientations:
         results_df = all_results_df[all_results_df['orientation'] == orientation]
+        results_df = results_df[(results_df['beam_width'] >= bw_range[0]) & (results_df['beam_width'] <= bw_range[1])]
 
         # Plot chi2 vs beta star for each step
-        fig, axs = plt.subplots(figsize=(10, 6), nrows=3, sharex='all')
+        fig, axs = plt.subplots(figsize=(10, 7), nrows=3, sharex='all')
         min_bses = []
         for step in results_df['step'].unique():
             if step in skip_steps:
@@ -435,8 +441,9 @@ def plot_beam_width_fit_results(base_path):
         axs[2].axvspan(opt_beam_width.val - opt_beam_width.err, opt_beam_width.val + opt_beam_width.err, color='black',
                        alpha=0.2)
 
+        max_val = results_df['resids'].max()
         axs[2].annotate(f'Minimum Scaled Residual at {opt_beam_width} cm',
-                        xy=(min_resid_avg_beam_width, 0), xytext=(min_resid_avg_beam_width + 4, 25),
+                        xy=(min_resid_avg_beam_width, 0), xytext=(min_resid_avg_beam_width + 4, max_val * 0.9),
                         arrowprops=dict(arrowstyle='->', color='black'), fontsize=10, color='black')
 
         axs[2].set_xlabel('Beam Width (um)')
@@ -448,7 +455,8 @@ def plot_beam_width_fit_results(base_path):
         for i in range(3):
             axs[i].grid()
         fig.tight_layout()
-        fig.suptitle(f'Beam Width Fit Results - {orientation.capitalize()} Orientation', fontsize=16)
+        fig.suptitle(f'Beam Width Fit Results - {orientation.capitalize()} Orientation', fontsize=16,
+                     bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.3'))
         fig.subplots_adjust(left=0.07, right=0.995, bottom=0.075, top=0.995, hspace=0.0)
 
         # Normalize all metrics to range of 0 to 1

@@ -17,8 +17,8 @@ def set_base_path():
     """
     if platform.system() == 'Windows' and platform.node() == 'DESKTOP-BCED9EL':
         return 'F:/Saclay/'
-    elif platform.system() == 'Linux' and platform.node() == 'dylan':
-        return '/local/home/dn277127/Bureau/'
+    elif platform.system() == 'Linux' and platform.node() == 'dylan-MS-7C84':
+        return '/media/ucla/Saclay/'
     elif platform.system() == 'Linux' and platform.node() == 'dn277127':
         return '/local/home/dn277127/Bureau/'
     else:

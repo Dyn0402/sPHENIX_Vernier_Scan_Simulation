@@ -21,13 +21,14 @@ def main():
     else:
         base_path = '/local/home/dn277127/Bureau/'
 
-    step = 23
+    step = 5
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
 
     combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
-    directories = ['vertex_data_old', 'vertex_data_less_old', 'vertex_data_calib', 'vertex_data_hold', 'vertex_data']
+    # directories = ['vertex_data_old', 'vertex_data_less_old', 'vertex_data_calib', 'vertex_data_hold', 'vertex_data']
+    directories = ['vertex_data_calib', 'vertex_data']
     # file_name = '54733_vertex_distributions_no_zdc_coinc.root'
     file_name = '54733_vertex_distributions.root'
 
@@ -36,9 +37,9 @@ def main():
         path = f'{base_path_auau}{directory}/{file_name}'
         vertex_data = load_vertex_distributions(path, [step], cad_df)
         centers, counts, count_errs = vertex_data[step]
-        ax.plot(centers, counts, label=directory)
+        ax.plot(abs(centers), counts, label=directory)
     ax.set_xlabel('Z Vertex Position (cm)')
-    ax.set_yscale('log')
+    # ax.set_yscale('log')
     ax.legend()
     fig.tight_layout()
 

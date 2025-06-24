@@ -14,7 +14,6 @@ from scipy.stats import binned_statistic
 import matplotlib.pyplot as plt
 import pandas as pd
 import uproot
-import ROOT
 
 
 def main():
@@ -34,6 +33,9 @@ def main():
     cad_df = pd.read_csv(cad_data_path, sep=',')
     print(cad_df)
 
+    compare_avg_total_step_rates(base_path_auau, cad_df, sub_dir)
+    plt.show()
+
     data, time = get_root_data_time(base_path_auau, root_file_name='54733_slimmed.root', tree_name='calo_tree', sub_dir=sub_dir,
                                     branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
                                               'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
@@ -44,16 +46,10 @@ def main():
 
     # plot_rates(data, time, cad_df)
     # more_rate_plotting(data, time, cad_df)
-    # get_step_z_vertex_dists(data, time, cad_df, plot=False, out_path=out_root_file_path)
-    # get_step_z_vertex_dists(data, time, cad_df, plot=False, out_path=out_root_file_path_no_zdc_coinc, zdc_coincidence=False)
-    # get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path=out_root_file_path_bbb)
-    # get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path=out_root_file_path_no_zdc_coinc_bbb, zdc_coincidence=False)
     # check_unreconstructed_z_vtx(data, time, cad_df, zdc_coincidence=False)
     # compare_scaled_live_triggers(data, time, cad_df)
     # compare_scaled_live_triggers_steps(data, time, cad_df)
-    # write_step_raw_rates(data, time, cad_df, out_path=f'{base_path_auau}step_raw_rates.csv')
     # compare_new_old_root_file(base_path, data, time)
-    compare_avg_total_step_rates(data, time, cad_df)
     plt.show()
 
     print('donzo')
@@ -70,7 +66,7 @@ def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name
     """
     if branches is None:
         branches = ['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger', 'mbd_raw_count', 'zdc_raw_count',
-                    'mbd_live_count', 'zdc_live_count']
+                    'GL1_clock_count', 'GL1_live_count', 'mbd_live_count', 'zdc_live_count']
 
     root_file_path = f'{scan_path}{sub_dir}{root_file_name}'
 
@@ -233,147 +229,6 @@ def more_rate_plotting(data, time, cad_df):
 #             plt.show()
 
 
-def get_step_z_vertex_dists(data, time, cad_df, plot=True, out_path="output_histograms.root", zdc_coincidence=True):
-    """
-    Get the steps from the data and cad_df, plot and save histograms to a ROOT file.
-    :param data: Data from the root file.
-    :param time: Time array.
-    :param cad_df: Dataframe with CAD step data.
-    :param plot: Whether to plot the histograms.
-    :param out_path: Name of the output ROOT file.
-    :param zdc_coincidence: Whether to include ZDC coincidence in the histograms.
-    :return: None
-    """
-    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
-    binning = np.linspace(-300, 300, 201)
-    nbins = len(binning) - 1
-
-    root_file = ROOT.TFile(out_path, "RECREATE")
-
-    # Get the start and end times of each step
-    cad_df['start'] = pd.to_datetime(cad_df['start'])
-    cad_df['end'] = pd.to_datetime(cad_df['end'])
-    run_start = cad_df.iloc[0]['start']
-
-    for index, row in cad_df.iterrows():
-        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
-        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
-        mask = (time >= start_time) & (time <= end_time)
-        step_data = data[mask]
-        step_duration = end_time - start_time
-        step_num = row['step']
-
-        raw_mbd_zvtx = step_data['mbd_zvtx']
-        zdc_ns_trigger = step_data['zdc_SN_trigger']
-        mbd_ns_trigger = step_data['mbd_SN_trigger']
-        mbd_zvtx_mbd_coinc = raw_mbd_zvtx[(mbd_ns_trigger == 1)]
-        mbd_zvtx_mbd_zdc_coinc = raw_mbd_zvtx[(zdc_ns_trigger == 1) & (mbd_ns_trigger == 1)]
-
-        # Raw counts for error calculation
-        if zdc_coincidence:
-            raw_counts, _ = np.histogram(mbd_zvtx_mbd_zdc_coinc, bins=binning)
-        else:
-            raw_counts, _ = np.histogram(mbd_zvtx_mbd_coinc, bins=binning)
-        hist_counts = raw_counts / step_duration
-        bin_errors = np.sqrt(raw_counts) / step_duration
-
-        # Create and fill ROOT histogram
-        hist_name = f"step_{step_num}"
-        hist = ROOT.TH1F(hist_name, f"Step {step_num} MBD+ZDC Coincidence Rate;MBD Z Vertex (cm);Rate (Hz)",
-                         nbins, binning[0], binning[-1])
-
-        for i in range(nbins):
-            hist.SetBinContent(i + 1, hist_counts[i])
-            hist.SetBinError(i + 1, bin_errors[i])
-
-        hist.Write()  # Write to file
-
-        print(f"Step {step_num}: Start Time: {start_time}, End Time: {end_time}, Duration: {step_duration:.2f} s, "
-              f"Data Points: {len(step_data)}, Rate: {len(step_data) / step_duration:.2f} Hz")
-
-        if plot:
-            fig, ax = plt.subplots()
-            ax.hist(raw_mbd_zvtx, bins=binning, alpha=0.5, label='Raw MBD Z Vertex')
-            ax.hist(mbd_zvtx_mbd_coinc, bins=binning, alpha=0.5, label='MBD Coincidence')
-            ax.hist(mbd_zvtx_mbd_zdc_coinc, bins=binning, alpha=0.5, label='MBD+ZDC Coincidence')
-            ax.set_xlabel('MBD Z Vertex (cm)')
-            ax.legend()
-
-            fig, ax = plt.subplots()
-            ax.bar(binning[:-1], hist_counts, yerr=bin_errors, width=np.diff(binning), align='edge',
-                   alpha=0.5, label='Rate with Error Bars')
-            ax.set_xlabel('MBD Z Vertex (cm)')
-            ax.set_ylabel('Rate (Hz)')
-            ax.legend()
-            plt.show()
-
-    root_file.Close()
-
-
-def get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path="output_histograms.root", zdc_coincidence=True):
-    """
-    Get the steps from the data and cad_df, plot and save histograms to a ROOT file.
-    :param data: Data from the root file.
-    :param time: Time array.
-    :param cad_df: Dataframe with CAD step data.
-    :param plot: Whether to plot the histograms.
-    :param out_path: Name of the output ROOT file.
-    :param zdc_coincidence: Whether to include ZDC coincidence in the histograms.
-    :return: None
-    """
-    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
-    binning = np.linspace(-300, 300, 201)
-    nbins = len(binning) - 1
-
-    root_file = ROOT.TFile(out_path, "RECREATE")
-
-    # Get the start and end times of each step
-    cad_df['start'] = pd.to_datetime(cad_df['start'])
-    cad_df['end'] = pd.to_datetime(cad_df['end'])
-    run_start = cad_df.iloc[0]['start']
-
-    bunch_numbers = np.sort(data['bunch'].unique())
-
-    for index, row in cad_df.iterrows():
-        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
-        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
-        mask = (time >= start_time) & (time <= end_time)
-        step_data = data[mask]
-        step_duration = end_time - start_time
-
-        raw_mbd_zvtx = step_data['mbd_zvtx']
-        zdc_ns_trigger = step_data['zdc_SN_trigger']
-        mbd_ns_trigger = step_data['mbd_SN_trigger']
-        mbd_zvtx_mbd_coinc = raw_mbd_zvtx[(mbd_ns_trigger == 1)]
-        mbd_zvtx_mbd_zdc_coinc = raw_mbd_zvtx[(zdc_ns_trigger == 1) & (mbd_ns_trigger == 1)]
-
-        for bunch in bunch_numbers:
-            bunch_mask = step_data['bunch'] == bunch
-            # Raw counts for error calculation
-            if zdc_coincidence:
-                raw_counts, _ = np.histogram(mbd_zvtx_mbd_zdc_coinc[bunch_mask], bins=binning)
-            else:
-                raw_counts, _ = np.histogram(mbd_zvtx_mbd_coinc[bunch_mask], bins=binning)
-            hist_counts = raw_counts / step_duration
-            bin_errors = np.sqrt(raw_counts) / step_duration
-
-            # Create and fill ROOT histogram
-            hist_name = f"step_{index}_bunch_{bunch}"
-            hist = ROOT.TH1F(hist_name, f"Step {index} Bunch {bunch} MBD+ZDC Coincidence Rate;MBD Z Vertex (cm);Rate (Hz)",
-                             nbins, binning[0], binning[-1])
-
-            for i in range(nbins):
-                hist.SetBinContent(i + 1, hist_counts[i])
-                hist.SetBinError(i + 1, bin_errors[i])
-
-            hist.Write()  # Write to file
-
-        print(f"Step {index}: Start Time: {start_time}, End Time: {end_time}, Duration: {step_duration:.2f} s, "
-              f"Data Points: {len(step_data)}, Rate: {len(step_data) / step_duration:.2f} Hz")
-
-    root_file.Close()
-
-
 def check_unreconstructed_z_vtx(data, time, cad_df, zdc_coincidence=True):
     """
     Get the steps from the data and cad_df, plot and save histograms to a ROOT file.
@@ -418,64 +273,75 @@ def check_unreconstructed_z_vtx(data, time, cad_df, zdc_coincidence=True):
             print()
 
 
-def write_step_raw_rates(data, time, cad_df, out_path='step_raw_rates.csv'):
+# def write_step_raw_rates(data, time, cad_df, out_path='step_raw_rates.csv'):
+#     """
+#     Get the mean and standard deviations of the raw rates at each step from the data, using step boundaries from cad_df.
+#     """
+#     step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+#     cad_df['start'] = pd.to_datetime(cad_df['start'])
+#     cad_df['end'] = pd.to_datetime(cad_df['end'])
+#     run_start = cad_df.iloc[0]['start']
+#
+#     rates = []
+#     fig, ax = plt.subplots()
+#     for index, row in cad_df.iterrows():
+#         start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+#         end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+#         mask = (time >= start_time) & (time <= end_time)
+#         step_data = data[mask]
+#         step_times = time[mask]
+#
+#         detectors = ['zdc', 'mbd']
+#         types = ['raw', 'live']
+#
+#         step_rates = {'step': row['step']}
+#         for detector in detectors:
+#             for count_type in types:
+#                 col_name = f'{detector}_{count_type}_count'
+#
+#                 step_counts = step_data[col_name].diff().fillna(0)
+#                 step_time_diffs = step_times.diff().fillna(0)
+#                 step_rate = step_counts / step_time_diffs
+#                 avg_step_times, avg_step_rates = average_counts_in_time_windows(
+#                     np.array(step_times),
+#                     np.array(step_rate),
+#                     window_size=1
+#                 )
+#                 if detector == 'zdc' and count_type == 'raw':
+#                     ax.plot(avg_step_times, avg_step_rates, 'o-', markersize=1, label=f'Step {row["step"]}')
+#
+#                 # Count number of nans in avg_step_rates
+#                 nan_entries = np.sum(np.isnan(avg_step_rates))
+#
+#                 avg_step_rate = np.nanmean(avg_step_rates)
+#                 std_step_rate = np.nanstd(avg_step_rates)
+#
+#                 step_rates[f'{detector}_{count_type}_rate_mean'] = avg_step_rate
+#                 step_rates[f'{detector}_{count_type}_rate_std'] = std_step_rate
+#
+#         rates.append(step_rates)
+#
+#     # Save rates to CSV
+#     rates_df = pd.DataFrame(rates)
+#     rates_df.to_csv(out_path, index=False)
+#     print(f'Saved step raw rates to {out_path}')
+
+
+def compare_avg_total_step_rates(base_path, cad_df, sub_dir='vertex_data/', out_path='step_raw_rates.csv'):
     """
     Get the mean and standard deviations of the raw rates at each step from the data, using step boundaries from cad_df.
     """
-    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
-    cad_df['start'] = pd.to_datetime(cad_df['start'])
-    cad_df['end'] = pd.to_datetime(cad_df['end'])
-    run_start = cad_df.iloc[0]['start']
+    data, time = get_root_data_time(base_path, root_file_name='54733_slimmed.root', tree_name='calo_tree',
+                                    sub_dir=sub_dir,
+                                    branches=['BCO',
+                                              'GL1_clock_count', 'GL1_live_count',
+                                              'mbd_raw_count', 'mbd_live_count'])
+                                    # branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
+                                    #           'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
+                                    #           'GL1_clock_count', 'GL1_live_count',
+                                    #           'mbd_raw_count', 'zdc_raw_count', 'mbd_live_count', 'zdc_live_count',
+                                    #           'bunch'])
 
-    rates = []
-    fig, ax = plt.subplots()
-    for index, row in cad_df.iterrows():
-        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
-        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
-        mask = (time >= start_time) & (time <= end_time)
-        step_data = data[mask]
-        step_times = time[mask]
-
-        detectors = ['zdc', 'mbd']
-        types = ['raw', 'live']
-
-        step_rates = {'step': row['step']}
-        for detector in detectors:
-            for count_type in types:
-                col_name = f'{detector}_{count_type}_count'
-
-                step_counts = step_data[col_name].diff().fillna(0)
-                step_time_diffs = step_times.diff().fillna(0)
-                step_rate = step_counts / step_time_diffs
-                avg_step_times, avg_step_rates = average_counts_in_time_windows(
-                    np.array(step_times),
-                    np.array(step_rate),
-                    window_size=1
-                )
-                if detector == 'zdc' and count_type == 'raw':
-                    ax.plot(avg_step_times, avg_step_rates, 'o-', markersize=1, label=f'Step {row["step"]}')
-
-                # Count number of nans in avg_step_rates
-                nan_entries = np.sum(np.isnan(avg_step_rates))
-
-                avg_step_rate = np.nanmean(avg_step_rates)
-                std_step_rate = np.nanstd(avg_step_rates)
-
-                step_rates[f'{detector}_{count_type}_rate_mean'] = avg_step_rate
-                step_rates[f'{detector}_{count_type}_rate_std'] = std_step_rate
-
-        rates.append(step_rates)
-
-    # Save rates to CSV
-    rates_df = pd.DataFrame(rates)
-    rates_df.to_csv(out_path, index=False)
-    print(f'Saved step raw rates to {out_path}')
-
-
-def compare_avg_total_step_rates(data, time, cad_df, out_path='step_raw_rates.csv'):
-    """
-    Get the mean and standard deviations of the raw rates at each step from the data, using step boundaries from cad_df.
-    """
     fig, ax = plt.subplots()
     ax.plot(time, data['GL1_clock_count'] / 1e7, label='Gl1_clock_count')
     ax.plot(time, data['GL1_live_count'] / 1e7, label='Gl1_live_count')
@@ -501,54 +367,59 @@ def compare_avg_total_step_rates(data, time, cad_df, out_path='step_raw_rates.cs
     # clock_bin_centers = (clock_bins[:-1] + clock_bins[1:]) / 2
     # ax.plot(clock_bin_centers / 1e7, avg_mbd_live_rate, 'o-', markersize=1, label='Avg MBD Live Rate (Binned by GL1 Clock Count)')
 
-    def compute_rate_sliding_window(data, clock_col, count_col, clock_freq_hz=10_000_000):
-        clock_counts = data[clock_col].values
-        detector_counts = data[count_col].values
+    # def compute_rate_sliding_window(data, clock_col, count_col, clock_freq_hz=10_000_000):
+    #     clock_counts = data[clock_col].values
+    #     detector_counts = data[count_col].values
+    #
+    #     start_idx = 0
+    #     result = []
+    #
+    #     while True:
+    #         # Current clock and count
+    #         start_clock = clock_counts[start_idx]
+    #         target_clock = start_clock + clock_freq_hz
+    #
+    #         # Find the first index where the clock exceeds the 1-second mark
+    #         end_idx = np.searchsorted(clock_counts[start_idx:], target_clock, side='left') + start_idx
+    #
+    #         if end_idx >= len(clock_counts):
+    #             break  # no more data beyond 1 second
+    #
+    #         delta_clock = clock_counts[end_idx] - clock_counts[start_idx]
+    #         delta_count = detector_counts[end_idx] - detector_counts[start_idx]
+    #
+    #         rate = delta_count / (delta_clock / clock_freq_hz)
+    #         mid_time = (clock_counts[start_idx] + clock_counts[end_idx]) / 2 / clock_freq_hz  # optional, for x-axis
+    #
+    #         result.append((mid_time, rate))
+    #         start_idx = end_idx
+    #
+    #     # Convert to DataFrame
+    #     return pd.DataFrame(result, columns=['time_sec', 'rate_hz'])
 
-        start_idx = 0
-        result = []
-
-        for start_idx in range(len(data)):
-            # Current clock and count
-            start_clock = clock_counts[start_idx]
-            target_clock = start_clock + clock_freq_hz
-
-            # Find the first index where the clock exceeds the 1-second mark
-            end_idx = np.searchsorted(clock_counts, target_clock, side='left')
-
-            if end_idx >= len(clock_counts):
-                break  # no more data beyond 1 second
-
-            delta_clock = clock_counts[end_idx] - clock_counts[start_idx]
-            delta_count = detector_counts[end_idx] - detector_counts[start_idx]
-
-            rate = delta_count / (delta_clock / clock_freq_hz)
-            mid_time = (clock_counts[start_idx] + clock_counts[end_idx]) / 2 / clock_freq_hz  # optional, for x-axis
-
-            result.append((mid_time, rate))
-
-        # Convert to DataFrame
-        return pd.DataFrame(result, columns=['time_sec', 'rate_hz'])
-
-    mbd_live_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'mbd_live_count')
-    mbd_raw_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'mbd_raw_count')
-    clock_live_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'GL1_live_count')
+    # mbd_live_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'mbd_live_count')
+    # mbd_raw_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'mbd_raw_count')
+    # clock_live_rate_df = compute_rate_sliding_window(data, 'GL1_clock_count', 'GL1_live_count')
+    mbd_live_rate_df = compute_rate_sliding_window_bco(data, time, 'mbd_live_count')
+    mbd_raw_rate_df = compute_rate_sliding_window_bco(data, time,'mbd_raw_count')
+    clock_live_rate_df = compute_rate_sliding_window_bco(data, time, 'GL1_live_count')
+    clock_raw_rate_df = compute_rate_sliding_window_bco(data, time, 'GL1_clock_count')
+    cor_mbd_rate = mbd_live_rate_df['rate_hz'] / (clock_live_rate_df['rate_hz'] / clock_raw_rate_df['rate_hz'])
     fig, ax = plt.subplots()
-    ax.plot(mbd_raw_rate_df['time_sec'], mbd_raw_rate_df['rate_hz'], 'o-', markersize=1, label='MBD Raw Rate')
-    ax.plot(mbd_live_rate_df['time_sec'], mbd_live_rate_df['rate_hz'], 'o-', markersize=1, label='MBD Live Rate')
-    ax.plot(clock_live_rate_df['time_sec'], mbd_live_rate_df['rate_hz'] / (clock_live_rate_df['rate_hz'] / 1e7), 'o-', markersize=1, label='MBD Live->Raw Rate')
+    ax.plot(mbd_raw_rate_df['time_sec'], mbd_raw_rate_df['rate_hz'], 'o-', markersize=1, color='blue', label='MBD Raw Rate')
+    ax.plot(mbd_live_rate_df['time_sec'], mbd_live_rate_df['rate_hz'], 'o-', markersize=1, color='orange', label='MBD Live Rate')
+    ax.plot(clock_live_rate_df['time_sec'], cor_mbd_rate, 'o-', markersize=1, color='red', label='MBD Live->Raw Rate')
     ax.set_xlabel('Time (s)')
     ax.legend()
 
-    plt.show()
+    # plt.show()
 
     step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
     cad_df['start'] = pd.to_datetime(cad_df['start'])
     cad_df['end'] = pd.to_datetime(cad_df['end'])
     run_start = cad_df.iloc[0]['start']
 
-    rates = []
-    fig, ax = plt.subplots()
+    mid_times, avg_raw_rates, avg_cor_rates, se_raw_rates, se_cor_rates = [], [], [], [], []
     for index, row in cad_df.iterrows():
         start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
         end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
@@ -557,35 +428,53 @@ def compare_avg_total_step_rates(data, time, cad_df, out_path='step_raw_rates.cs
         step_data = data[mask]
         step_times = time[mask]
 
-        # detectors = ['zdc', 'mbd']
-        # types = ['raw', 'live']
-        detectors = ['zdc']
-        types = ['raw']
+        mbd_live_rate_step_df = compute_rate_sliding_window_bco(step_data, step_times, 'mbd_live_count')
+        mbd_raw_rate_step_df = compute_rate_sliding_window_bco(step_data, step_times, 'mbd_raw_count')
+        clock_live_rate_step_df = compute_rate_sliding_window_bco(step_data, step_times, 'GL1_live_count')
+        clock_raw_rate_step_df = compute_rate_sliding_window_bco(step_data, step_times, 'GL1_clock_count')
+        cor_mbd_step_rate = mbd_live_rate_step_df['rate_hz'] / (clock_live_rate_step_df['rate_hz'] / clock_raw_rate_step_df['rate_hz'])
 
-        step_rates = {'step': row['step']}
-        col_name = f'zdc_raw_count'
+        mid_step_time = start_time + step_duration / 2
+        avg_mbd_live_step_rate = np.mean(mbd_live_rate_step_df['rate_hz'])
+        avg_mbd_raw_step_rate = np.mean(mbd_raw_rate_step_df['rate_hz'])
+        avg_cor_mbd_step_rate = np.mean(cor_mbd_step_rate)
 
-        clock_diffs = step_data['clock_raw_count'].diff().fillna(0)
+        se_raw_rate = ((step_data['mbd_raw_count'].iloc[-1] - step_data['mbd_raw_count'].iloc[0]) /
+                       (step_times.iloc[-1] - step_times.iloc[0]))
+        se_live_rate = ((step_data['mbd_live_count'].iloc[-1] - step_data['mbd_live_count'].iloc[0]) /
+                       (step_times.iloc[-1] - step_times.iloc[0]))
+        se_clock_raw_rate = ((step_data['GL1_clock_count'].iloc[-1] - step_data['GL1_clock_count'].iloc[0]) /
+                             (step_times.iloc[-1] - step_times.iloc[0]))
+        se_clock_live_rate = ((step_data['GL1_live_count'].iloc[-1] - step_data['GL1_live_count'].iloc[0]) /
+                              (step_times.iloc[-1] - step_times.iloc[0]))
+        se_cor_rate = se_live_rate / (se_clock_live_rate / se_clock_raw_rate)
 
-        step_counts = step_data[col_name].diff().fillna(0)
-        step_time_diffs = step_times.diff().fillna(0)
-        step_rate = step_counts / step_time_diffs
-        avg_step_times, avg_step_rates = average_counts_in_time_windows(
-            np.array(step_times),
-            np.array(step_rate),
-            window_size=1
-        )
-        # if detector == 'zdc' and count_type == 'raw':
-        #     ax.plot(avg_step_times, avg_step_rates, 'o-', markersize=1, label=f'Step {row["step"]}')
+        ax.scatter([mid_step_time], [avg_mbd_live_step_rate], marker='s', s=100, zorder=2, color='orange')
+        ax.scatter([mid_step_time], [avg_mbd_raw_step_rate], marker='s', s=100, zorder=2, color='blue')
+        ax.scatter([mid_step_time], [avg_cor_mbd_step_rate], marker='s', s=100, zorder=2, color='red')
+        ax.scatter([mid_step_time], [se_raw_rate], marker='^', s=100, zorder=2, color='blue')
+        ax.scatter([mid_step_time], [se_cor_rate], marker='^', s=100, zorder=2, color='red')
 
-        print(f'avg_step_rates: {avg_step_rates}')
-        print(f'avg_avg_step_rate: {np.nanmean(avg_step_rates)}')
-        print(f'last step count minus first step count: {(step_data[col_name].iloc[-1] - step_data[col_name].iloc[0]) / step_duration}')
-        print(f'last step count minus first step count clock: '
-              f'{(step_data[col_name].iloc[-1] - step_data[col_name].iloc[0]) / step_data["clock_raw_count"].iloc[-1] - step_data["clock_raw_count"].iloc[0]}')
 
-        avg_step_rate = np.nanmean(avg_step_rates)
-        std_step_rate = np.nanstd(avg_step_rates)
+        mid_times.append(mid_step_time)
+        avg_raw_rates.append(avg_mbd_raw_step_rate)
+        avg_cor_rates.append(avg_cor_mbd_step_rate)
+        se_raw_rates.append(se_raw_rate)
+        se_cor_rates.append(se_cor_rate)
+
+    fig, ax = plt.subplots()
+    ax.scatter(mid_times, np.array(avg_raw_rates) - np.array(avg_cor_rates))
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('MBD Raw - Corrected Rate (Hz)')
+    fig.tight_layout()
+
+    fig, ax = plt.subplots()
+    ax.scatter(mid_times, np.array(avg_raw_rates) / np.array(avg_cor_rates))
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('MBD Raw / Corrected Rate (Hz)')
+    fig.tight_layout()
+
+    plt.show()
 
 
 def compare_scaled_live_triggers_steps(data, time, cad_df):
@@ -690,6 +579,9 @@ def get_step_rates(scan_path, cad_df):
     """
     Get the rates at each step from the data, using step boundaries defined in cad_df.
     """
+    detectors = ['zdc', 'mbd']
+    types = ['raw', 'live', 'cor']
+
     data, time = get_root_data_time(scan_path)
 
     step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
@@ -703,18 +595,25 @@ def get_step_rates(scan_path, cad_df):
         end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
         mask = (time >= start_time) & (time <= end_time)
         step_data = data[mask]
-        step_duration = end_time - start_time
+        # step_duration = end_time - start_time
 
-        detectors = ['zdc', 'mbd']
-        types = ['raw', 'live']
+        step_times = time[mask]
+        step_fine_dur = step_times.iloc[-1] - step_times.iloc[0]
+        clock_raw_rate = (step_data['GL1_clock_count'].iloc[-1] - step_data['GL1_clock_count'].iloc[0]) / step_fine_dur
+        clock_live_rate = (step_data['GL1_live_count'].iloc[-1] - step_data['GL1_live_count'].iloc[0]) / step_fine_dur
+        clock_scale = clock_raw_rate / clock_live_rate
 
         step_rates = {'step': row['step']}
         for detector in detectors:
             for count_type in types:
-                col_name = f'{detector}_{count_type}_count'
+                col_name = f'{detector}_{count_type}_count' if count_type != 'cor' else f'{detector}_live_count'
+                rate = (step_data[col_name].iloc[-1] - step_data[col_name].iloc[0]) / step_fine_dur
 
-                counts = step_data[col_name].diff().fillna(0)
-                rate = counts.sum() / step_duration  # Total counts divided by duration gives rate
+                if count_type == 'cor':
+                    rate *= clock_scale
+
+                # counts = step_data[col_name].diff().fillna(0)
+                # rate = counts.sum() / step_duration  # Total counts divided by duration gives rate
                 step_rates[f'{detector}_{count_type}_rate'] = rate
 
         rates.append(step_rates)
@@ -750,6 +649,36 @@ def average_counts_in_time_windows(time_array, counts_array, window_size, bin_st
 
     return bin_centers, averages
 
+
+def compute_rate_sliding_window_bco(data, time, count_col, time_step=1):
+    detector_counts = data[count_col].values
+    time = time.values
+
+    start_idx = 0
+    result = []
+
+    while True:
+        # Current clock and count
+        start_time = time[start_idx]
+        target_time = start_time + time_step
+
+        # Find the first index where the clock exceeds the 1-second mark
+        end_idx = np.searchsorted(time[start_idx:], target_time, side='left') + start_idx
+
+        if end_idx >= len(time):
+            break  # no more data beyond 1 second
+
+        delta_time = time[end_idx] - time[start_idx]
+        delta_count = detector_counts[end_idx] - detector_counts[start_idx]
+
+        rate = delta_count / delta_time
+        mid_time = (time[start_idx] + time[end_idx]) / 2
+
+        result.append((mid_time, rate))
+        start_idx = end_idx
+
+    # Convert to DataFrame
+    return pd.DataFrame(result, columns=['time_sec', 'rate_hz'])
 
 
 if __name__ == '__main__':

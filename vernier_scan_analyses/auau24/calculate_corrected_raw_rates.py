@@ -11,7 +11,6 @@ Created as sPHENIX_Vernier_Scan_Simulation/calculate_raw_rates
 import platform
 import numpy as np
 import matplotlib.pyplot as plt
-from IPython.core.pylabtools import figsize
 from scipy.interpolate import interp1d
 import pandas as pd
 
@@ -33,7 +32,7 @@ def main():
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     plot_out_path = f'{base_path}Figures/zvertex_cut_plots/'
 
-    # get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
+    get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
     add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)
     # compare_mbd_corrected_to_zdc(base_path)
 
@@ -62,9 +61,9 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
     fit_range = [-200, 200]
     z_cut = 200  # cm, cut for the MBD
-    steps = [5]
+    # steps = [5]
     # steps = [0, 6, 12, 18]
-    # steps = np.arange(0, 25)
+    steps = np.arange(0, 25)
     # plot_out_path = None
 
     # Get the vz fraction outside of the cut for data from no ZDC coincidence and from simulation with ZDC coincidence

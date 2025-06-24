@@ -69,7 +69,7 @@ def merge_cad_rates_df(cad_df, rates_df):
 
 
 def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, count_errs_list, sim_settings,
-                       metrics=('chi2')):
+                       metrics=('chi2',)):
     beam_width_x, beam_width_y, beta_star_x, beta_star_y, yellow_angle_dx, blue_offset_dx, yellow_angle_dy, blue_offset_dy = params
     # collider_sim.set_bunch_beta_stars(beta_star_x, beta_star_y)
     collider_sim.set_bunch_beta_stars(beta_star_x, beta_star_x)
@@ -132,8 +132,8 @@ def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, 
         count_errs = count_errs_list[data_index]
         fit_mask = (centers > sim_settings['fit_range'][0]) & (centers < sim_settings['fit_range'][1])
 
-        # if data_index == 0:  # Fix the amplitude in the first head-on step
-        if True:  # Fix the amplitude in the first head-on step
+        if data_index == 0:  # Fix the amplitude in the first head-on step
+        # if True:  # Fix the amplitude in the first head-on step
             fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])
         else:
             # fit_amp_shift(collider_sim, counts[fit_mask], centers[fit_mask], count_errs[fit_mask])

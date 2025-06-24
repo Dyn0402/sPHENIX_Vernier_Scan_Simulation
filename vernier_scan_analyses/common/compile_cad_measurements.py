@@ -25,6 +25,7 @@ def main():
     else:
         base_path = '/local/home/dn277127/Bureau/'
     scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    root_file_name = 'calofit_54733.root'
 
     if scan_path.split('/')[-2] == 'auau_oct_16_24':
         pre_run_buffer = 100  # seconds to remove from the start of the scan
@@ -50,7 +51,7 @@ def main():
     df = df.merge(emittance_df, on='mid_time', how='left')
 
     # Add rates to the dataframe
-    rates_df = get_step_rates(scan_path, df)
+    rates_df = get_step_rates(scan_path, df, root_file_name)
     df = df.merge(rates_df, on='step', how='left')
 
     # Write the dataframe to a CSV file

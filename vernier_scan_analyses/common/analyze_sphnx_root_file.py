@@ -575,14 +575,17 @@ def compare_new_old_root_file(base_path, data, time):
             print(f'Index {i}: New MBD Z Vtx: {mbd_z_vtx}, Old MBD Z Vtx: {mbd_z_vtx_old}')
 
 
-def get_step_rates(scan_path, cad_df):
+def get_step_rates(scan_path, cad_df, root_file_name=None):
     """
     Get the rates at each step from the data, using step boundaries defined in cad_df.
     """
     detectors = ['zdc', 'mbd']
     types = ['raw', 'live', 'cor']
 
-    data, time = get_root_data_time(scan_path)
+    if root_file_name is None:
+        data, time = get_root_data_time(scan_path)
+    else:
+        data, time = get_root_data_time(scan_path, root_file_name)
 
     step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
     cad_df['start'] = pd.to_datetime(cad_df['start'])

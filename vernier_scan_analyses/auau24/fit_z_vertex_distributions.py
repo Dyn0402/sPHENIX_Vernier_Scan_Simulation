@@ -8,7 +8,6 @@ Created as sPHENIX_Vernier_Scan_Simulation/fit_z_vertex_distributions
 @author: Dylan Neff, dn277127
 """
 
-import platform
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,20 +21,17 @@ from BunchCollider import BunchCollider
 from z_vertex_fitting_common import (fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2,
                                      load_vertex_distributions, merge_cad_rates_df)
 from Measure import Measure
+from common_logistics import set_base_path
 
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
-
+    base_path = set_base_path()
     base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
 
-    fit_beta_star_to_head_on_steps(base_path)
+    # fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
     # fit_beam_widths(base_path)
-    # plot_beta_star_head_on_fit_results(base_path)
+    plot_beta_star_head_on_fit_results(base_path)
     # plot_beam_width_fit_results(base_path)
     plt.show()
     print('donzo')
@@ -163,11 +159,10 @@ def fit_beta_star_to_head_on_steps(base_path):
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
-    rates_path = f'{base_path}step_raw_rates.csv'
     # out_name = 'beta_star_fit_results.csv'
     # out_name = 'beta_star_fit_results_zdc_cor_rate_bw130.csv'
     # out_name = 'beta_star_fit_results_zdc_raw_rate_bw130.csv'
-    out_name_base = 'beta_star_fit_results_.csv'
+    out_name_base = 'beta_star_fit_results_'
     # out_name = 'beta_star_fit_results_mbd_z200_rate_bw110.csv'
     # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
     # rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
@@ -176,8 +171,6 @@ def fit_beta_star_to_head_on_steps(base_path):
     bws = [110, 130]
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
-    rates_df = pd.read_csv(rates_path)
-    cad_df = merge_cad_rates_df(cad_df, rates_df)
 
     fit_range = [-200, 200]
     steps = [0, 6, 12, 18, 24]
@@ -326,8 +319,8 @@ def plot_beta_star_head_on_fit_results(base_path):
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results.csv')
 
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw110.csv')
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw130.csv')  # Nominal
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw130.csv')  # Nominal
+    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw130.csv')
 

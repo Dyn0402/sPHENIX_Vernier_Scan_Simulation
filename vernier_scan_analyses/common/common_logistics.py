@@ -19,7 +19,7 @@ def set_base_path():
         return 'F:/Saclay/'
     elif platform.system() == 'Linux' and platform.node() == 'dylan-MS-7C84':
         return '/media/ucla/Saclay/'
-    elif platform.system() == 'Linux' and platform.node() == 'dn277127':
+    elif platform.system() == 'Linux' and platform.node() == 'dphnpct50.extra.cea.fr':
         return '/local/home/dn277127/Bureau/'
     else:
         raise ValueError(f"Unknown platform or hostname: {platform.system()} on {platform.node()}")

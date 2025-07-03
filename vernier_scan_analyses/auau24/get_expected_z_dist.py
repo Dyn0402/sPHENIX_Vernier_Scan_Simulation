@@ -19,7 +19,8 @@ import uproot
 from datetime import datetime, time
 
 from BunchCollider import BunchCollider
-from z_vertex_fitting_common import fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2
+from z_vertex_fitting_common import fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2, load_vertex_distributions
+from common_logistics import set_base_path
 
 
 def main():
@@ -27,11 +28,11 @@ def main():
     # auau_data_comp()
     # auau_compare_profiles()
     # auau_pull_cad_step_data()
-    # auau_plot_all_steps()
+    auau_plot_all_steps()
     # auau_tests()
     # auau_minimization()
     # auau_manual_simple_minimization()
-    auau_manual_simple_beta_star_minimization()
+    # auau_manual_simple_beta_star_minimization()
     # auau_single_dist_bw_min()
     # auau_residuals_vs_beam_width()
     # auau_single_dist_multi_par_opt()
@@ -313,10 +314,7 @@ def auau_pull_cad_step_data():
 
 
 def auau_plot_all_steps():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
 
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
@@ -361,7 +359,7 @@ def auau_plot_all_steps():
                 count_errs[count_errs == 0] = 1
 
             # Normalize counts to ZDC rate
-            zdc_raw_rate = cad_step_row['zdc_raw_rate']
+            zdc_raw_rate = cad_step_row['zdc_cor_rate']
             zdc_hist_counts = np.sum(counts)
             hist_scaling_factor = zdc_raw_rate / zdc_hist_counts
 
@@ -375,11 +373,11 @@ def auau_plot_all_steps():
             counts *= dcct_scale
             counts_no_zdc *= dcct_scale
 
-            beam_width_scale = 0.9
-            beta_star = 72  # cm
-            bkg = 2.0e-17
+            # beam_width_scale = 0.9
+            beta_star = 77.15  # cm
+            bkg = 0.0e-17
             gauss_eff_width = 500
-            mbd_resolution = 2.0
+            mbd_resolution = 1.0
             blue_angle_x = -cad_step_row['blue angle h'] * 1e-3
             blue_angle_y = -cad_step_row['blue angle v'] * 1e-3
             yellow_angle_x = -cad_step_row['yellow angle h'] * 1e-3
@@ -390,8 +388,9 @@ def auau_plot_all_steps():
             em_blue_horiz, em_blue_vert = cad_step_row['blue_horiz_emittance'], cad_step_row['blue_vert_emittance']
             em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row['yellow_vert_emittance']
 
-            beam_width_x = 205 / np.sqrt(2) * beam_width_scale
-            beam_width_y = 205 / np.sqrt(2) * beam_width_scale
+            # beam_width_x = 205 / np.sqrt(2) * beam_width_scale
+            # beam_width_y = 205 / np.sqrt(2) * beam_width_scale
+            beam_width_x, beam_width_y = 129.2, 125.7  # microns
 
             blue_widths = np.array([beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
                                     beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)])
@@ -416,7 +415,8 @@ def auau_plot_all_steps():
                 yellow_profile_path = longitudinal_profile_path.replace('COLOR_', 'yellow_')
                 collider_sim.set_longitudinal_profiles_from_file(blue_profile_path, yellow_profile_path)
 
-                for offset_type in ['set', 'measured']:
+                # for offset_type in ['set', 'measured']:
+                for offset_type in ['set']:
                     if offset_type == 'set':
                         blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
                     elif offset_type == 'measured':

@@ -30,8 +30,8 @@ def main():
 
     # fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
-    fit_beam_widths(base_path)
-    # plot_beta_star_head_on_fit_results(base_path)
+    # fit_beam_widths(base_path)
+    plot_beta_star_head_on_fit_results(base_path)
     plot_beam_width_fit_results(base_path)
     plt.show()
     print('donzo')
@@ -388,7 +388,8 @@ def plot_beam_width_fit_results(base_path):
     """
     Plot the results of the beam width fit.
     """
-    all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results.csv')
+    # all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results.csv')
+    all_results_df = pd.read_csv(f'{base_path}beam_width_fit_results_zdc_cor_rate.csv')
     skip_steps = [1, 7, 13, 19]  # Skip steps at 100 microns, less sensitive to beam width
     bw_range = (110, 150)  # Range of beam widths in micrometers
 

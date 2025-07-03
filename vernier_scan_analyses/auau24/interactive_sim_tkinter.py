@@ -50,7 +50,7 @@ class PlotSimulatorApp:
         self.em_yel_horiz_nom, self.em_yel_vert_nom = self.step_0['yellow_horiz_emittance'], self.step_0['yellow_vert_emittance']
 
         # Steps: fill this with your real data
-        # self.steps = [0, 2, 3, 4, 5]
+        # self.steps = [0, 2, 4, 5, 6]
         self.steps = [0, 6, 12, 18, 24]
         self.raw_data = {}  # Map from step -> (centers_no_zdc, counts_no_zdc, centers, counts)
 
@@ -61,7 +61,7 @@ class PlotSimulatorApp:
         self.load_raw_data()
 
         # Simulation object placeholder
-        self.collider_sim = BunchCollider()  # You assign this externally
+        self.collider_sim = BunchCollider()
 
         # Define parameters with default values
         self.n_xy_points = tk.IntVar(value=31)

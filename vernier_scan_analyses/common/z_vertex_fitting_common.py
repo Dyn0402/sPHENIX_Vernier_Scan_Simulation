@@ -152,14 +152,15 @@ def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, 
             total_scaled_resid += scaled_resid
 
         if sim_settings.get('plot', False):
+            interp_sim_plot = np.interp(centers, zs, z_dist)
             fig, ax = plt.subplots(2, 1, figsize=(8, 6), sharex=True, gridspec_kw={'height_ratios': [3, 1]})
             ax[0].errorbar(centers, counts, yerr=count_errs, fmt='o', label='Data', color='black', markersize=4)
-            ax[0].plot(centers, interp_sim, label='Simulation', color='blue')
+            ax[0].plot(centers, interp_sim_plot, label='Simulation', color='blue')
             ax[0].set_ylabel('Counts')
             ax[0].legend()
             ax[0].set_title(f'Step {scan_step}, Chi2={chi2:.2f}')
 
-            residuals = (counts - interp_sim) / count_errs
+            residuals = (counts - interp_sim_plot) / count_errs
             ax[1].plot(centers[fit_mask], residuals[fit_mask], 'o', color='red')
             ax[1].axhline(0, color='gray', linestyle='--')
             ax[1].set_ylabel('Residuals')
@@ -189,6 +190,54 @@ def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, 
         return total_chi2
 
     return None
+
+
+def set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom, em_yel_nom, profile_path):
+    em_blue_horiz, em_blue_vert = cad_step_row['blue_horiz_emittance'], cad_step_row['blue_vert_emittance']
+    em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row['yellow_vert_emittance']
+
+    em_blue_horiz_nom, em_blue_vert_nom = em_blue_nom
+    em_yel_horiz_nom, em_yel_vert_nom = em_yel_nom
+
+    # blue_widths = np.array([
+    #     beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+    #     beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+    # ])
+    # yellow_widths = np.array([
+    #     beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+    #     beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+    # ])
+
+    blue_widths = np.array([
+        beam_width_x * (em_blue_horiz / em_blue_horiz_nom),
+        beam_width_y * (em_blue_vert / em_blue_vert_nom)
+    ])
+    yellow_widths = np.array([
+        beam_width_x * (em_yel_horiz / em_yel_horiz_nom),
+        beam_width_y * (em_yel_vert / em_yel_vert_nom)
+    ])
+
+    collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
+
+    blue_angle_x = -cad_step_row['blue angle h'] * 1e-3
+    blue_angle_y = -cad_step_row['blue angle v'] * 1e-3
+    yellow_angle_x = -cad_step_row['yellow angle h'] * 1e-3
+    yellow_angle_y = -cad_step_row['yellow angle v'] * 1e-3
+
+    blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
+    yellow_offset_x, yellow_offset_y = 0, 0
+
+    collider_sim.set_bunch_crossing(blue_angle_x, blue_angle_y, yellow_angle_x, yellow_angle_y)
+
+    collider_sim.set_bunch_offsets(
+        [blue_offset_x, blue_offset_y],
+        [yellow_offset_x, yellow_offset_y]
+    )
+
+    collider_sim.set_longitudinal_profiles_from_file(
+        profile_path.replace('COLOR_', 'blue_'),
+        profile_path.replace('COLOR_', 'yellow_')
+    )
 
 
 def fit_amp_shift(collider_sim, z_dist_data, zs_data, z_dist_errs=None):
@@ -285,7 +334,7 @@ def shift_only_residual(x, collider_sim, shift_0, z_dist_data, zs_data, z_dist_e
     return resid
 
 
-def get_profile_path(profile_dir_path, start_time, end_time, return_all=False):
+def get_profile_path(profile_dir_path, start_time, end_time, return_all=False, bunch_num=None):
     """
     Returns a list of full paths to all blue/yellow profile files in the given directory
     between start_datetime and end_datetime (inclusive),
@@ -296,11 +345,13 @@ def get_profile_path(profile_dir_path, start_time, end_time, return_all=False):
     if isinstance(end_time, str):
         end_time = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
 
+    starts_with = 'avg_' if bunch_num is None else f'bunch_{bunch_num}_'
+
     # Get all files in the directory
-    all_files = [f for f in os.listdir(profile_dir_path) if f.endswith('.dat') and f.startswith('avg_')]
+    all_files = [f for f in os.listdir(profile_dir_path) if f.endswith('.dat') and f.startswith(starts_with)]
 
     # Filter files that match the expected pattern
-    blue_files = [f for f in all_files if f.startswith("avg_blue_profile_24_")]
+    blue_files = [f for f in all_files if f.startswith(f"{starts_with}blue_profile_24_")]
     blue_times = [datetime.combine(start_time.date(), extract_time_from_filename(f)) for f in blue_files]
     blue_times, blue_files = zip(*sorted(zip(blue_times, blue_files)))  # Sort blue files and times together by time
     good_files = []

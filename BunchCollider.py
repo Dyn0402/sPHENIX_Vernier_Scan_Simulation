@@ -252,11 +252,21 @@ class BunchCollider:
         if print_params:
             print(self)
 
+        # self.average_density_product_xyz = 0
+        # with Pool(max_workers=self.parallel_threads) as pool:
+        #     density_products = pool.map(self.compute_time_step, range(self.n_points_t))
+        # self.average_density_product_xyz = np.mean([p for p in density_products], axis=0)
+        # self.z_dist = np.sum(self.average_density_product_xyz, axis=(0, 1))
+
         self.average_density_product_xyz = 0
         with Pool(max_workers=self.parallel_threads) as pool:
             density_products = pool.map(self.compute_time_step, range(self.n_points_t))
-        self.average_density_product_xyz = np.mean([p for p in density_products], axis=0)
-        self.z_dist = np.sum(self.average_density_product_xyz, axis=(0, 1))
+        density_products = np.array([p for p in density_products])  # shape: (n_points_t, n_points_x, n_points_y, n_points_z)
+        integrated_over_t = np.trapezoid(density_products, dx=self.bunch1.dt, axis=0)
+        integrated_over_tx = np.trapezoid(integrated_over_t, x=self.x, axis=0)
+        integrated_over_txy = np.trapezoid(integrated_over_tx, x=self.y, axis=0)
+        self.average_density_product_xyz = integrated_over_t
+        self.z_dist = integrated_over_txy
 
     def get_grid_info(self):
         """
@@ -295,7 +305,6 @@ class BunchCollider:
             z_dist = gaussian_filter1d(z_dist, self.gaus_smearing_sigma / z_spacing)
         return z_vals, z_dist
 
-
     def get_x_density_dist(self):
         x_vals = self.x
         x_dist = np.sum(self.average_density_product_xyz, axis=(1, 2))
@@ -305,7 +314,6 @@ class BunchCollider:
         y_vals = self.y
         y_dist = np.sum(self.average_density_product_xyz, axis=(0, 2))
         return y_vals, y_dist
-
 
     def get_relativistic_moller_factor(self):
         """
@@ -320,18 +328,35 @@ class BunchCollider:
         moller_factor = np.sqrt(np.linalg.norm(v1 - v2)**2 - np.linalg.norm(np.cross(v1, v2))**2 / self.bunch1.c**2)
         return moller_factor
 
-    def get_naked_luminosity(self):
+    def get_naked_luminosity_old(self):
         """
         Calculate the luminosity corresponding to a single particle in each bunch colliding at 1Hz.
         Assuming head on so Moller factor is 2c.
         :return:
         """
         # integral = np.sum(self.average_density_product_xyz)
-        integral = np.sum(self.z_dist)
+        # integral = np.sum(self.z_dist)
         grid_info = self.get_grid_info()
-        luminosity = integral * grid_info['dx'] * grid_info['dy'] * grid_info['dz'] * grid_info['n_points_t'] * grid_info['dt']
+        # luminosity = integral * grid_info['dx'] * grid_info['dy'] * grid_info['dz'] * grid_info['n_points_t'] * grid_info['dt']
         # luminosity = luminosity * 2 * self.bunch1.c  # 2c for head on
+        luminosity = np.trapezoid(self.z_dist, self.z) * grid_info['dx'] * grid_info['dy'] * grid_info['n_points_t'] * grid_info['dt']
+        # print(f'Old lumi: {luminosity}, new lumi: {new_lumi}')
         luminosity = luminosity * self.get_relativistic_moller_factor()
+        return luminosity
+
+    def get_naked_luminosity(self, observed=False):
+        """
+        Calculate the luminosity corresponding to a single particle in each bunch colliding at 1Hz.
+        Assuming head on so Moller factor is 2c.
+        :param observed: If True, return the luminosity as observed in the z distribution.
+        :return:
+        """
+        if observed:
+            zs, z_dist = self.get_z_density_dist()
+            zs = zs * 1e4  # Convert from cm back to um for the luminosity calculation
+        else:
+            zs, z_dist = self.z, self.z_dist
+        luminosity = np.trapezoid(z_dist, zs) * self.get_relativistic_moller_factor()
         return luminosity
 
     # def get_params(self):

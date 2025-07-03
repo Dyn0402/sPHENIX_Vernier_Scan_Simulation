@@ -66,7 +66,9 @@ def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name
     """
     if branches is None:
         branches = ['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger', 'mbd_raw_count', 'zdc_raw_count',
-                    'GL1_clock_count', 'GL1_live_count', 'mbd_live_count', 'zdc_live_count']
+                    'GL1_clock_count', 'GL1_live_count', 'mbd_live_count', 'zdc_live_count',
+                    'mbd_S_raw_count', 'mbd_N_raw_count', 'mbd_S_live_count', 'mbd_N_live_count',
+                    'zdc_S_raw_count', 'zdc_N_raw_count', 'zdc_S_live_count', 'zdc_N_live_count',]
 
     root_file_path = f'{scan_path}{sub_dir}{root_file_name}'
 
@@ -579,7 +581,7 @@ def get_step_rates(scan_path, cad_df, root_file_name=None):
     """
     Get the rates at each step from the data, using step boundaries defined in cad_df.
     """
-    detectors = ['zdc', 'mbd']
+    detectors = ['zdc', 'mbd', 'zdc_N', 'zdc_S', 'mbd_N', 'mbd_S']
     types = ['raw', 'live', 'cor']
 
     if root_file_name is None:

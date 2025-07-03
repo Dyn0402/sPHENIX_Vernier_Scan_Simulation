@@ -20,6 +20,7 @@ import uproot
 
 from BunchCollider import BunchCollider
 from z_vertex_fitting_common import fit_amp_shift, fit_shift_only, get_profile_path
+from common_logistics import set_base_path
 
 
 def main():
@@ -34,10 +35,7 @@ class PlotSimulatorApp:
         self.master = master
         master.title("Simulation Viewer")
 
-        if platform.system() == 'Windows':
-            base_path = 'C:/Users/Dylan/Desktop/'
-        else:
-            base_path = '/local/home/dn277127/Bureau/'
+        base_path = set_base_path()
 
         base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
         self.longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
@@ -52,7 +50,7 @@ class PlotSimulatorApp:
         self.em_yel_horiz_nom, self.em_yel_vert_nom = self.step_0['yellow_horiz_emittance'], self.step_0['yellow_vert_emittance']
 
         # Steps: fill this with your real data
-        # self.steps = [0, 2, 4, 5, 6]
+        # self.steps = [0, 2, 3, 4, 5]
         self.steps = [0, 6, 12, 18, 24]
         self.raw_data = {}  # Map from step -> (centers_no_zdc, counts_no_zdc, centers, counts)
 
@@ -164,7 +162,7 @@ class PlotSimulatorApp:
                 count_errs[count_errs == 0] = 1
 
             # Normalize counts to ZDC rate
-            zdc_raw_rate = cad_step_row['zdc_raw_rate']
+            zdc_raw_rate = cad_step_row['zdc_cor_rate']
             zdc_hist_counts = np.sum(counts)
             hist_scaling_factor = zdc_raw_rate / zdc_hist_counts
 
@@ -229,14 +227,32 @@ class PlotSimulatorApp:
                 em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row[
                     'yellow_vert_emittance']
 
+                # blue_widths = np.array([
+                #     self.beam_width_x.get() * np.sqrt(em_blue_horiz / self.em_blue_horiz_nom),
+                #     self.beam_width_y.get() * np.sqrt(em_blue_vert / self.em_blue_vert_nom)
+                # ])
+                # yellow_widths = np.array([
+                #     self.beam_width_x.get() * np.sqrt(em_yel_horiz / self.em_yel_horiz_nom),
+                #     self.beam_width_y.get() * np.sqrt(em_yel_vert / self.em_yel_vert_nom)
+                # ])
+
                 blue_widths = np.array([
-                    self.beam_width_x.get() * np.sqrt(em_blue_horiz / self.em_blue_horiz_nom),
-                    self.beam_width_y.get() * np.sqrt(em_blue_vert / self.em_blue_vert_nom)
+                    self.beam_width_x.get() * (em_blue_horiz / self.em_blue_horiz_nom),
+                    self.beam_width_y.get() * (em_blue_vert / self.em_blue_vert_nom)
                 ])
                 yellow_widths = np.array([
-                    self.beam_width_x.get() * np.sqrt(em_yel_horiz / self.em_yel_horiz_nom),
-                    self.beam_width_y.get() * np.sqrt(em_yel_vert / self.em_yel_vert_nom)
+                    self.beam_width_x.get() * (em_yel_horiz / self.em_yel_horiz_nom),
+                    self.beam_width_y.get() * (em_yel_vert / self.em_yel_vert_nom)
                 ])
+
+                # blue_widths = np.array([
+                #     self.beam_width_x.get() * 1,
+                #     self.beam_width_y.get() * 1
+                # ])
+                # yellow_widths = np.array([
+                #     self.beam_width_x.get() * 1,
+                #     self.beam_width_y.get() * 1
+                # ])
 
                 self.collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
 

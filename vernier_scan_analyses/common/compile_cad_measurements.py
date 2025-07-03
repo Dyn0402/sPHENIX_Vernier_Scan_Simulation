@@ -8,22 +8,17 @@ Created as sPHENIX_Vernier_Scan_Simulation/compile_cad_measurements
 @author: Dylan Neff, dn277127
 """
 
-import platform
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from bpm_analysis import bpm_analysis, get_start_end_times
 from analyze_ions import analyze_ions
 from analyze_emittance import add_emittance_info_to_df
 from analyze_sphnx_root_file import get_step_rates
+from common_logistics import set_base_path
 
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
     scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     root_file_name = 'calofit_54733.root'
 

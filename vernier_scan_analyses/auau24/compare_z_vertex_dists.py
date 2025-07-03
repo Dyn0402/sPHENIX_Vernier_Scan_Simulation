@@ -13,13 +13,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from z_vertex_fitting_common import load_vertex_distributions
+from common_logistics import set_base_path
 
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
 
     step = 5
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'

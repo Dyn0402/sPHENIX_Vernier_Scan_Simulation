@@ -17,212 +17,27 @@ from scipy.signal import find_peaks
 from scipy.interpolate import interp1d
 
 from plot_cad_measurements import gaus_pdf
+from common_logistics import set_base_path
 from Measure import Measure
 
 
 def main():
     write_avg_longitudinal_profiles()
-    # fit_longitudinal_profiles()
-    # plot_profiles_vs_time()
+    # write_bunch_by_bunch_longitudinal_profiles()
     # compare_direct_profiles()
     # plot_abort_gaps()
+    # plot_profiles_for_an()
     print('donzo')
 
 
-def fit_longitudinal_profiles_old():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
-    cad_measurements_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/'
-
-    # min_time, max_time = 30, 75
-    min_time, max_time = 0, 106
-    # min_val = 1.5
-    min_val = 0.2
-    fit_range = [35, 70]
-    # max_pdf_val = 0.125 if vernier_scan_date == 'Aug12' else 0.1
-    beam_colors = ['blue', 'yellow']
-    plot_colors = ['blue', 'orange']
-    # beam_colors = ['blue']
-    # plot_colors = ['blue']
-    # sufx = '_21:33'
-    sufx = '_22'
-    peak_list = define_peaks()
-
-    write_out = True
-    p0 = None
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig2, ax2 = plt.subplots(figsize=(12, 6))
-
-    for beam_color, plot_color in zip(beam_colors, plot_colors):
-        file_path = f'{cad_measurements_path}VernierScan_AuAu_longitudinal_{beam_color}{sufx}.dat'
-        fit_out_path = f'{cad_measurements_path}VernierScan_AuAu_{beam_color}_longitudinal_fit{sufx}.dat'
-        with open(file_path, 'r') as f:
-            file_content = f.read()
-        lines = file_content.split('\n')
-        times, values = [[]], [[]]
-        for line in lines[1:]:
-            if line == '':
-                continue
-            columns = line.split('\t')
-            time, value = float(columns[0]), float(columns[1])
-            if len(times[-1]) > 0 and time < times[-1][-1]:
-                times.append([])
-                values.append([])
-            times[-1].append(time)
-            values[-1].append(value)
-
-        # For times less than 30 ns and greater than 75 ns set to 0
-        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-            bunch_vals = np.array(bunch_vals)
-            bunch_vals[(np.array(bunch_times) < min_time) | (np.array(bunch_times) > max_time)] = 0
-            values[bunch_i] = bunch_vals
-
-        full_time = 0
-        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-            bunch_vals = np.array(bunch_vals)
-            max_bunch_val = np.max(bunch_vals)
-            times_increasing = np.array(bunch_times)
-            times_increasing += full_time
-            full_time += bunch_times[-1]
-            if max_bunch_val > min_val:
-                ax.plot(bunch_times, bunch_vals / np.max(bunch_vals), color=plot_color)
-            ax2.plot(times_increasing, bunch_vals, color=plot_color)
-
-        # Fit all the bunches superimposed
-        fit_times, fit_vals, weird_one_times, weird_one_vals, weird_ones = [], [], [], [], 0
-        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-            if np.max(bunch_vals) < min_val:
-                continue
-            bin_width = bunch_times[1] - bunch_times[0]
-            bunch_times, bunch_vals = np.array(bunch_times), np.array(bunch_vals)
-            fit_mask = (bunch_times > fit_range[0]) & (bunch_times < fit_range[1])
-            vals = bunch_vals[fit_mask] / np.sum(bunch_vals[fit_mask]) / bin_width
-            fit_times.extend(list(bunch_times[fit_mask]))
-            fit_vals.extend(list(vals))
-
-            # if p0 is None:  # Get guess from first blue bunch
-                # p0, bounds, peak_xs = make_initial_guess_from_data(np.array(bunch_times), np.array(vals))
-                # p0, bounds, peak_xs = make_initial_guess_from_expectation(np.array(bunch_times), np.array(vals))
-        p0, bounds = build_manual_initial_guess(peak_list[beam_color])
-
-        print(f'{beam_color} {weird_ones} weird ones of {len(times)} bunches')
-
-        popt, pcov = cf(multi_gaus_pdf, fit_times, fit_vals, p0=p0, bounds=bounds)
-        perr = np.sqrt(np.diag(pcov))
-        pmeas = [Measure(p, e) for p, e in zip(popt, perr)]
-
-        fig_all, ax_all = plt.subplots(figsize=(8, 6))
-        x_plot = np.linspace(fit_times[0], fit_times[-1], 1000)
-        ax_all.plot(fit_times, fit_vals, color=plot_color, alpha=0.01, ls='none', marker='.', label='CAD Profiles')
-        ax_all.plot(x_plot, multi_gaus_pdf(x_plot, *p0), color='green', ls='-', label='Guess')
-        ax_all.plot(x_plot, p0[-3] / (1 + np.sum(p0[2::3])) * gaus_pdf(x_plot, *p0[-2:]), color='green', ls='--')
-        ax_all.plot(x_plot, multi_gaus_pdf(x_plot, *popt), color='red', ls='-', label='Fit')
-        ax_all.plot(x_plot, popt[-3] / (1 + np.sum(popt[2::3])) * gaus_pdf(x_plot, *popt[-2:]), color='red', ls='--')
-        ax_all.set_xlabel('Time (ns)')
-        ax_all.set_ylabel('Probability Density')
-        ax_all.set_title(
-            f'AuAu24 Vernier Scan {beam_color.capitalize()} Beam Longitudinal Bunch Density')
-        ax_all.set_xlim(min_time, max_time)
-        ax_all.legend(loc='upper right', fontsize=14)
-        ax_all.grid(True)
-        ax_all.set_xlim(30, 75)
-        fig_all.tight_layout()
-
-        if write_out:  # Write out fit parameters
-            # fig_all.savefig(fit_plots_out_path)
-            write_longitudinal_beam_profile_fit_parameters(fit_out_path, beam_color, pmeas)
-
-    ax.set_xlabel('Time (ns)')
-    ax.set_ylabel('Value')
-    ax.set_title('Longitudinal Beam Measurements vs Time')
-    ax.grid(True)
-
-    ax2.set_xlabel('Time (ns)')
-    ax2.set_ylabel('Value')
-    ax2.set_title('Longitudinal Beam Measurements vs Index')
-    ax2.grid(True)
-
-    fig.tight_layout()
-    fig2.tight_layout()
-
-    plt.show()
-
-
-def plot_profiles_vs_time():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
-    cad_measurements_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles/'
-
-    min_val = 0.2
-    plot_colors = {'blue': 'blue', 'yellow': 'orange'}
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig2, ax2 = plt.subplots(figsize=(12, 6))
-
-    for file_name in os.listdir(cad_measurements_path):
-        if not file_name.endswith('.dat'):
-            continue
-        file_name_parts = file_name.split('_')
-        beam_color = file_name_parts[0]
-        hour, minute, second = file_name_parts[1:]
-        file_path = f'{cad_measurements_path}{file_name}'
-        with open(file_path, 'r') as f:
-            file_content = f.read()
-        lines = file_content.split('\n')
-        times, values = [[]], [[]]
-        for line in lines[1:]:
-            if line == '':
-                continue
-            columns = line.split('\t')
-            time, value = float(columns[0]), float(columns[1])
-            if len(times[-1]) > 0 and time < times[-1][-1]:
-                times.append([])
-                values.append([])
-            times[-1].append(time)
-            values[-1].append(value)
-
-        full_time = 0
-        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-            bunch_vals = np.array(bunch_vals)
-            max_bunch_val = np.max(bunch_vals)
-            times_increasing = np.array(bunch_times)
-            times_increasing += full_time
-            full_time += bunch_times[-1]
-            if max_bunch_val > min_val:
-                ax.plot(bunch_times, bunch_vals / np.max(bunch_vals), color=plot_colors[beam_color], alpha=0.01)
-            ax2.plot(times_increasing, bunch_vals, color=plot_colors[beam_color])
-
-    ax.set_xlabel('Time (ns)')
-    ax.set_ylabel('Value')
-    ax.set_title('Longitudinal Beam Measurements vs Time')
-    ax.grid(True)
-
-    ax2.set_xlabel('Time (ns)')
-    ax2.set_ylabel('Value')
-    ax2.set_title('Longitudinal Beam Measurements vs Index')
-    ax2.grid(True)
-
-    fig.tight_layout()
-    fig2.tight_layout()
-
-    plt.show()
-
-
 def compare_direct_profiles():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
     cad_measurements_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
     # cad_measurements_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
     beam_color = 'blue'
-    blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_22_22_10.dat'
-    # blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_14_26_00.dat'
+    # blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_22_22_10.dat'
+    blue_profiles_test_path = f'{cad_measurements_path}{beam_color}_profile_24_22_26_00.dat'
+    # blue_profiles_test_path = f'{cad_measurements_path}profiles_test/{beam_color}_profile_24_14_12.dat'
     # blue_profiles_test_path = f'{cad_measurements_path}profiles_test/{beam_color}_profile_24_14_12.dat'
     # blue_profile_wcm_path = f'{cad_measurements_path}profiles/{beam_color}_22_14_12.dat'
 
@@ -289,10 +104,6 @@ def compare_direct_profiles():
     peak_threshold = 60
     fit_window = 20  # points to the left and right of the peak
 
-    # Gaussian function for fitting
-    def gaussian(x, a, mu, sigma, c):
-        return a * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2)) + c
-
     # Prepare segments
     num_full_segments = len(data) // segment_size
     data = data[:num_full_segments * segment_size]  # truncate the end
@@ -317,8 +128,10 @@ def compare_direct_profiles():
             sigma_guess = 5
             c_guess = y.min()
             try:
-                popt, _ = cf(gaussian, x, y, p0=[a_guess, mu_guess, sigma_guess, c_guess])
+                popt, pcov = cf(gaussian, x, y, p0=[a_guess, mu_guess, sigma_guess, c_guess])
                 gaussian_means.append(popt[1])
+                if len(gaussian_means) == 1:
+                    print(f'First mean: {Measure(popt[1], np.sqrt(np.diag(pcov))[1]) * 0.05} ns')
             except RuntimeError:
                 continue  # skip if the fit fails
 
@@ -365,10 +178,7 @@ def compare_direct_profiles():
 
 
 def plot_abort_gaps():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
     cad_measurements_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
     # cad_measurements_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
     beam_color = 'blue'
@@ -432,103 +242,18 @@ def plot_abort_gaps():
     plt.show()
 
 
-def fit_longitudinal_profiles():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
-    profiles_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles_test/'
-
-    peak_list = define_peaks()
-
-    for file_name in os.listdir(profiles_path):
-        if not file_name.endswith('.dat'):
-            continue
-        with open(f'{profiles_path}{file_name}', 'r') as f:
-            lines = f.readlines()
-        data_str_list = lines[-1].split()
-        date = data_str_list[0]
-        time = data_str_list[1]
-        data = np.array([int(x) for x in data_str_list[3:]])
-        beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
-        print(f'{beam_color} from {date} at {time}')
-
-        baseline = np.percentile(data, 90)
-        print(f'Baseline: {baseline}')
-        data = baseline - data
-
-        time_step = 0.05  # ns
-        segment_time = 106.573785  # ns
-        fit_range = [35, 70]  # ns
-        bunch_min_peak = np.max(data) * 0.1
-        times_flat = np.arange(len(data)) * time_step
-
-        abort_gap = False
-        values, times = [], []
-        while not abort_gap:
-            n_segs = len(times)
-            new_seg_mask = (times_flat >= n_segs * segment_time) & (times_flat < (n_segs + 1) * segment_time)
-            new_segment_times, new_segment_values = times_flat[new_seg_mask], data[new_seg_mask]
-            new_segment_times = new_segment_times - (n_segs * segment_time)
-            if np.max(new_segment_values) < bunch_min_peak:
-                abort_gap = True
-            else:
-                times.append(new_segment_times)
-                values.append(new_segment_values)
-
-        print(f'Number of bunches: {len(times)}')
-
-        # Fit all the bunches superimposed
-        fit_times, fit_vals, weird_one_times, weird_one_vals, weird_ones = [], [], [], [], 0
-        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-            bin_width = bunch_times[1] - bunch_times[0]
-            bunch_times, bunch_vals = np.array(bunch_times), np.array(bunch_vals)
-            fit_mask = (bunch_times > fit_range[0]) & (bunch_times < fit_range[1])
-            vals = bunch_vals[fit_mask] / np.sum(bunch_vals[fit_mask]) / bin_width
-            fit_times.extend(list(bunch_times[fit_mask]))
-            fit_vals.extend(list(vals))
-
-        p0, bounds = build_manual_initial_guess(peak_list[beam_color])
-        popt, pcov = cf(multi_gaus_pdf, fit_times, fit_vals, p0=p0, bounds=bounds)
-        perr = np.sqrt(np.diag(pcov))
-        pmeas = [Measure(p, e) for p, e in zip(popt, perr)]
-
-        fig_all, ax_all = plt.subplots(figsize=(8, 6))
-        x_plot = np.linspace(fit_times[0], fit_times[-1], 1000)
-        plot_color = 'blue' if beam_color == 'blue' else 'orange'
-        ax_all.plot(fit_times, fit_vals, color=plot_color, alpha=0.01, ls='none', marker='.', label='CAD Profiles')
-        ax_all.plot(x_plot, multi_gaus_pdf(x_plot, *p0), color='green', ls='-', label='Guess')
-        ax_all.plot(x_plot, p0[-3] / (1 + np.sum(p0[2::3])) * gaus_pdf(x_plot, *p0[-2:]), color='green', ls='--')
-        ax_all.plot(x_plot, multi_gaus_pdf(x_plot, *popt), color='red', ls='-', label='Fit')
-        ax_all.plot(x_plot, popt[-3] / (1 + np.sum(popt[2::3])) * gaus_pdf(x_plot, *popt[-2:]), color='red', ls='--')
-        ax_all.set_xlabel('Time (ns)')
-        ax_all.set_ylabel('Probability Density')
-        ax_all.set_title(
-            f'AuAu24 Vernier Scan {beam_color.capitalize()} Beam Longitudinal Bunch Density')
-        ax_all.set_xlim(*fit_range)
-        ax_all.legend(loc='upper right', fontsize=14)
-        ax_all.grid(True)
-        ax_all.set_xlim(30, 75)
-        fig_all.tight_layout()
-
-        plt.show()
-
-
 def write_avg_longitudinal_profiles():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
     # profiles_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles/'
     profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
     plot = False
 
     for file_name in os.listdir(profiles_path):
-        if not file_name.endswith('.dat') or file_name.startswith('avg_'):
+        if not file_name.endswith('.dat') or file_name.startswith('avg_') or file_name.startswith('bunch_'):
             continue
         with open(f'{profiles_path}{file_name}', 'r') as f:
             lines = f.readlines()
-        print(file_name)
+        # print(file_name)
         data_str_list = lines[-1].split()
         date = data_str_list[0]
         time = data_str_list[1]
@@ -537,7 +262,7 @@ def write_avg_longitudinal_profiles():
         print(f'{beam_color} from {date} at {time}')
 
         baseline = np.percentile(data, 90)
-        print(f'Baseline: {baseline}')
+        # print(f'Baseline: {baseline}')
         data = baseline - data
 
         time_step = 0.05  # ns
@@ -593,24 +318,33 @@ def write_avg_longitudinal_profiles():
         times_interp = np.arange(0, segment_time + 0.01, 0.01)
         min_interp = np.nanmin(interp_func(times_interp))
 
-        # Normalize
         interp_func = interp1d(mv_avg_times, mv_avg_vals - min_interp, kind='linear', bounds_error=False, fill_value=0)
         vals_interp = interp_func(times_interp)
-        vals_integral = np.trapz(vals_interp, times_interp)
-        print(f'Integral: {vals_integral}')
-        vals_interp /= vals_integral
 
         if plot:
+            vals_integral = np.trapezoid(vals_interp, times_interp)
+            vals_interp_plt = vals_interp/ vals_integral
+
             fig, ax = plt.subplots(figsize=(8, 6))
             ax.plot(times_flat, norm_vals, color=plot_color, alpha=0.01, ls='none', marker='.', label='CAD Profiles')
-            ax.plot(times_interp, vals_interp, ls='-', label=f'Interpolated ({n_bunches} points)', color='red')
-            ax.set_xlabel('z (um)')
+            ax.plot(times_interp, vals_interp_plt, ls='-', label=f'Interpolated ({n_bunches} points)', color='red')
+            ax.set_xlabel('Time (ns)')
             ax.set_ylabel('Probability Density')
             ax.legend()
             fig.tight_layout()
 
+        peak_time = fit_peak(vals_interp, times_interp, plot=plot)
+        times_interp_centered = times_interp - peak_time  # Center the times around the peak
+        # times_interp_centered = times_interp - time_of_max  # Center the times around the peak
+
         c = 299792458. * 1e6 / 1e9  # um/ns Speed of light
-        zs_interp = c * (times_interp - segment_time / 2)  # Convert to um
+        # zs_interp = c * (times_interp - segment_time / 2)  # Convert to um
+        zs_interp = c * times_interp_centered  # Convert to um
+
+        # Normalize
+        vals_integral = np.trapezoid(vals_interp, zs_interp)
+        print(f'Integral: {vals_integral}')
+        vals_interp = vals_interp / vals_integral
 
         if beam_color == 'blue':
             zs_interp = -zs_interp[::-1]  # Reverse for blue beam
@@ -629,6 +363,161 @@ def write_avg_longitudinal_profiles():
         np.savetxt(out_path, np.column_stack((zs_interp, vals_interp)), header='z (um)\tProbability Density', delimiter='\t')
         print()
 
+
+def write_bunch_by_bunch_longitudinal_profiles():
+    base_path = set_base_path()
+    profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    plot = False
+
+    for file_name in os.listdir(profiles_path):
+        if not file_name.endswith('.dat') or file_name.startswith('avg_') or file_name.startswith('bunch_'):
+            continue
+        with open(f'{profiles_path}{file_name}', 'r') as f:
+            lines = f.readlines()
+        data_str_list = lines[-1].split()
+        date = data_str_list[0]
+        time = data_str_list[1]
+        data = np.array([int(x) for x in data_str_list[3:]])
+        beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
+        print(f'{beam_color} from {date} at {time}')
+
+        baseline = np.percentile(data, 90)
+        data = baseline - data
+
+        time_step = 0.05  # ns
+        segment_time = 106.573785  # ns
+        c = 299792458. * 1e6 / 1e9  # um/ns Speed of light
+        bunch_min_peak = np.max(data) * 0.1
+        times_flat = np.arange(len(data)) * time_step
+
+        abort_gap = False
+        values, times = [], []
+        while not abort_gap:
+            n_segs = len(times)
+            new_seg_mask = (times_flat >= n_segs * segment_time) & (times_flat < (n_segs + 1) * segment_time)
+            new_segment_times, new_segment_values = times_flat[new_seg_mask], data[new_seg_mask]
+            new_segment_times = new_segment_times - (n_segs * segment_time)
+            if np.max(new_segment_values) < bunch_min_peak:
+                abort_gap = True
+            else:
+                times.append(new_segment_times)
+                values.append(new_segment_values)
+
+        n_bunches = len(times)
+        if n_bunches != 111:
+            print(f'Number of bunches not 111: {n_bunches}!!!!!!')
+
+        if plot:
+            fig_all, ax_all = plt.subplots(figsize=(8, 6))
+
+        norm_factors = []
+        first_peak_time = fit_peak(values[0], times[0], plot=plot)
+        for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
+            bunch_times, bunch_vals = np.array(bunch_times), np.array(bunch_vals)
+            zs = c * (bunch_times - first_peak_time)  # Convert to um
+            if beam_color == 'blue':
+                zs = -zs[::-1]  # Reverse for blue beam
+                bunch_vals = bunch_vals[::-1]
+            norm_factor = np.trapezoid(bunch_vals, zs)
+            vals = bunch_vals / norm_factor
+            norm_factors.append(norm_factor)
+
+            # Write bunch_times and normalized values to file with numpy
+            out_path = f'{profiles_path}bunch_{bunch_i}_{file_name}'
+            np.savetxt(out_path, np.column_stack((zs, vals)), header='z (um)\tProbability Density',
+                       delimiter='\t')
+
+            if plot:
+                plot_color = 'blue' if beam_color == 'blue' else 'orange'
+                ax_all.plot(zs * 1e-6, bunch_vals, color=plot_color, alpha=0.3, ls='-', lw=0.5, marker='None')
+
+        out_path_norm_factors = f'{profiles_path}bunch_norm_factors_{file_name}'
+        np.savetxt(out_path_norm_factors, norm_factors, header='Bunch Index\tNormalization Factor', delimiter='\t')
+
+        if plot:
+            ax_all.set_xlabel('Z Vertex (m)')
+            ax_all.set_ylabel('Current')
+            ax_all.set_title(f'AuAu24 Vernier Scan {beam_color.capitalize()} Beam Longitudinal Bunch Density')
+            ax_all.grid(True)
+            fig_all.tight_layout()
+            plt.show()
+
+
+def plot_profiles_for_an():
+    base_path = set_base_path()
+    profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    out_path = f'{base_path}Vernier_Scans/auau_oct_16_24/Figures/CAD_Measurements/'
+    profile_time = '24_22_00_00'
+    beam_colors = ['blue', 'yellow']
+    plot_colors = {'blue': 'blue', 'yellow': 'orange'}
+    time_step = 0.05  # ns
+
+    fig_time_series, ax_time_series = plt.subplots(figsize=(10, 6))
+    for beam_color in beam_colors:
+        file_name = f'{beam_color}_profile_{profile_time}.dat'
+        with open(f'{profiles_path}{file_name}', 'r') as f:
+            lines = f.readlines()
+        data_str_list = lines[-1].split()
+        date = data_str_list[0]
+        time = data_str_list[1]
+        data = np.array([int(x) for x in data_str_list[3:]])
+
+        baseline = np.percentile(data, 90)
+        data = baseline - data
+
+        ax_time_series.plot(np.arange(len(data)) * time_step, data, color=plot_colors[beam_color], alpha=0.5,
+                            label=f'{beam_color.capitalize()} Beam', ls='-')
+    ax_time_series.set_xlabel('Time (ns)')
+    ax_time_series.set_ylabel('Wall Current')
+    ax_time_series.set_title(f'AuAu24 Vernier Scan Profiles at {profile_time}')
+    ax_time_series.legend()
+    fig_time_series.tight_layout()
+
+    fig_time_series.savefig(f'{out_path}auau24_vernier_scan_profiles_{profile_time}.png', dpi=300)
+    fig_time_series.savefig(f'{out_path}auau24_vernier_scan_profiles_{profile_time}.pdf', dpi=300)
+
+    plt.show()
+
+
+def fit_peak(vals, times, plot=False):
+    """
+    Fit a Gaussian peak to the average longitudinal profile data.
+    """
+    # Initial guess for fitting
+    a_guess = vals.max() - vals.min()
+    mu_guess = times[np.argmax(vals)]
+    sigma_guess = 1
+    c_guess = vals.min()
+    p0 = [a_guess, mu_guess, sigma_guess, c_guess]
+    time_of_max = times[np.argmax(vals)]
+    fit_mask = (times > time_of_max - 1) & (times < time_of_max + 1)
+    times_fit, vals_fit = times[fit_mask], vals[fit_mask]
+    popt = None
+    try:
+        popt, pcov = cf(gaussian, times_fit, vals_fit, p0=p0)
+        perr = np.sqrt(np.diag(pcov))
+        print(f'Peak position: {Measure(popt[1], perr[1])} ns')
+        peak_time = popt[1]  # Time of the peak
+    except RuntimeError as e:
+        peak_time = time_of_max  # Time of the peak
+        plot = True  # Force plotting if fitting fails
+    if plot:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(times, vals, ls='-', label='Interpolated', color='red')
+        ax.plot(times_fit, vals_fit, ls='-', label='Fitted', color='green')
+        ax.plot(times_fit, gaussian(times_fit, *p0), ls='-', label='Guess', alpha=0.5, color='gray')
+        if popt is not None:
+            ax.plot(times, gaussian(times, *popt), ls='--', label='Gaussian Fit', color='blue')
+            ax.axvline(x=popt[1], color='orange', ls='--', label='Fit Peak')
+        ax.axvline(x=time_of_max, color='k', ls='--', label='Max')
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel('Probability Density')
+        ax.legend()
+        fig.tight_layout()
+        if popt is None:
+            plt.show()
+
+    return peak_time
 
 
 def moving_average(xs, ys, window_size):
@@ -853,7 +742,6 @@ def write_longitudinal_beam_profile_fit_parameters(fit_out_path, beam_color, fit
             file.write(f'{param}: {val:.6g}\n')
 
 
-
 def generate_fit_equation_string(n_gaussians):
     """
     Dynamically generate the LaTeX fit equation for n Gaussians.
@@ -870,6 +758,10 @@ def generate_fit_equation_string(n_gaussians):
     denominator = '1' + ''.join([f' + a_{i}' for i in range(2, n_gaussians + 1)])
     return fr'$p(t) = \frac{{{numerator}}}{{{denominator}}}$'
 
+
+# Gaussian function for fitting
+def gaussian(x, a, mu, sigma, c):
+    return a * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2)) + c
 
 
 if __name__ == '__main__':

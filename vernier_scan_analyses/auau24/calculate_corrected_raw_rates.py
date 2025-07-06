@@ -16,13 +16,11 @@ import pandas as pd
 
 from BunchCollider import BunchCollider
 from z_vertex_fitting_common import load_vertex_distributions, get_profile_path, fit_amp_shift, merge_cad_rates_df
+from common_logistics import set_base_path
 
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
 
     base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
 
@@ -46,8 +44,8 @@ def add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path):
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
     # Calculate the background corrected MBD rate
-    cad_df['mbd_bkg_cor_rate'] = cad_df['mbd_raw_rate'] * (1 - cad_df['mbd_cut_correction_fraction'] / 100)
-    cad_df['mbd_z200_rate'] = cad_df['mbd_raw_rate'] * (1 - (cad_df['mbd_cut_correction_fraction'] + cad_df['simulated_cut_fraction']) / 100)
+    cad_df['mbd_bkg_cor_rate'] = cad_df['mbd_acc_multi_cor_rate'] * (1 - cad_df['mbd_cut_correction_fraction'] / 100)
+    cad_df['mbd_z200_rate'] = cad_df['mbd_acc_multi_cor_rate'] * (1 - (cad_df['mbd_cut_correction_fraction'] + cad_df['simulated_cut_fraction']) / 100)
 
     # Save the updated DataFrame back to the CSV file
     cad_df.to_csv(combined_cad_step_data_csv_path, index=False)

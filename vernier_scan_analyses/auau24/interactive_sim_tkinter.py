@@ -315,6 +315,13 @@ class PlotSimulatorApp:
                                 fontsize=12, va='top', ha='left', color='black')
                 self.canvas.draw()
 
+                # Sum the simulation and data z-distributions within a cut range
+                z_sum_cut = 200  # cm
+                z_mask_sim, z_mask_data = np.abs(zs) < z_sum_cut, np.abs(centers) < z_sum_cut
+                sim_sum = np.trapezoid(z_dist[z_mask_sim], zs[z_mask_sim])
+                data_sum = np.trapezoid(counts[z_mask_data], centers[z_mask_data])
+                print(f'Step {scan_step}: Simulated Sum: {sim_sum:.2f}, Data Sum: {data_sum:.2f}, Ratio: {sim_sum / data_sum:.2f}')
+
 
 if __name__ == '__main__':
     main()

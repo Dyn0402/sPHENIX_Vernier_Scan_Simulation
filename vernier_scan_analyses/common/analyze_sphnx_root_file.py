@@ -15,12 +15,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import uproot
 
+from common_logistics import set_base_path
+
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
 
     sub_dir = 'vertex_data/'
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
@@ -33,16 +32,16 @@ def main():
     cad_df = pd.read_csv(cad_data_path, sep=',')
     print(cad_df)
 
-    compare_avg_total_step_rates(base_path_auau, cad_df, sub_dir)
-    plt.show()
+    # compare_avg_total_step_rates(base_path_auau, cad_df, sub_dir)
+    # plt.show()
 
-    data, time = get_root_data_time(base_path_auau, root_file_name='54733_slimmed.root', tree_name='calo_tree', sub_dir=sub_dir,
-                                    branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
-                                              'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
-                                              'GL1_clock_count', 'GL1_live_count',
-                                              'mbd_raw_count', 'zdc_raw_count', 'mbd_live_count', 'zdc_live_count',
-                                              'bunch'])
-    print(data.columns)
+    # data, time = get_root_data_time(base_path_auau, root_file_name='54733_slimmed.root', tree_name='calo_tree', sub_dir=sub_dir,
+    #                                 branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
+    #                                           'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
+    #                                           'GL1_clock_count', 'GL1_live_count',
+    #                                           'mbd_raw_count', 'zdc_raw_count', 'mbd_live_count', 'zdc_live_count',
+    #                                           'bunch'])
+    # print(data.columns)
 
     # plot_rates(data, time, cad_df)
     # more_rate_plotting(data, time, cad_df)
@@ -50,22 +49,28 @@ def main():
     # compare_scaled_live_triggers(data, time, cad_df)
     # compare_scaled_live_triggers_steps(data, time, cad_df)
     # compare_new_old_root_file(base_path, data, time)
+    get_mbd_zdc_coincident_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
     plt.show()
 
     print('donzo')
 
 
-def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name='calo_tree', branches=None, sub_dir='vertex_data/'):
+def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name='calo_tree', branches=None,
+                       sub_dir='vertex_data/'):
     """
     Get the data and time from the ROOT file.
     :param scan_path: Path to the directory with the ROOT file.
     :param root_file_name: Name of the ROOT file.
     :param tree_name: Name of the tree in the ROOT file.
     :param branches: List of branches to extract from the tree.
+    :param sub_dir: Subdirectory within the scan path where the ROOT file is located.
     :return: DataFrame with the data and time.
     """
     if branches is None:
-        branches = ['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger', 'mbd_raw_count', 'zdc_raw_count',
+        branches = ['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
+                    'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
+                    'zdc_N_trigger', 'zdc_S_trigger', 'zdc_N_live_trigger', 'zdc_S_live_trigger',
+                    'mbd_raw_count', 'zdc_raw_count',
                     'GL1_clock_count', 'GL1_live_count', 'mbd_live_count', 'zdc_live_count',
                     'mbd_S_raw_count', 'mbd_N_raw_count', 'mbd_S_live_count', 'mbd_N_live_count',
                     'zdc_S_raw_count', 'zdc_N_raw_count', 'zdc_S_live_count', 'zdc_N_live_count',]
@@ -600,7 +605,6 @@ def get_step_rates(scan_path, cad_df, root_file_name=None):
         end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
         mask = (time >= start_time) & (time <= end_time)
         step_data = data[mask]
-        # step_duration = end_time - start_time
 
         step_times = time[mask]
         step_fine_dur = step_times.iloc[-1] - step_times.iloc[0]
@@ -617,8 +621,60 @@ def get_step_rates(scan_path, cad_df, root_file_name=None):
                 if count_type == 'cor':
                     rate *= clock_scale
 
-                # counts = step_data[col_name].diff().fillna(0)
-                # rate = counts.sum() / step_duration  # Total counts divided by duration gives rate
+                step_rates[f'{detector}_{count_type}_rate'] = rate
+
+        rates.append(step_rates)
+
+    return pd.DataFrame(rates)
+
+
+def get_mbd_zdc_coincident_step_rates(scan_path, cad_df, root_file_name=None):
+    """
+    Get the rates at each step requiring both MBD and ZDC coincidence, using step boundaries defined in cad_df.
+    """
+    if root_file_name is None:
+        data, time = get_root_data_time(scan_path)
+    else:
+        data, time = get_root_data_time(scan_path, root_file_name)
+
+    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+
+    print(data['mbd_SN_trigger'])
+    print(data['zdc_SN_trigger'])
+    zdc_mbd_coinc = data['mbd_SN_trigger'] & data['zdc_SN_trigger']
+    print(zdc_mbd_coinc)
+    zdc_sn_not_n_s = data['zdc_SN_trigger'] & ~(data['zdc_N_trigger'] & data['zdc_S_trigger'])
+    print(zdc_sn_not_n_s)
+    print(np.sum(zdc_sn_not_n_s))
+    return
+
+    rates = []
+    for index, row in cad_df.iterrows():
+        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+        mask = (time >= start_time) & (time <= end_time)
+        step_data = data[mask]
+
+        step_times = time[mask]
+        step_fine_dur = step_times.iloc[-1] - step_times.iloc[0]
+        clock_raw_rate = (step_data['GL1_clock_count'].iloc[-1] - step_data['GL1_clock_count'].iloc[0]) / step_fine_dur
+        clock_live_rate = (step_data['GL1_live_count'].iloc[-1] - step_data['GL1_live_count'].iloc[0]) / step_fine_dur
+        clock_scale = clock_raw_rate / clock_live_rate
+
+        zdc_mbd_coinc_step = zdc_mbd_coinc[mask]
+
+        step_rates = {'step': row['step']}
+        for detector in detectors:
+            for count_type in types:
+                col_name = f'{detector}_{count_type}_count' if count_type != 'cor' else f'{detector}_live_count'
+                rate = (step_data[col_name].iloc[-1] - step_data[col_name].iloc[0]) / step_fine_dur
+
+                if count_type == 'cor':
+                    rate *= clock_scale
+
                 step_rates[f'{detector}_{count_type}_rate'] = rate
 
         rates.append(step_rates)

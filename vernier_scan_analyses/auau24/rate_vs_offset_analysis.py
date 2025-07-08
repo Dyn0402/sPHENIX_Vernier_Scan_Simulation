@@ -21,7 +21,8 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
     base_path += 'Vernier_Scans/auau_oct_16_24/'
-    plot_lumi_vs_step(base_path)
+    # plot_lumi_vs_step(base_path)
+    plot_lumi_vs_step_zdc_cor(base_path)
     # lumi_test(base_path)
     print('donzo')
 
@@ -191,6 +192,103 @@ def plot_lumi_vs_step(base_path):
     ax.legend(loc='upper center')
     ax.set_ylim(bottom=0)
     plt.tight_layout()
+
+    plt.show()
+
+
+def plot_lumi_vs_step_zdc_cor(base_path):
+    """
+    Simulate bunch-by-bunch expectations for a vernier scan and plot the results.
+    :param base_path: Base path to the vernier scan data.
+    :return: None
+    """
+    longitudinal_profiles_dir_path = f'{base_path}profiles/'
+    combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+
+    f_beam = 78.4  # kHz
+    mb_to_um2 = 1e-19
+    lumi_z_cut = 200
+
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    scan_steps = np.arange(0, 25, 1)
+
+    collider_sim = BunchCollider()
+    collider_sim.set_grid_size(31, 31, 101, 31)
+    beam_width_x, beam_width_y = 130.0, 130.0
+    beta_star = 76.7
+    bkg = 0.0e-17
+    gauss_eff_width = 500
+    mbd_resolution = 1.0
+    # gauss_eff_width = None
+    # mbd_resolution = None
+
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+
+    # Get nominal dcct ions and emittances
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+    em_blue_nom = (em_blue_horiz_nom, em_blue_vert_nom)
+    em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
+
+    lumis, mbd_rates, zdc_rates = [], [], []
+    for scan_step in scan_steps:
+        print(f'Scan Step: {scan_step}')
+        cad_step_row = cad_df[cad_df['step'] == scan_step].iloc[0]
+        profile_path = get_profile_path(
+            longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], False
+        )
+        set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom, em_yel_nom, profile_path)
+        collider_sim.run_sim_parallel()
+        if lumi_z_cut is None:
+            naked_lumi = collider_sim.get_naked_luminosity()
+        else:
+            zs, z_dist = collider_sim.get_z_density_dist()
+            zs_cut, z_dist_cut = zs[np.abs(zs) < lumi_z_cut], z_dist[np.abs(zs) < lumi_z_cut]
+            naked_lumi = collider_sim.get_naked_luminosity(observed=True)
+            cut_fraction = np.trapezoid(z_dist_cut, zs_cut) / np.trapezoid(z_dist, zs)
+            naked_lumi *= cut_fraction
+        n_blue, n_yellow = cad_step_row['blue_dcct_ions'], cad_step_row['yellow_dcct_ions']
+        lumi = naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
+        lumis.append(lumi)
+        # zdc_rates.append(cad_step_row['zdc_cor_rate'])
+        # zdc_rates.append(cad_step_row['mbd_z200_rate'])
+        zdc_rates.append(cad_step_row['mbd_bkg_cor_rate'])
+
+        for bunch_i in range(111):
+            pass
+
+    fig, ax = plt.subplots()
+    ax2 = ax.twinx()
+    ax.plot(scan_steps, lumis, marker='o', linestyle='-', color='b', label='Luminosity')
+    ax2.plot(scan_steps, zdc_rates, marker='o', linestyle='-', color='r', label='ZDC Rate')
+    ax.set_xlabel('Scan Step')
+    ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$]')
+    ax2.set_ylabel('ZDC Rate [Hz]')
+    ax.set_title('Luminosity vs Scan Step')
+    ax.legend(loc='upper center')
+    ax2.legend(loc='upper right')
+    ax.set_ylim(bottom=0, top=1.2 * np.max(lumis))
+    ax2.set_ylim(bottom=0, top=1.2 * np.max(zdc_rates))
+    plt.tight_layout()
+
+    norm_rates = np.array(zdc_rates) / zdc_rates[0] * lumis[0]
+    percent_rate = (lumis - norm_rates) / norm_rates * 100
+
+    steps = np.array([0, 6, 12, 18, 24])
+    step_mask = np.isin(scan_steps, steps)
+
+    fig, ax = plt.subplots()
+    ax.plot(scan_steps[step_mask], percent_rate[step_mask], marker='o', linestyle='-', color='b', label='Percent')
+    ax.set_xlabel('Scan Step')
+    ax.set_ylabel('Percent [%]')
+    ax.set_title('Percent vs Scan Step')
+    ax.legend(loc='upper center')
+    fig.tight_layout()
 
     plt.show()
 

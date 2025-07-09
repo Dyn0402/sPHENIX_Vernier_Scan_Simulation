@@ -41,7 +41,8 @@ def add_emittance_info_to_df(emittance_file_path, times=None):
     :param times: Optional list of times to use for parametrization. If None, uses the times from the emittance file.
     :return: DataFrame with emittance information added.
     """
-    emittance_df = read_angelika_emittance_file(emittance_file_path)
+    # emittance_df = read_angelika_emittance_file(emittance_file_path)
+    emittance_df = read_emittance_file(emittance_file_path)
     emittance_df = parametrize_emittances_vs_time(emittance_df, times)
     emittance_df = emittance_df.rename(columns={'Time': 'mid_time',
                                                 'BlueHoriz_fit': 'blue_horiz_emittance',

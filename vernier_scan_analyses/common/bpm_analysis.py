@@ -34,20 +34,9 @@ def bpm_analysis(bpm_file_path, start_time, end_time, plot=True, pre_scan_buffer
     """
     Read BMP file and extract Vernier scan steps and crossing angles.
     """
-    bpm_separation_distance = 16250  # mm
     step_derivative_threshold = 30
-
-    bpm_data = pd.read_csv(bpm_file_path, sep='\t', header=2)
-    bpm_data.drop(columns=['Unnamed: 9'], inplace=True)
-    bpm_data = bpm_data.rename(columns={'# Time ': 'Time'})
-    bpm_data = bpm_data.rename(columns={col: col.replace(' ', '') for col in bpm_data.columns})
-    for col in bpm_data.columns:
-        if col == 'Time':
-            bpm_data[col] = pd.to_datetime(bpm_data[col], errors='coerce')
-        else:
-            bpm_data[col] = pd.to_numeric(bpm_data[col], errors='coerce')
-
-    bpm_data = bpm_data[(bpm_data['Time'] >= start_time) & (bpm_data['Time'] <= end_time)]
+    bpm_data, blue_xing_h, yellow_xing_h, blue_xing_v, yellow_xing_v, rel_xing_h, rel_xing_v = (
+        read_bpm_file(bpm_file_path, start_time, end_time))
 
     if plot:
         for c in ['b', 'y']:
@@ -96,14 +85,6 @@ def bpm_analysis(bpm_file_path, start_time, end_time, plot=True, pre_scan_buffer
         mid_time = (step['start'] + duration / 2.0).round('s')
         step['duration'] = duration.total_seconds()
         step['mid_time'] = mid_time
-
-    blue_xing_h = np.arctan((bpm_data['b7bx_h'] - bpm_data['b8bx_h']) / bpm_separation_distance)
-    yellow_xing_h = np.arctan((bpm_data['y7bx_h'] - bpm_data['y8bx_h']) / bpm_separation_distance)
-    blue_xing_v = np.arctan((bpm_data['b7bx_v'] - bpm_data['b8bx_v']) / bpm_separation_distance)
-    yellow_xing_v = np.arctan((bpm_data['y7bx_v'] - bpm_data['y8bx_v']) / bpm_separation_distance)
-
-    rel_xing_h = blue_xing_h - yellow_xing_h
-    rel_xing_v = blue_xing_v - yellow_xing_v
 
     if plot:
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -221,6 +202,32 @@ def get_start_end_times(scan_path):
     start_time, end_time = pd.Timestamp(start_time_str), pd.Timestamp(end_time_str)
 
     return start_time, end_time
+
+
+def read_bpm_file(bpm_file_path, start_time, end_time):
+    bpm_separation_distance = 16250  # mm
+
+    bpm_data = pd.read_csv(bpm_file_path, sep='\t', header=2)
+    bpm_data.drop(columns=['Unnamed: 9'], inplace=True)
+    bpm_data = bpm_data.rename(columns={'# Time ': 'Time'})
+    bpm_data = bpm_data.rename(columns={col: col.replace(' ', '') for col in bpm_data.columns})
+    for col in bpm_data.columns:
+        if col == 'Time':
+            bpm_data[col] = pd.to_datetime(bpm_data[col], errors='coerce')
+        else:
+            bpm_data[col] = pd.to_numeric(bpm_data[col], errors='coerce')
+
+    bpm_data = bpm_data[(bpm_data['Time'] >= start_time) & (bpm_data['Time'] <= end_time)]
+
+    blue_xing_h = np.arctan((bpm_data['b7bx_h'] - bpm_data['b8bx_h']) / bpm_separation_distance)
+    yellow_xing_h = np.arctan((bpm_data['y7bx_h'] - bpm_data['y8bx_h']) / bpm_separation_distance)
+    blue_xing_v = np.arctan((bpm_data['b7bx_v'] - bpm_data['b8bx_v']) / bpm_separation_distance)
+    yellow_xing_v = np.arctan((bpm_data['y7bx_v'] - bpm_data['y8bx_v']) / bpm_separation_distance)
+
+    rel_xing_h = blue_xing_h - yellow_xing_h
+    rel_xing_v = blue_xing_v - yellow_xing_v
+
+    return bpm_data, blue_xing_h, yellow_xing_h, blue_xing_v, yellow_xing_v, rel_xing_h, rel_xing_v
 
 
 if __name__ == '__main__':

@@ -334,7 +334,7 @@ def shift_only_residual(x, collider_sim, shift_0, z_dist_data, zs_data, z_dist_e
     return resid
 
 
-def get_profile_path(profile_dir_path, start_time, end_time, return_all=False, bunch_num=None):
+def get_profile_path(profile_dir_path, start_time, end_time, return_all=False, bunch_num=None, return_times=False):
     """
     Returns a list of full paths to all blue/yellow profile files in the given directory
     between start_datetime and end_datetime (inclusive),
@@ -354,18 +354,25 @@ def get_profile_path(profile_dir_path, start_time, end_time, return_all=False, b
     blue_files = [f for f in all_files if f.startswith(f"{starts_with}blue_profile_24_")]
     blue_times = [datetime.combine(start_time.date(), extract_time_from_filename(f)) for f in blue_files]
     blue_times, blue_files = zip(*sorted(zip(blue_times, blue_files)))  # Sort blue files and times together by time
-    good_files = []
+    good_files, good_file_times = [], []
     for file_time, file_name in zip(blue_times, blue_files):
         if file_time < start_time or file_time > end_time:
             continue
         if file_name.replace('blue_', 'yellow_') not in all_files:
             continue
         good_files.append(os.path.join(profile_dir_path, file_name.replace('blue_', 'COLOR_')))
+        good_file_times.append(file_time)
 
     if return_all:
-        return good_files
+        if return_times:
+            return good_files, good_file_times
+        else:
+            return good_files
     else:  # Get middle file in list
-        return good_files[len(good_files) // 2]
+        if return_times:
+            return good_files[len(good_files) // 2], good_file_times[len(good_files) // 2]
+        else:
+            return good_files[len(good_files) // 2]
 
 
 def extract_time_from_filename(filename):

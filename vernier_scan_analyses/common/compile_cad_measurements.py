@@ -41,7 +41,8 @@ def main():
     df = df.merge(set_offsets_df, on='step', how='left')
 
     # Add emittance information to the dataframe
-    emittance_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
+    # emittance_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
+    emittance_file_path = f'{scan_path}emittance.dat'
     emittance_df = add_emittance_info_to_df(emittance_file_path, times=df['mid_time'])
     df = df.merge(emittance_df, on='mid_time', how='left')
 

@@ -46,6 +46,8 @@ def add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path):
     # Calculate the background corrected MBD rate
     cad_df['mbd_bkg_cor_rate'] = cad_df['mbd_acc_multi_cor_rate'] * (1 - cad_df['mbd_cut_correction_fraction'] / 100)
     cad_df['mbd_z200_rate'] = cad_df['mbd_acc_multi_cor_rate'] * (1 - (cad_df['mbd_cut_correction_fraction'] + cad_df['simulated_cut_fraction']) / 100)
+    cad_df['mbd_sasha_bkg_cor_rate'] = cad_df['mbd_sasha_cor_rate'] * (1 - cad_df['mbd_cut_correction_fraction'] / 100)
+    cad_df['mbd_sasha_z200_rate'] = cad_df['mbd_sasha_cor_rate'] * (1 - (cad_df['mbd_cut_correction_fraction'] + cad_df['simulated_cut_fraction']) / 100)
 
     # Save the updated DataFrame back to the CSV file
     cad_df.to_csv(combined_cad_step_data_csv_path, index=False)

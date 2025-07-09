@@ -17,6 +17,7 @@ from common_logistics import set_base_path
 from analyze_ions import read_ions_file
 from analyze_emittance import read_emittance_file, parametrize_emittances_vs_time
 from bpm_analysis import read_bpm_file
+from analyze_sphnx_root_file import get_root_data_time
 from z_vertex_fitting_common import get_profile_path
 from BunchCollider import BunchCollider
 
@@ -38,6 +39,7 @@ def plot_lumi_decay(base_path):
     ions_path = f'{base_path}COLOR_ions.dat'
     emittance_file_path = f'{base_path}emittance.dat'
     bpm_file_path = f'{base_path}bpms.dat'
+    root_file_name = 'calofit_54733.root'
 
     ions_data = {'blue': None, 'yellow': None}
     for color in ions_data.keys():
@@ -46,6 +48,7 @@ def plot_lumi_decay(base_path):
         ions_data[color] = ion_data
 
     emittance_df = read_emittance_file(emittance_file_path)
+    get_root_data_time(base_path, root_file_name, branches=['BCO', 'mbd_raw_count', 'zdc_raw_count'])
 
     f_beam = 78.4  # kHz
     mb_to_um2 = 1e-19
@@ -87,13 +90,29 @@ def plot_lumi_decay(base_path):
     em_blue_nom = (em_blue_horiz_nom, em_blue_vert_nom)
     em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
 
+    # WCM to DCCT scaling factor
+    blue_time_mask = (
+            (ions_data['blue']['Time'] >= profile_times[0] - ions_avg_window / 2) &
+            (ions_data['blue']['Time'] <= profile_times[0] + ions_avg_window / 2)
+    )
+    yellow_time_mask = (
+            (ions_data['yellow']['Time'] >= profile_times[0] - ions_avg_window / 2) &
+            (ions_data['yellow']['Time'] <= profile_times[0] + ions_avg_window / 2)
+    )
+    n_blue_dcct0 = np.mean(ions_data['blue']['blue_dcct_ions'][blue_time_mask])
+    n_yellow_dcct0 = np.mean(ions_data['yellow']['yellow_dcct_ions'][yellow_time_mask])
+    n_blue_wcm0 = np.mean(ions_data['blue']['blue_wcm_ions'][blue_time_mask])
+    n_yellow_wcm0 = np.mean(ions_data['yellow']['yellow_wcm_ions'][yellow_time_mask])
+
     lumi_runs = [
         {'angle': False, 'emittance': False, 'profile': False, 'n_protons': False, 'lumis': [], 'name': 'Baseline'},
-        {'angle': True, 'emittance': False, 'profile': False, 'n_protons': False, 'lumis': [], 'name': 'Angles Only'},
-        {'angle': False, 'emittance': True, 'profile': False, 'n_protons': False, 'lumis': [], 'name': 'Emittance Only'},
-        {'angle': False, 'emittance': False, 'profile': True, 'n_protons': False, 'lumis': [], 'name': 'Profile Only'},
-        {'angle': False, 'emittance': False, 'profile': False, 'n_protons': True, 'lumis': [], 'name': 'n_protons Only'},
-        {'angle': True, 'emittance': True, 'profile': True, 'n_protons': True, 'lumis': [], 'name': 'All Corrections'},
+        {'angle': True, 'emittance': False, 'profile': False, 'n_protons': False, 'lumis': [], 'name': 'Crossing Angles Variation'},
+        {'angle': False, 'emittance': True, 'profile': False, 'n_protons': False, 'lumis': [], 'name': 'Emittance Growth'},
+        {'angle': False, 'emittance': False, 'profile': True, 'n_protons': False, 'lumis': [], 'name': 'Longitudinal Profiles'},
+        {'angle': False, 'emittance': False, 'profile': False, 'n_protons': 'dcct', 'lumis': [], 'name': 'DCCT Proton Burn Off'},
+        {'angle': False, 'emittance': False, 'profile': False, 'n_protons': 'wcm', 'lumis': [], 'name': 'WCM Proton Burn Off (Scaled to DCCT)'},
+        {'angle': True, 'emittance': True, 'profile': True, 'n_protons': 'dcct', 'lumis': [], 'name': 'All Effects (DCCT)'},
+        {'angle': True, 'emittance': True, 'profile': True, 'n_protons': 'wcm', 'lumis': [], 'name': 'All Effects (WCM -- Scaled to DCCT)'},
     ]
 
     for profile_path, time in zip(profile_paths, profile_times):
@@ -150,23 +169,31 @@ def plot_lumi_decay(base_path):
             naked_lumi = collider_sim.get_naked_luminosity()
 
             if lumi_run['n_protons']:
-                n_blue = np.mean(ions_data['blue']['blue_dcct_ions'][(ions_data['blue']['Time'] >= time - ions_avg_window / 2) &
-                                                      (ions_data['blue']['Time'] <= time + ions_avg_window / 2)])
-                n_yellow = np.mean(ions_data['yellow']['yellow_dcct_ions'][(ions_data['yellow']['Time'] >= time - ions_avg_window / 2) &
-                                                            (ions_data['yellow']['Time'] <= time + ions_avg_window / 2)])
+                n_blue_key = f'blue_{lumi_run["n_protons"]}_ions'
+                n_yellow_key = f'yellow_{lumi_run["n_protons"]}_ions'
+                blue_time_mask = (
+                    (ions_data['blue']['Time'] >= time - ions_avg_window / 2) &
+                    (ions_data['blue']['Time'] <= time + ions_avg_window / 2)
+                )
+                yellow_time_mask = (
+                    (ions_data['yellow']['Time'] >= time - ions_avg_window / 2) &
+                    (ions_data['yellow']['Time'] <= time + ions_avg_window / 2)
+                )
+                n_blue = np.mean(ions_data['blue'][n_blue_key][blue_time_mask])
+                n_yellow = np.mean(ions_data['yellow'][n_yellow_key][yellow_time_mask])
+                if lumi_run['n_protons'] == 'wcm':  # Scale to DCCT
+                    n_blue *= n_blue_dcct0 / n_blue_wcm0
+                    n_yellow *= n_yellow_dcct0 / n_yellow_wcm0
             else:
-                n_blue = np.mean(ions_data['blue']['blue_dcct_ions'][(ions_data['blue']['Time'] >= profile_times[0] - ions_avg_window / 2) &
-                                                   (ions_data['blue']['Time'] <= profile_times[0] + ions_avg_window / 2)])
-                n_yellow = np.mean(ions_data['yellow']['yellow_dcct_ions'][(ions_data['yellow']['Time'] >= profile_times[0] - ions_avg_window / 2) &
-                                                       (ions_data['yellow']['Time'] <= profile_times[0] + ions_avg_window / 2)])
+                n_blue = n_blue_dcct0
+                n_yellow = n_yellow_dcct0
             lumi = naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
             lumi_run['lumis'].append(lumi)
 
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 6))
     for lumi_run in lumi_runs:
         ax.plot(profile_times, lumi_run['lumis'], label=lumi_run['name'])
-    ax.set_xlabel('Time')
     ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$]')
     ax.set_title('Luminosity Decay Over Time')
     ax.legend()

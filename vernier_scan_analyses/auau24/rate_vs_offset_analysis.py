@@ -132,6 +132,7 @@ def plot_lumi_vs_step(base_path):
         {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': []},
         {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD Sasha Corrected Z200', 'data': []},
         {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': []},
+        {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': []},
     ]
 
     lumis, scan_steps_plt = [], []
@@ -143,7 +144,7 @@ def plot_lumi_vs_step(base_path):
         # )
         profile_paths = get_profile_path(
             longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], True
-        )[:1]  # Only take the first profile path for now
+        )
         for profile_path in profile_paths:
             set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom, em_yel_nom, profile_path)
             collider_sim.run_sim_parallel()
@@ -155,7 +156,8 @@ def plot_lumi_vs_step(base_path):
                 naked_lumi = collider_sim.get_naked_luminosity(observed=observed)
                 cut_fraction = np.trapezoid(z_dist_cut, zs_cut) / np.trapezoid(z_dist, zs)
                 naked_lumi *= cut_fraction
-            n_blue, n_yellow = cad_step_row['blue_dcct_ions'], cad_step_row['yellow_dcct_ions']
+            # n_blue, n_yellow = cad_step_row['blue_dcct_ions'], cad_step_row['yellow_dcct_ions']
+            n_blue, n_yellow = cad_step_row['blue_wcm_ions'], cad_step_row['yellow_wcm_ions']
             lumi = naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
             lumis.append(lumi)
             scan_steps_plt.append(scan_step)
@@ -213,6 +215,30 @@ def plot_lumi_vs_step(base_path):
     ax.set_xlabel('Scan Step')
     ax.set_ylabel('Percent Difference (Data - Sim) / Data [%]')
     ax.set_title('Luminosity Plus Background vs Scan Step')
+    ax.legend()
+    plt.tight_layout()
+
+    # Calculate the average luminosity for each scan step and use standard deviation for error bars
+    lumis = np.array(lumis)
+    lumis_mean = np.array([np.mean(lumis[scan_steps_plt == step]) for step in scan_steps])
+    lumis_std = np.array([np.std(lumis[scan_steps_plt == step]) for step in scan_steps])
+    for rate_data in rates_data:
+        rate_data['data'] = np.array(rate_data['data'])  # All values for each step should be the same, just get mea
+        rate_data['data_step'] = np.array([np.mean(rate_data['data'][scan_steps_plt == step]) for step in scan_steps])
+
+    step_mask = np.isin(scan_steps, steps)
+    norm_step = 0
+
+    fig, ax = plt.subplots()
+    ax.axhline(0, color='k', ls='-', zorder=0)
+    for rate_data in rates_data:
+        norm_rates = np.array(rate_data['data_step']) / rate_data['data_step'][norm_step] * lumis_mean[norm_step]
+        percent_rate = (norm_rates - lumis_mean) / norm_rates * 100
+        ax.errorbar(scan_steps[step_mask], percent_rate[step_mask],
+                    yerr=lumis_std[step_mask] / norm_rates[step_mask] * 100, fmt='o-', label=rate_data["name"])
+    ax.set_xlabel('Scan Step')
+    ax.set_ylabel('Percent Difference (Data - Sim) / Data [%]')
+    ax.set_title('Luminosity vs Scan Step with Error Bars')
     ax.legend()
     plt.tight_layout()
 

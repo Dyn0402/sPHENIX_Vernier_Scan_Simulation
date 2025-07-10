@@ -49,7 +49,8 @@ def main():
     # compare_scaled_live_triggers(data, time, cad_df)
     # compare_scaled_live_triggers_steps(data, time, cad_df)
     # compare_new_old_root_file(base_path, data, time)
-    get_mbd_zdc_coincident_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
+    # get_mbd_zdc_coincident_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
+    get_gl1p_bunch_by_bunch_rates(base_path_auau, cad_df)
     plt.show()
 
     print('donzo')
@@ -580,6 +581,18 @@ def compare_new_old_root_file(base_path, data, time):
             print(f'Index {i}: New MBD Scaled: {mbd_scaled_trigger}, Old MBD Scaled: {mbd_scaled_trigger_old}')
         if mbd_z_vtx != mbd_z_vtx_old:
             print(f'Index {i}: New MBD Z Vtx: {mbd_z_vtx}, Old MBD Z Vtx: {mbd_z_vtx_old}')
+
+
+def get_gl1p_bunch_by_bunch_rates(base_path, cad_df):
+    data, time = get_root_data_time(base_path, root_file_name='calofit_54733.root', tree_name='calo_tree',
+                                    sub_dir='vertex_data/',
+                                    branches=['BCO', 'GL1P_mbd_live_count',
+                                              'mbd_live_count', 'zdc_live_count',
+                                              'bunch'])
+
+    print(data.columns)
+    print(data['GL1P_mbd_live_count'])
+    print(data['mbd_live_count'])
 
 
 def get_step_rates(scan_path, cad_df, root_file_name=None):

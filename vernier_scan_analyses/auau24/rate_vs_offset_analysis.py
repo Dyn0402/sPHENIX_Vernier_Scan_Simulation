@@ -125,14 +125,14 @@ def plot_lumi_vs_step(base_path):
     em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
 
     rates_data = [
-        {'col_name': 'zdc_cor_rate', 'name': 'ZDC Uncorrected', 'data': []},
-        {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'data': []},
-        {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'data': []},
-        {'col_name': 'mbd_z200_rate', 'name': 'MBD Angelika Corrected Z200', 'data': []},
-        {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': []},
-        {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD Sasha Corrected Z200', 'data': []},
-        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': []},
-        {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': []},
+        {'col_name': 'zdc_cor_rate', 'name': 'ZDC Uncorrected', 'data': [], 'errs': []},
+        {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'data': [], 'errs': []},
+        {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'data': [], 'errs': []},
+        {'col_name': 'mbd_z200_rate', 'name': 'MBD Angelika Corrected Z200', 'data': [], 'errs': []},
+        {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': []},
+        {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD Sasha Corrected Z200', 'data': [], 'errs': []},
+        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': []},
+        {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': [], 'errs': []},
     ]
 
     lumis, scan_steps_plt = [], []
@@ -163,6 +163,8 @@ def plot_lumi_vs_step(base_path):
             scan_steps_plt.append(scan_step)
             for rate_data in rates_data:
                 rate_data['data'].append(cad_step_row[rate_data['col_name']])
+                dur = cad_step_row['duration'] - 2  # Should be pretty close (~1%) to actual duration used to get rate.
+                rate_data['errs'].append(np.sqrt(cad_step_row[rate_data['col_name']] * dur) / dur)
 
         for bunch_i in range(111):
             pass
@@ -225,6 +227,8 @@ def plot_lumi_vs_step(base_path):
     for rate_data in rates_data:
         rate_data['data'] = np.array(rate_data['data'])  # All values for each step should be the same, just get mea
         rate_data['data_step'] = np.array([np.mean(rate_data['data'][scan_steps_plt == step]) for step in scan_steps])
+        rate_data['err_step'] = np.array([np.mean(rate_data['errs'][scan_steps_plt == step]) for step in scan_steps])
+        rate_data['data_measures'] = np.array([Measure(rate_data['data_step'][i], rate_data['err_step'][i]) for i in range(len(rate_data['data_step']))])
 
     step_mask = np.isin(scan_steps, steps)
     norm_step = 0
@@ -233,11 +237,24 @@ def plot_lumi_vs_step(base_path):
     ax.axhline(0, color='k', ls='-', zorder=0)
     for rate_data in rates_data:
         norm_rates = np.array(rate_data['data_step']) / rate_data['data_step'][norm_step] * lumis_mean[norm_step]
+        lumi_errs = lumis_std[step_mask] / norm_rates * 100
         percent_rate = (norm_rates - lumis_mean) / norm_rates * 100
         ax.errorbar(scan_steps[step_mask], percent_rate[step_mask],
                     yerr=lumis_std[step_mask] / norm_rates[step_mask] * 100, fmt='o-', label=rate_data["name"])
     ax.set_xlabel('Scan Step')
     ax.set_ylabel('Percent Difference (Data - Sim) / Data [%]')
+    ax.set_title('Luminosity vs Scan Step with Error Bars')
+    ax.legend()
+    plt.tight_layout()
+
+    fig, ax = plt.subplots()
+    ax.axhline(0, color='k', ls='-', zorder=0)
+    for rate_data in rates_data:
+        norm_rates = np.array(rate_data['data_step']) / rate_data['data_step'][norm_step] * lumis_mean[norm_step]
+        ax.errorbar(scan_steps[step_mask], norm_rates[step_mask],
+                    yerr=lumis_std[step_mask] / norm_rates[step_mask] * 100, fmt='o-', label=rate_data["name"])
+    ax.set_xlabel('Scan Step')
+    ax.set_ylabel('Luminosity ')
     ax.set_title('Luminosity vs Scan Step with Error Bars')
     ax.legend()
     plt.tight_layout()

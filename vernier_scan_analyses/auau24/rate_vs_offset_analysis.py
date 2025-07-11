@@ -125,14 +125,14 @@ def plot_lumi_vs_step(base_path):
     em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
 
     rates_data = [
-        {'col_name': 'zdc_cor_rate', 'name': 'ZDC Uncorrected', 'data': [], 'errs': []},
-        {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'data': [], 'errs': []},
-        {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'data': [], 'errs': []},
-        {'col_name': 'mbd_z200_rate', 'name': 'MBD Angelika Corrected Z200', 'data': [], 'errs': []},
-        {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': []},
-        {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD Sasha Corrected Z200', 'data': [], 'errs': []},
-        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': []},
-        {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': [], 'errs': []},
+        {'col_name': 'zdc_cor_rate', 'name': 'ZDC Uncorrected', 'data': [], 'errs': [], 'marker': 's', 'color':'black', 'ls': '-'},
+        {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'data': [], 'errs': [], 'marker': 's', 'color':'orange', 'ls': '-'},
+        {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'data': [], 'errs': [], 'marker': 's', 'color':'green', 'ls': '-'},
+        {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'black', 'ls': '-'},
+        {'col_name': 'mbd_z200_rate', 'name': 'MBD |z|<200 Angelika Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '-'},
+        {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '--'},
+        {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '-'},
+        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '--'},
     ]
 
     lumis, scan_steps_plt = [], []
@@ -204,28 +204,30 @@ def plot_lumi_vs_step(base_path):
     ax.legend()
     plt.tight_layout()
 
-    bkg_frac = 0.17
-    lumis_plus_bkg = np.array(lumis) + lumis[norm_step] * bkg_frac
-
-    fig, ax = plt.subplots()
-    ax.axhline(0, color='k', ls='-', zorder=0)
-    for rate_data in rates_data:
-        # Normalize rates to the first step
-        norm_rates = np.array(rate_data['data']) / rate_data['data'][norm_step] * lumis_plus_bkg[norm_step]
-        percent_rate = (norm_rates - lumis_plus_bkg) / norm_rates * 100
-        ax.plot(scan_steps_plt[step_mask], percent_rate[step_mask], marker='o', linestyle='-', label=rate_data["name"])
-    ax.set_xlabel('Scan Step')
-    ax.set_ylabel('Percent Difference (Data - Sim) / Data [%]')
-    ax.set_title('Luminosity Plus Background vs Scan Step')
-    ax.legend()
-    plt.tight_layout()
+    # bkg_frac = 0.17
+    # lumis_plus_bkg = np.array(lumis) + lumis[norm_step] * bkg_frac
+    #
+    # fig, ax = plt.subplots()
+    # ax.axhline(0, color='k', ls='-', zorder=0)
+    # for rate_data in rates_data:
+    #     # Normalize rates to the first step
+    #     norm_rates = np.array(rate_data['data']) / rate_data['data'][norm_step] * lumis_plus_bkg[norm_step]
+    #     percent_rate = (norm_rates - lumis_plus_bkg) / norm_rates * 100
+    #     ax.plot(scan_steps_plt[step_mask], percent_rate[step_mask], marker='o', linestyle='-', label=rate_data["name"])
+    # ax.set_xlabel('Scan Step')
+    # ax.set_ylabel('Percent Difference (Data - Sim) / Data [%]')
+    # ax.set_title('Luminosity Plus Background vs Scan Step')
+    # ax.legend()
+    # plt.tight_layout()
 
     # Calculate the average luminosity for each scan step and use standard deviation for error bars
     lumis = np.array(lumis)
     lumis_mean = np.array([np.mean(lumis[scan_steps_plt == step]) for step in scan_steps])
     lumis_std = np.array([np.std(lumis[scan_steps_plt == step]) for step in scan_steps])
+    lumis_measures = np.array([Measure(lumis_mean[i], lumis_std[i]) for i in range(len(lumis_mean))])
     for rate_data in rates_data:
-        rate_data['data'] = np.array(rate_data['data'])  # All values for each step should be the same, just get mea
+        rate_data['data'] = np.array(rate_data['data'])  # All values for each step should be the same, just get mean
+        rate_data['errs'] = np.array(rate_data['errs'])
         rate_data['data_step'] = np.array([np.mean(rate_data['data'][scan_steps_plt == step]) for step in scan_steps])
         rate_data['err_step'] = np.array([np.mean(rate_data['errs'][scan_steps_plt == step]) for step in scan_steps])
         rate_data['data_measures'] = np.array([Measure(rate_data['data_step'][i], rate_data['err_step'][i]) for i in range(len(rate_data['data_step']))])
@@ -233,31 +235,43 @@ def plot_lumi_vs_step(base_path):
     step_mask = np.isin(scan_steps, steps)
     norm_step = 0
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 6))
     ax.axhline(0, color='k', ls='-', zorder=0)
     for rate_data in rates_data:
-        norm_rates = np.array(rate_data['data_step']) / rate_data['data_step'][norm_step] * lumis_mean[norm_step]
-        lumi_errs = lumis_std[step_mask] / norm_rates * 100
-        percent_rate = (norm_rates - lumis_mean) / norm_rates * 100
-        ax.errorbar(scan_steps[step_mask], percent_rate[step_mask],
-                    yerr=lumis_std[step_mask] / norm_rates[step_mask] * 100, fmt='o-', label=rate_data["name"])
+        norm_rates = np.array(rate_data['data_measures']) / rate_data['data_measures'][norm_step] * lumis_measures[norm_step]
+        percent_rate = (norm_rates - lumis_measures) / norm_rates * 100
+        percent_rate_vals = np.array([m.val for m in percent_rate])
+        percent_rate_errs = np.array([m.err for m in percent_rate])
+        ax.errorbar(scan_steps[step_mask], percent_rate_vals[step_mask], yerr=percent_rate_errs[step_mask],
+                    color=rate_data['color'], marker=rate_data['marker'], linestyle=rate_data['ls'],
+                    label=rate_data['name'])
     ax.set_xlabel('Scan Step')
     ax.set_ylabel('Percent Difference (Data - Sim) / Data [%]')
-    ax.set_title('Luminosity vs Scan Step with Error Bars')
+    ax.set_title('Simulation Luminosity Prediction Accuracy vs Scan Step (Head On Steps Only)')
+    ax.annotate(
+        'Normalization Step',
+        xy=(scan_steps[norm_step], percent_rate_vals[norm_step]),
+        xytext=(0.2, 0.8),
+        textcoords='axes fraction',
+        arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=4),
+        ha='center',
+        fontsize=10,
+        color='black'
+    )
     ax.legend()
     plt.tight_layout()
 
-    fig, ax = plt.subplots()
-    ax.axhline(0, color='k', ls='-', zorder=0)
-    for rate_data in rates_data:
-        norm_rates = np.array(rate_data['data_step']) / rate_data['data_step'][norm_step] * lumis_mean[norm_step]
-        ax.errorbar(scan_steps[step_mask], norm_rates[step_mask],
-                    yerr=lumis_std[step_mask] / norm_rates[step_mask] * 100, fmt='o-', label=rate_data["name"])
-    ax.set_xlabel('Scan Step')
-    ax.set_ylabel('Luminosity ')
-    ax.set_title('Luminosity vs Scan Step with Error Bars')
-    ax.legend()
-    plt.tight_layout()
+    # fig, ax = plt.subplots()
+    # ax.axhline(0, color='k', ls='-', zorder=0)
+    # for rate_data in rates_data:
+    #     norm_rates = np.array(rate_data['data_step']) / rate_data['data_step'][norm_step] * lumis_mean[norm_step]
+    #     ax.errorbar(scan_steps[step_mask], norm_rates[step_mask],
+    #                 yerr=lumis_std[step_mask] / norm_rates[step_mask] * 100, fmt='o-', label=rate_data["name"])
+    # ax.set_xlabel('Scan Step')
+    # ax.set_ylabel('Luminosity ')
+    # ax.set_title('Luminosity vs Scan Step with Error Bars')
+    # ax.legend()
+    # plt.tight_layout()
 
     plt.show()
 

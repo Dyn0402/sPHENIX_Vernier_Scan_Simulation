@@ -83,7 +83,7 @@ def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name
         print(f'Keys in tree: {tree.keys()}')
         data = tree.arrays(branches, library='pd')
 
-    bco_step = 106.57377e-9  # BCO step in ns
+    bco_step = 106.57377e-9  # BCO step in s
     constant_offset = 2.0  # Constant offset in s
 
     time = (data['BCO'] - data['BCO'][0]) * bco_step + constant_offset  # Convert BCO to time in seconds

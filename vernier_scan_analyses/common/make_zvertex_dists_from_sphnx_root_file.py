@@ -160,6 +160,7 @@ def get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path="output_
         mask = (time >= start_time) & (time <= end_time)
         step_data = data[mask]
         step_duration = end_time - start_time
+        step_num = row['step']
 
         raw_mbd_zvtx = step_data['mbd_zvtx']
         zdc_ns_trigger = step_data['zdc_SN_trigger']
@@ -178,8 +179,8 @@ def get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path="output_
             bin_errors = np.sqrt(raw_counts) / step_duration
 
             # Create and fill ROOT histogram
-            hist_name = f"step_{index}_bunch_{bunch}"
-            hist = ROOT.TH1F(hist_name, f"Step {index} Bunch {bunch} MBD+ZDC Coincidence Rate;MBD Z Vertex (cm);Rate (Hz)",
+            hist_name = f"step_{step_num}_bunch_{bunch}"
+            hist = ROOT.TH1F(hist_name, f"Step {step_num} Bunch {bunch} MBD+ZDC Coincidence Rate;MBD Z Vertex (cm);Rate (Hz)",
                              nbins, binning[0], binning[-1])
 
             for i in range(nbins):
@@ -188,7 +189,7 @@ def get_bunch_by_bunch_step_z_vertex_dists(data, time, cad_df, out_path="output_
 
             hist.Write()  # Write to file
 
-        print(f"Step {index}: Start Time: {start_time}, End Time: {end_time}, Duration: {step_duration:.2f} s, "
+        print(f"Step {step_num}: Start Time: {start_time}, End Time: {end_time}, Duration: {step_duration:.2f} s, "
               f"Data Points: {len(step_data)}, Rate: {len(step_data) / step_duration:.2f} Hz")
 
     root_file.Close()

@@ -9,6 +9,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/z_vertex_fitting_common
 """
 
 import os
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -18,7 +19,7 @@ from datetime import datetime, time
 import uproot
 
 
-def load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column='zdc_raw_rate'):
+def load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column='zdc_raw_rate', n_protons='wcm'):
     """
     Load vertex data from a ROOT file for the specified steps.
     :param z_vertex_data_path: Path to the ROOT file containing vertex distributions.
@@ -28,7 +29,7 @@ def load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column='zd
     :return: Dictionary with step as key and (centers, counts, count_errs) as values.
     """
     step_0 = cad_df[cad_df['step'] == 0].iloc[0]
-    dcct_blue_nom, dcct_yellow_nom = step_0['blue_dcct_ions'], step_0['yellow_dcct_ions']
+    n_protons_blue_nom, n_protons_yellow_nom = step_0[f'blue_{n_protons}_ions'], step_0[f'yellow_{n_protons}_ions']
 
     vertex_data = {}
     with uproot.open(z_vertex_data_path) as f:
@@ -46,13 +47,55 @@ def load_vertex_distributions(z_vertex_data_path, steps, cad_df, rate_column='zd
             else:
                 hist_scaling_factor = 1
 
-            dcct_scale = (dcct_blue_nom * dcct_yellow_nom) / (
-                    cad_step_row['blue_dcct_ions'] * cad_step_row['yellow_dcct_ions'])
-            counts *= hist_scaling_factor * dcct_scale
-            count_errs *= hist_scaling_factor * dcct_scale
+            n_protons_scale = (n_protons_blue_nom * n_protons_yellow_nom) / (
+                    cad_step_row[f'blue_{n_protons}_ions'] * cad_step_row[f'yellow_{n_protons}_ions'])
+            counts *= hist_scaling_factor * n_protons_scale
+            count_errs *= hist_scaling_factor * n_protons_scale
 
             vertex_data[step] = (centers, counts, count_errs)
     return vertex_data
+
+
+def load_gl1p_vertex_distributions(z_vertex_data_path, steps, gl1p_rates_df):
+    """
+    Load vertex data from a ROOT file for the specified steps.
+    :param z_vertex_data_path: Path to the ROOT file containing vertex distributions.
+    :param steps: List of steps to load data for.
+    :param gl1p_rates_df: DataFrame containing GL1P rates data.
+    :return: Dictionary with step as key and (centers, counts, count_errs) as values.
+    """
+    bunches = get_bunches_from_gl1p_rates_df(gl1p_rates_df)
+    vertex_data = {}
+    with uproot.open(z_vertex_data_path) as f:
+        for step in steps:
+            vertex_data[step] = {bunch: {} for bunch in bunches}
+            for bunch in bunches:
+                hist = f[f'step_{step}_bunch_{bunch}']
+                centers = hist.axis().centers()
+                counts = hist.counts()
+                count_errs = hist.errors()
+                count_errs[count_errs == 0] = 1  # Avoid division by zero
+
+                vertex_data[step][bunch] = (centers, counts, count_errs)
+    return vertex_data
+
+
+def get_bunches_from_gl1p_rates_df(gl1p_rates_df):
+    """
+    Extract unique bunch numbers from the column names of the gl1p_rates_df DataFrame.
+    """
+    column_names = gl1p_rates_df.columns
+
+    bunch_numbers = set()
+
+    for col_name in column_names:
+        match = re.search(r'_bunch_(\d+)_', col_name)
+        if match:
+            bunch_numbers.add(int(match.group(1)))
+
+    unique_bunch_numbers = sorted(bunch_numbers)
+
+    return unique_bunch_numbers
 
 
 def merge_cad_rates_df(cad_df, rates_df):
@@ -84,13 +127,22 @@ def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, 
         em_blue_horiz_nom, em_blue_vert_nom = sim_settings['em_blue_nom']
         em_yel_horiz_nom, em_yel_vert_nom = sim_settings['em_yel_nom']
 
+        # blue_widths = np.array([
+        #     beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+        #     beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+        # ])
+        # yellow_widths = np.array([
+        #     beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+        #     beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+        # ])
+
         blue_widths = np.array([
-            beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
-            beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+            beam_width_x * em_blue_horiz / em_blue_horiz_nom,
+            beam_width_y * em_blue_vert / em_blue_vert_nom
         ])
         yellow_widths = np.array([
-            beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
-            beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+            beam_width_x * em_yel_horiz / em_yel_horiz_nom,
+            beam_width_y * em_yel_vert / em_yel_vert_nom
         ])
 
         collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
@@ -116,15 +168,32 @@ def compute_total_chi2(params, collider_sim, cad_df, centers_list, counts_list, 
             [yellow_offset_x, yellow_offset_y]
         )
 
-        profile_path = get_profile_path(
-            sim_settings['profiles_path'], cad_step_row['start'], cad_step_row['end'], False
-        )
-        collider_sim.set_longitudinal_profiles_from_file(
-            profile_path.replace('COLOR_', 'blue_'),
-            profile_path.replace('COLOR_', 'yellow_')
+        # profile_path = get_profile_path(
+        #     sim_settings['profiles_path'], cad_step_row['start'], cad_step_row['end'], False
+        # )
+        # collider_sim.set_longitudinal_profiles_from_file(
+        #     profile_path.replace('COLOR_', 'blue_'),
+        #     profile_path.replace('COLOR_', 'yellow_')
+        # )
+        # collider_sim.run_sim_parallel()
+
+        profile_paths = get_profile_path(
+            sim_settings['profiles_path'], cad_step_row['start'], cad_step_row['end'], True
         )
 
-        collider_sim.run_sim_parallel()
+        z_dists = []
+        for profile_path in profile_paths:
+            collider_sim.set_longitudinal_profiles_from_file(
+                profile_path.replace('COLOR_', 'blue_'),
+                profile_path.replace('COLOR_', 'yellow_')
+            )
+
+            collider_sim.run_sim_parallel()
+            z_dists.append(collider_sim.z_dist)
+
+        # Use the average z_dist across all profiles
+        z_dist = np.mean(z_dists, axis=0)
+        collider_sim.z_dist = z_dist  # Update the collider_sim with the averaged z_dist
 
         data_index = i if isinstance(centers_list, list) else scan_step
         centers = centers_list[data_index]
@@ -198,15 +267,6 @@ def set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom,
 
     em_blue_horiz_nom, em_blue_vert_nom = em_blue_nom
     em_yel_horiz_nom, em_yel_vert_nom = em_yel_nom
-
-    # blue_widths = np.array([
-    #     beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
-    #     beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
-    # ])
-    # yellow_widths = np.array([
-    #     beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
-    #     beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
-    # ])
 
     blue_widths = np.array([
         beam_width_x * (em_blue_horiz / em_blue_horiz_nom),

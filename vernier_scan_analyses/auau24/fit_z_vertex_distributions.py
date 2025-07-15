@@ -32,7 +32,7 @@ def main():
     # fit_beta_stars_bws_to_all_steps(base_path)
     # fit_beam_widths(base_path)
     plot_beta_star_head_on_fit_results(base_path)
-    plot_beam_width_fit_results(base_path)
+    # plot_beam_width_fit_results(base_path)
     plt.show()
     print('donzo')
 
@@ -167,8 +167,8 @@ def fit_beta_star_to_head_on_steps(base_path):
     # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
     # rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
 
-    rate_cols = ['zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', 'mbd_bkg_cor_rate']
-    bws = [110, 130]
+    rate_cols = ['zdc_sasha_cor_rate', 'mbd_sasha_z200_rate', 'mbd_sasha_bkg_cor_rate']
+    bws = [130, 110]
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
@@ -319,14 +319,14 @@ def plot_beta_star_head_on_fit_results(base_path):
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_130bw.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results.csv')
 
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw110.csv')
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_cor_rate_bw130.csv')  # Nominal
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw110.csv')
+    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw130.csv')  # Nominal
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw130.csv')
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw110.csv')
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_z200_rate_bw130.csv')
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_bkg_cor_rate_bw110.csv')
-    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_bkg_cor_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_z200_rate_bw110.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_z200_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_bkg_cor_rate_bw110.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_bkg_cor_rate_bw130.csv')
 
     # Plot chi2 vs beta star for each step
     fig, axs = plt.subplots(figsize=(10, 6), nrows=3, sharex='all')

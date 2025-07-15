@@ -50,7 +50,8 @@ def main():
     # compare_scaled_live_triggers_steps(data, time, cad_df)
     # compare_new_old_root_file(base_path, data, time)
     # get_mbd_zdc_coincident_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
-    get_gl1p_bunch_by_bunch_rates(base_path_auau, cad_df)
+    df = get_gl1p_bunch_by_bunch_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
+    print(df)
     plt.show()
 
     print('donzo')
@@ -583,16 +584,81 @@ def compare_new_old_root_file(base_path, data, time):
             print(f'Index {i}: New MBD Z Vtx: {mbd_z_vtx}, Old MBD Z Vtx: {mbd_z_vtx_old}')
 
 
-def get_gl1p_bunch_by_bunch_rates(base_path, cad_df):
-    data, time = get_root_data_time(base_path, root_file_name='calofit_54733.root', tree_name='calo_tree',
-                                    sub_dir='vertex_data/',
-                                    branches=['BCO', 'GL1P_mbd_live_count',
-                                              'mbd_live_count', 'zdc_live_count',
-                                              'bunch'])
+def get_gl1p_bunch_by_bunch_step_rates(scan_path, cad_df, root_file_name=None):
+    # data, time = get_root_data_time(scan_path, root_file_name='calofit_54733.root', tree_name='calo_tree',
+    #                                 sub_dir='vertex_data/',
+    #                                 branches=['BCO', 'GL1P_mbd_live_count',
+    #                                           'mbd_live_count', 'zdc_live_count',
+    #                                           'bunch'])
+    #
+    # print(data.columns)
+    # print(data[['bunch', 'GL1P_mbd_live_count']])
+    # print(data['mbd_live_count'])
+    # bunches = data['bunch'].unique()
+    # fig, ax = plt.subplots(figsize=(10, 6))
+    # ax.axhline(0, color='k', zorder=-1)
+    # for bunch in bunches:
+    #     mask = data['bunch'] == bunch
+    #     mbd_live_counts = data['GL1P_mbd_live_count'][mask]
+    #     if bunch >= 111:
+    #         ax.plot(data['BCO'][mask], mbd_live_counts, ls=':')
+    #     else:
+    #         ax.plot(data['BCO'][mask], mbd_live_counts)
+    # ax.set_xlabel('BCO')
+    # ax.set_ylabel('GL1P MBD Live Count')
+    # fig.tight_layout()
+    # plt.show()
 
-    print(data.columns)
-    print(data['GL1P_mbd_live_count'])
-    print(data['mbd_live_count'])
+    detectors = ['mbd', 'mbd_N', 'mbd_S']
+    types = ['raw', 'live', 'cor']
+
+    branches = ['BCO', 'GL1P_clock_raw_count', 'GL1P_clock_live_count', 'GL1P_mbd_raw_count', 'GL1P_mbd_live_count',
+                'GL1P_mbd_N_raw_count', 'GL1P_mbd_N_live_count', 'GL1P_mbd_S_raw_count', 'GL1P_mbd_S_live_count', 'bunch']
+
+    if root_file_name is None:
+        data, time = get_root_data_time(scan_path, branches=branches)
+    else:
+        data, time = get_root_data_time(scan_path, root_file_name, branches=branches)
+
+    step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+    bunches = np.sort(data['bunch'].unique())
+
+    rates = []
+    for index, row in cad_df.iterrows():
+        start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
+        end_time = (row['end'] - run_start).total_seconds() - step_time_cushion
+        mask = (time >= start_time) & (time <= end_time)
+        step_data = data[mask]
+        step_times = time[mask]
+        step_rates = {'step': row['step']}
+
+        for bunch in bunches:
+            bunch_mask = step_data['bunch'] == bunch
+            step_bunch_data = step_data[bunch_mask]
+            step_bunch_times = step_times[bunch_mask]
+
+            step_fine_dur = step_bunch_times.iloc[-1] - step_bunch_times.iloc[0]
+            clock_raw_counts = (step_bunch_data['GL1P_clock_raw_count'].iloc[-1] - step_bunch_data['GL1P_clock_raw_count'].iloc[0])
+            clock_live_counts = (step_bunch_data['GL1P_clock_live_count'].iloc[-1] - step_bunch_data['GL1P_clock_live_count'].iloc[0])
+            clock_scale = clock_raw_counts / clock_live_counts
+
+            step_rates[f'rate_calc_duration_bunch_{bunch}'] = step_fine_dur
+            for detector in detectors:
+                for count_type in types:
+                    col_name = f'GL1P_{detector}_{count_type}_count' if count_type != 'cor' else f'GL1P_{detector}_live_count'
+                    rate = (step_bunch_data[col_name].iloc[-1] - step_bunch_data[col_name].iloc[0]) / step_fine_dur
+
+                    if count_type == 'cor':
+                        rate *= clock_scale
+
+                    step_rates[f'{detector}_{count_type}_bunch_{bunch}_rate'] = rate
+
+        rates.append(step_rates)
+
+    return pd.DataFrame(rates)
 
 
 def get_step_rates(scan_path, cad_df, root_file_name=None):
@@ -625,7 +691,7 @@ def get_step_rates(scan_path, cad_df, root_file_name=None):
         clock_live_rate = (step_data['GL1_live_count'].iloc[-1] - step_data['GL1_live_count'].iloc[0]) / step_fine_dur
         clock_scale = clock_raw_rate / clock_live_rate
 
-        step_rates = {'step': row['step']}
+        step_rates = {'step': row['step'], 'rate_calc_duration': step_fine_dur}
         for detector in detectors:
             for count_type in types:
                 col_name = f'{detector}_{count_type}_count' if count_type != 'cor' else f'{detector}_live_count'

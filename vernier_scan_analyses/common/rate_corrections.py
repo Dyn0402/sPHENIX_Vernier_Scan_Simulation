@@ -14,6 +14,7 @@ import pandas as pd
 from scipy.optimize import root_scalar
 
 from common_logistics import set_base_path
+from z_vertex_fitting_common import get_bunches_from_gl1p_rates_df
 
 
 def main():
@@ -21,6 +22,58 @@ def main():
     scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     combined_cad_step_data_csv_path = f'{scan_path}combined_cad_step_data.csv'
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+
+    cad_df = make_rate_corrections_old(cad_df, plot=True)
+
+    cad_df.to_csv(combined_cad_step_data_csv_path, index=False)
+    print(cad_df.columns)
+    plt.show()
+
+    print('donzo')
+
+
+def make_rate_corrections(cad_df):
+    """ Apply rate corrections to the cad_df DataFrame.
+    """
+    detectors = ['mbd', 'zdc']
+    for detector in detectors:
+        r_ns, r_n, r_s = cad_df[f"{detector}_cor_rate"], cad_df[f'{detector}_N_cor_rate'], cad_df[f'{detector}_S_cor_rate']
+
+        r_ns_cor, r_ns_sasha_cor = calculate_rate_corrections(r_ns, r_n, r_s)
+
+        # Save the corrected rates back to the DataFrame
+        cad_df[f'{detector}_acc_multi_cor_rate'] = r_ns_cor
+        cad_df[f'{detector}_sasha_cor_rate'] = r_ns_sasha_cor
+
+    return cad_df
+
+
+def make_gl1p_rate_corrections(gl1p_rates_df):
+    """ Apply rate corrections to the cad_df DataFrame.
+    """
+    detectors = ['mbd']
+    bunches = get_bunches_from_gl1p_rates_df(gl1p_rates_df)
+    new_columns = {}
+    for detector in detectors:
+        for bunch in bunches:
+            r_ns = gl1p_rates_df[f"{detector}_cor_bunch_{bunch}_rate"]
+            r_n = gl1p_rates_df[f'{detector}_N_cor_bunch_{bunch}_rate']
+            r_s = gl1p_rates_df[f'{detector}_S_cor_bunch_{bunch}_rate']
+
+            r_ns_cor, r_ns_sasha_cor = calculate_rate_corrections(r_ns, r_n, r_s)
+
+            # Save the corrected rates back to the DataFrame
+            new_columns[f'{detector}_acc_multi_cor_bunch_{bunch}_rate'] = r_ns_cor
+            new_columns[f'{detector}_sasha_cor_bunch_{bunch}_rate'] = r_ns_sasha_cor
+
+    new_df = pd.DataFrame(new_columns, index=gl1p_rates_df.index)
+    gl1p_rates_df = pd.concat([gl1p_rates_df, new_df], axis=1)
+    return gl1p_rates_df
+
+
+def make_rate_corrections_old(cad_df, plot=False):
+    """ Apply rate corrections to the cad_df DataFrame.
+    """
 
     f_beam = 78.4 * 1e3  # Hz
     n_bunch = 111
@@ -42,26 +95,40 @@ def main():
             r_ns_sasha_cor = solve_sasha_equation(r_n.iloc[i], r_s.iloc[i], r_ns.iloc[i], n_bunch * f_beam, plot=False)
             cad_df.at[i, f'{detector}_sasha_cor_rate'] = r_ns_sasha_cor
 
-        fig, ax = plt.subplots()
-        ax.plot(cad_df['step'], r_ns, marker='o', label=f'{detector.upper()} Raw Rate')
-        ax.plot(cad_df['step'], r_ns - by, marker='o', label=f'{detector.upper()} Accidental Corrected')
-        ax.plot(cad_df['step'], r_ns_cor, marker='o', label=f'{detector.upper()} Full Corrected Rate')
-        ax.plot(cad_df['step'], cad_df[f'{detector}_sasha_cor_rate'], marker='o', label=f'{detector.upper()} Sasha Corrected Rate')
-        ax.set_xlabel('Step')
-        ax.set_ylabel(f'{detector.upper()} Rate (Hz)')
-        ax.set_title(f'{detector.upper()} Rate Corrections')
-        ax.set_ylim(bottom=0)
-        ax.legend()
-        fig.tight_layout()
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(cad_df['step'], r_ns, marker='o', label=f'{detector.upper()} Raw Rate')
+            ax.plot(cad_df['step'], r_ns - by, marker='o', label=f'{detector.upper()} Accidental Corrected')
+            ax.plot(cad_df['step'], r_ns_cor, marker='o', label=f'{detector.upper()} Full Corrected Rate')
+            ax.plot(cad_df['step'], cad_df[f'{detector}_sasha_cor_rate'], marker='o', label=f'{detector.upper()} Sasha Corrected Rate')
+            ax.set_xlabel('Step')
+            ax.set_ylabel(f'{detector.upper()} Rate (Hz)')
+            ax.set_title(f'{detector.upper()} Rate Corrections')
+            ax.set_ylim(bottom=0)
+            ax.legend()
+            fig.tight_layout()
 
         # Save the corrected rates back to the DataFrame
         cad_df[f'{detector}_acc_multi_cor_rate'] = r_ns_cor
 
-    cad_df.to_csv(combined_cad_step_data_csv_path, index=False)
-    print(cad_df.columns)
-    plt.show()
+    return cad_df
 
-    print('donzo')
+
+def calculate_rate_corrections(r_ns, r_n, r_s):
+    """ Apply rate corrections to the cad_df DataFrame.
+    """
+
+    f_beam = 78.4 * 1e3  # Hz
+    n_bunch = 111
+    by = r_n * r_s / (f_beam * n_bunch)
+    r_ns_cor = n_bunch * f_beam * (-np.log(1 - (r_ns - by) / (n_bunch * f_beam + r_ns - r_n - r_s)))
+
+    r_df = pd.DataFrame({'r_ns': r_ns, 'r_n': r_n, 'r_s': r_s})
+
+    r_ns_sasha_cor = r_df.apply(lambda row: solve_sasha_equation(row['r_n'], row['r_s'], row['r_ns'], n_bunch * f_beam,
+                                                                 plot=False), axis=1)
+
+    return r_ns_cor, r_ns_sasha_cor
 
 
 def solve_sasha_equation(n_eff, s_eff, ns_eff, n_crossings, plot=False):

@@ -13,7 +13,8 @@ import pandas as pd
 from bpm_analysis import bpm_analysis, get_start_end_times
 from analyze_ions import analyze_ions
 from analyze_emittance import add_emittance_info_to_df
-from analyze_sphnx_root_file import get_step_rates
+from analyze_sphnx_root_file import get_step_rates, get_gl1p_bunch_by_bunch_step_rates
+from rate_corrections import make_rate_corrections, make_gl1p_rate_corrections
 from common_logistics import set_base_path
 
 
@@ -50,8 +51,18 @@ def main():
     rates_df = get_step_rates(scan_path, df, root_file_name)
     df = df.merge(rates_df, on='step', how='left')
 
+    # Apply rate corrections to the dataframe
+    df = make_rate_corrections(df)
+
     # Write the dataframe to a CSV file
-    df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
+    # df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
+
+    # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
+    gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name)
+    gl1p_rates_df = make_gl1p_rate_corrections(gl1p_rates_df)
+    gl1p_rates_df.to_csv(f'{scan_path}gl1p_bunch_by_bunch_step_rates.csv', index=False)
+
+    # For auau24 next run calculate_corrected_raw_rates to deal with mbd background
 
     print('donzo')
 

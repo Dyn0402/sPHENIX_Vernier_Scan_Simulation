@@ -15,7 +15,8 @@ from scipy.interpolate import interp1d
 import pandas as pd
 
 from BunchCollider import BunchCollider
-from z_vertex_fitting_common import load_vertex_distributions, get_profile_path, fit_amp_shift, merge_cad_rates_df
+from z_vertex_fitting_common import (load_vertex_distributions, get_profile_path, fit_amp_shift,
+                                     load_gl1p_vertex_distributions, get_bunches_from_gl1p_rates_df)
 from common_logistics import set_base_path
 
 
@@ -27,11 +28,16 @@ def main():
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     z_vertex_no_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
+    z_vertex_no_zdc_gl1_data_path = f'{base_path}vertex_data/54733_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    gl1p_step_rates_csv_path = f'{base_path}gl1p_bunch_by_bunch_step_rates.csv'
     plot_out_path = f'{base_path}Figures/zvertex_cut_plots/'
 
-    get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
-    add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)
+    # get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
+    # add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)
+    if gl1p_step_rates_csv_path:
+        get_mbd_gl1p_cut_rates(z_vertex_no_zdc_gl1_data_path, gl1p_step_rates_csv_path, combined_cad_step_data_csv_path)
+        add_bkg_cor_mbd_rate_to_gl1p_df(gl1p_step_rates_csv_path)
     # compare_mbd_corrected_to_zdc(base_path)
 
     print('donzo')
@@ -52,6 +58,40 @@ def add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path):
     # Save the updated DataFrame back to the CSV file
     cad_df.to_csv(combined_cad_step_data_csv_path, index=False)
     print(f'Saved updated cad_df with mbd_bkg_cor_rate to {combined_cad_step_data_csv_path}')
+
+
+def add_bkg_cor_mbd_rate_to_gl1p_df(gl1p_rates_csv_path):
+    """
+    Add the background corrected MBD rates to the gl1p_rates_df.
+    """
+    gl1p_rates_df = pd.read_csv(gl1p_rates_csv_path)
+    bunches = get_bunches_from_gl1p_rates_df(gl1p_rates_df)
+
+    new_columns = {}
+    for bunch in bunches:
+        cut_fraction = gl1p_rates_df[f'mbd_cut_correction_fraction_bunch_{bunch}'] / 100
+        sim_cut_fraction = gl1p_rates_df['simulated_cut_fraction'] / 100
+
+        mbd_uncor = gl1p_rates_df[f'mbd_cor_bunch_{bunch}_rate']
+        mbd_acc_multi = gl1p_rates_df[f'mbd_acc_multi_cor_bunch_{bunch}_rate']
+        mbd_sasha_cor = gl1p_rates_df[f'mbd_sasha_cor_bunch_{bunch}_rate']
+
+        new_columns[f'mbd_bkg_cor_bunch_{bunch}_rate'] = mbd_acc_multi * (1 - cut_fraction)
+        new_columns[f'mbd_z200_bunch_{bunch}_rate'] = mbd_acc_multi * (1 - (cut_fraction + sim_cut_fraction))
+        new_columns[f'mbd_z200_uncor_bunch_{bunch}_rate'] = mbd_uncor * (1 - (cut_fraction + sim_cut_fraction))
+        row_num = 6
+        print(f'Bunch {bunch}: cut_fraction = {cut_fraction.iloc[6]}, sim_cut_fraction = {sim_cut_fraction.iloc[6]}, mbd_uncor = {mbd_uncor.iloc[6]}, mbd_acc_multi = {mbd_acc_multi.iloc[6]}, mbd_sasha_cor = {mbd_sasha_cor.iloc[6]}')
+        new_columns[f'mbd_sasha_bkg_cor_bunch_{bunch}_rate'] = mbd_sasha_cor * (1 - cut_fraction)
+        new_columns[f'mbd_sasha_z200_bunch_{bunch}_rate'] = mbd_sasha_cor * (1 - (cut_fraction + sim_cut_fraction))
+
+    # Drop any existing columns that are going to be overwritten
+    gl1p_rates_df = gl1p_rates_df.drop(columns=new_columns.keys(), errors='ignore')
+
+    # Concatenate new columns in one operation → no fragmentation
+    gl1p_rates_df = pd.concat([gl1p_rates_df, pd.DataFrame(new_columns)], axis=1)
+
+    gl1p_rates_df.to_csv(gl1p_rates_csv_path, index=False)
+    print(f'Saved updated cad_df with mbd_bkg_cor_rate to {gl1p_rates_csv_path}')
 
 
 def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path=None):
@@ -85,6 +125,7 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
     collider_sim.set_gaus_smearing_sigma(mbd_resolution)
 
     for step in steps:
+        print(f'Processing step {step}...')
         centers, counts, count_errs = vertex_data[step]
         centers_zdc, counts_zdc, count_errs_zdc = vertex_data_with_zdc[step]
 
@@ -98,13 +139,22 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
         em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
         em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
 
+        # blue_widths = np.array([
+        #     beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+        #     beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+        # ])
+        # yellow_widths = np.array([
+        #     beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+        #     beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+        # ])
+
         blue_widths = np.array([
-            beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
-            beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+            beam_width_x * em_blue_horiz / em_blue_horiz_nom,
+            beam_width_y * em_blue_vert / em_blue_vert_nom
         ])
         yellow_widths = np.array([
-            beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
-            beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+            beam_width_x * em_yel_horiz / em_yel_horiz_nom,
+            beam_width_y * em_yel_vert / em_yel_vert_nom
         ])
 
         blue_angle_x = -cad_step_row['blue angle h'] * 1e-3
@@ -115,20 +165,40 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
         blue_offset_x, blue_offset_y = cad_step_row['set offset h'] * 1e3, cad_step_row['set offset v'] * 1e3
         yellow_offset_x, yellow_offset_y = 0, 0
 
-        profile_path = get_profile_path(
-            longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], False
-        )
-
         collider_sim.set_bunch_beta_stars(beta_star, beta_star)
         collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
         collider_sim.set_bunch_crossing(blue_angle_x, blue_angle_y, yellow_angle_x, yellow_angle_y)
         collider_sim.set_bunch_offsets([blue_offset_x, blue_offset_y], [yellow_offset_x, yellow_offset_y])
-        collider_sim.set_longitudinal_profiles_from_file(
-            profile_path.replace('COLOR_', 'blue_'),
-            profile_path.replace('COLOR_', 'yellow_')
+
+        # profile_path = get_profile_path(
+        #     longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], False
+        # )
+        #
+        # collider_sim.set_longitudinal_profiles_from_file(
+        #     profile_path.replace('COLOR_', 'blue_'),
+        #     profile_path.replace('COLOR_', 'yellow_')
+        # )
+        #
+        # collider_sim.run_sim_parallel()
+
+        profile_paths = get_profile_path(
+            longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], True
         )
 
-        collider_sim.run_sim_parallel()
+        z_dists = []
+        for profile_i, profile_path in enumerate(profile_paths):
+            print(f' Profile {profile_i + 1}/{len(profile_paths)}')
+            collider_sim.set_longitudinal_profiles_from_file(
+                profile_path.replace('COLOR_', 'blue_'),
+                profile_path.replace('COLOR_', 'yellow_')
+            )
+
+            collider_sim.run_sim_parallel()
+            z_dists.append(collider_sim.z_dist)
+
+        # Use the average z_dist across all profiles
+        z_dist = np.mean(z_dists, axis=0)
+        collider_sim.z_dist = z_dist  # Update the collider_sim with the averaged z_dist
 
         fit_mask = (centers > fit_range[0]) & (centers < fit_range[1])
 
@@ -202,6 +272,55 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
     # Update the cad_df with the new rates
     cad_df.to_csv(combined_cad_step_data_csv_path, index=False)
     print(f'Saved updated cad_df to {combined_cad_step_data_csv_path}')
+
+
+def get_mbd_gl1p_cut_rates(z_vertex_data_path, gl1p_step_rate_data_csv_path, combined_cad_step_data_csv_path):
+    """
+    Calculate the fraction of MBD z vertex positions outside of the cut for each step. For GL1P bunch-by-bunch rates,
+    not enough stats to do fit, just get the fraction of counts outside of the cut.
+    """
+    gl1p_rates_df = pd.read_csv(gl1p_step_rate_data_csv_path)
+    cad_df = pd.read_csv(combined_cad_step_data_csv_path)
+    z_cut = 200  # cm, cut for the MBD
+    steps = np.arange(0, 25)
+
+    bunches = get_bunches_from_gl1p_rates_df(gl1p_rates_df)
+
+    # Add simulated_cut_fraction column from cad_df to gl1p_rates_df
+    # gl1p_rates_df['simulated_cut_fraction'] = cad_df['simulated_cut_fraction']
+    gl1p_rates_df = gl1p_rates_df.merge(cad_df[['step', 'simulated_cut_fraction']], on='step', how='left')
+    print(f'columns in gl1p_rates_df: {gl1p_rates_df.columns}')
+
+    # Get the vz fraction outside of the cut for data from no ZDC coincidence and from simulation with ZDC coincidence
+    vertex_data = load_gl1p_vertex_distributions(z_vertex_data_path, steps, gl1p_rates_df)
+
+    # Build all new columns in dict of lists
+    # new_columns = {f'mbd_cut_correction_fraction_bunch_{bunch}': [] for bunch in bunches}
+
+    for step in steps:
+        sim_cut_fraction = gl1p_rates_df[gl1p_rates_df['step'] == step].iloc[0]['simulated_cut_fraction']
+
+        for bunch in bunches:
+            centers, counts, count_errs = vertex_data[step][bunch]
+
+            # Get fraction of counts where |z| > z_cut
+            z_cut_mask = np.abs(centers) > z_cut
+            total_counts = counts.sum()
+            cut_counts = counts[z_cut_mask].sum()
+            cut_fraction = cut_counts / total_counts if total_counts > 0 else 0
+
+            cut_fraction = cut_fraction * 100
+            print(f'Step {step}, bunch {bunch}: MBD cut fraction = {cut_fraction:.2f}%, Simulated cut fraction = {sim_cut_fraction:.2f}%')
+
+            correction_fraction = cut_fraction - sim_cut_fraction
+
+            # new_columns[f'mbd_cut_correction_fraction_bunch_{bunch}'].append(correction_fraction)
+            gl1p_rates_df.loc[gl1p_rates_df['step'] == step, f'mbd_cut_correction_fraction_bunch_{bunch}'] = correction_fraction
+
+    # Update the cad_df with the new rates
+    # gl1p_rates_df = pd.concat([gl1p_rates_df, pd.DataFrame(new_columns)], axis=1)
+    gl1p_rates_df.to_csv(gl1p_step_rate_data_csv_path, index=False)
+    print(f'Saved updated cad_df to {gl1p_step_rate_data_csv_path}')
 
 
 def compare_mbd_corrected_to_zdc(base_path):

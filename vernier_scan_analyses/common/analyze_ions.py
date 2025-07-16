@@ -17,8 +17,8 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     plot_ions(scan_path)
     print('donzo')
 

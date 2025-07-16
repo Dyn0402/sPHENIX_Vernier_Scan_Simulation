@@ -427,7 +427,8 @@ def fit_beam_widths_bunch_by_bunch(base_path):
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     gl1p_rate_data_csv_path = f'{base_path}gl1p_bunch_by_bunch_step_rates.csv'
 
-    bunches = np.arange(0, 111, 1)
+    # bunches = np.arange(0, 111, 1)
+    bunches = np.arange(0, 1, 1)
 
     f_beam = 78.4  # kHz
     mb_to_um2 = 1e-19
@@ -447,12 +448,12 @@ def fit_beam_widths_bunch_by_bunch(base_path):
     min_offset = 150  # um
     max_offset = 850  # um
 
-    plot_bunches = False
+    plot_bunches = True
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
     beam_width_x, beam_width_y = 130.0, 130.0
-    beam_width_xs = np.linspace(120, 140, 9)
+    beam_width_xs = np.linspace(120, 145, 15)
     beta_star = 76.4
     bkg = 0.0e-17
     gauss_eff_width = 500
@@ -594,7 +595,7 @@ def fit_beam_widths_bunch_by_bunch(base_path):
 
                 ax.errorbar(scan_steps_plt, rate_data['scaled_rate'], yerr=rate_data['scaled_errs'],
                             marker=rate_data['marker'], linestyle=rate_data['ls'],
-                            color=rate_data['color'], label=rate_data['name'])
+                            color=rate_data['color'], label=rate_data['name'], zorder=10)
 
             chi2s = {rd['name']: {} for rd in rates_data}
             for beam_width_x in beam_width_xs:
@@ -605,12 +606,12 @@ def fit_beam_widths_bunch_by_bunch(base_path):
                 for rate_data in rates_data:
                     chi2s[rate_data['name']][beam_width_x] = (lumis_mean * scale - rate_data['scaled_rate'])**2 / (rate_data['scaled_errs']**2 + lumi_std**2)
 
-                ax.errorbar(scan_steps_plt, lumis_mean * scale, yerr=lumi_std * scale, alpha=0.7,
-                            marker='.', linestyle='-', label=rf'Lumi $\sigma_x=$ {beam_width_x} um')
+                ax.errorbar(scan_steps_plt, lumis_mean * scale, yerr=lumi_std * scale, alpha=0.5,
+                            marker='.', linestyle='-', label=rf'Lumi $\sigma_x=$ {beam_width_x:.1f} um')
 
             ax.axhline(0, color='k', ls='-', zorder=0)
             ax.set_xlabel('Scan Step')
-            ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$] / Rate [Hz]')
+            ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$] (Rate Scaled to Lumi)')
             ax.set_title(f'Beam Width X Scan: Bunch {bunch}')
             ax.legend()
             fig.tight_layout()
@@ -675,7 +676,7 @@ def fit_beam_widths_bunch_by_bunch(base_path):
         pmeas = [Measure(v, e) for v, e in zip(popt, perr)]
         ax.annotate(f'Gaussian Fit:\nAmplitude: {pmeas[0]}\nMean: {pmeas[1]} μm\nStd Dev: {pmeas[2]} μm',
                     xy=(0.03, 0.97), xycoords='axes fraction', textcoords='axes fraction',
-                    fontsize=10, ha='left', va='top', color='black', bboxstyle='round,pad=0.5', alpha=0.5)
+                    fontsize=10, ha='left', va='top', color='black')
         ax.set_xlabel('Beam Width X [um]')
         ax.set_ylabel('Count')
         ax.set_title(f'Bunch by Bunch Beam Width X for {rate_data_name}')

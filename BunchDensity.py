@@ -116,6 +116,16 @@ class BunchDensity:
             self.effective_longitudinal_params['sigma1'] = z
         self.reset = True
 
+    def set_bunch_length(self, length):
+        """
+        Set the length of the bunch for Gaussian approximation.
+        :param length:
+        :return:
+        """
+        self.longitudinal_params['sigma1'] = length
+        self.effective_longitudinal_params['sigma1'] = length
+        self.reset = True
+
     def set_angles(self, angle_x, angle_y):
         """
         Set the rotation angles of the bunch in the y-z and x-z planes.
@@ -149,10 +159,15 @@ class BunchDensity:
         Read the longitudinal beam profile from a file and set it.
         :param profile_path: str Path to file with longitudinal profile
         """
-        data = np.loadtxt(profile_path, skiprows=1)
+        if profile_path is None:
+            print("No longitudinal profile file provided. Using default parameters.")
+            self.longitudinal_profile_zs = None
+            self.longitudinal_profile_densities = None
+        else:
+            data = np.loadtxt(profile_path, skiprows=1)
 
-        self.longitudinal_profile_zs = data[:, 0]  # z positions in um
-        self.longitudinal_profile_densities = data[:, 1]  # densities in um^-3
+            self.longitudinal_profile_zs = data[:, 0]  # z positions in um
+            self.longitudinal_profile_densities = data[:, 1]  # densities in um^-3
         self.reset = True
 
     def set_longitudinal_beam_profile_scaling(self, scaling):
@@ -191,6 +206,18 @@ class BunchDensity:
         length = 2 * popt[1]
 
         return length
+
+    def check_profile_normalization(self):
+        """
+        Check if the longitudinal profile is normalized.
+        """
+        total_density = None
+        if self.longitudinal_profile_densities is not None and self.longitudinal_profile_zs is not None:
+            total_density = np.trapezoid(self.longitudinal_profile_densities, self.longitudinal_profile_zs)
+            print(f'Total density from profile: {total_density:.6f}, is normalized: {np.isclose(total_density, 1.0, atol=1e-6)}')
+        else:
+            print("Longitudinal profile not set. Cannot check normalization.")
+        return total_density
 
     def calculate_r_and_beta(self):
         """

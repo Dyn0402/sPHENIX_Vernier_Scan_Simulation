@@ -145,6 +145,15 @@ class BunchCollider:
         self.bunch1.read_longitudinal_beam_profile_from_file(bunch1_path)
         self.bunch2.read_longitudinal_beam_profile_from_file(bunch2_path)
 
+    def set_bunch_lengths(self, length1, length2):
+        """
+        Set the gaussian longitudinal widths of the bunches in microns.
+        :param length1: Length of bunch 1 in microns
+        :param length2: Length of bunch 2 in microns
+        """
+        self.bunch1.set_bunch_length(length1)
+        self.bunch2.set_bunch_length(length2)
+
     def set_grid_size(self, n_points_x=None, n_points_y=None, n_points_z=None, n_points_t=None):
         if n_points_x is not None:
             self.n_points_x = n_points_x
@@ -154,6 +163,19 @@ class BunchCollider:
             self.n_points_z = n_points_z
         if n_points_t is not None:
             self.n_points_t = n_points_t
+
+    def check_profile_normalizations(self):
+        """
+        Check if the longitudinal profiles of the bunches are normalized correctly.
+        :return: True if both profiles are normalized, False otherwise.
+        """
+        total_density1 = self.bunch1.check_profile_normalization()
+        total_density2 = self.bunch2.check_profile_normalization()
+        print(f'Bunch 1 total density: {total_density1}, Bunch 2 total density: {total_density2}')
+        if not np.isclose(total_density1, 1.0, atol=1e-6):
+            print(f'Bunch 1 profile is not normalized: {total_density1}')
+        if not np.isclose(total_density2, 1.0, atol=1e-6):
+            print(f'Bunch 2 profile is not normalized: {total_density2}')
 
     def generate_grid(self):
         # Set timestep for propagation in nano seconds

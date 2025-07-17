@@ -246,7 +246,7 @@ def write_avg_longitudinal_profiles():
     base_path = set_base_path()
     # profiles_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles/'
     profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
-    plot = False
+    plot = True
 
     for file_name in os.listdir(profiles_path):
         if not file_name.endswith('.dat') or file_name.startswith('avg_') or file_name.startswith('bunch_'):
@@ -261,9 +261,32 @@ def write_avg_longitudinal_profiles():
         beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
         print(f'{beam_color} from {date} at {time}')
 
-        baseline = np.percentile(data, 90)
+        if ':20:' not in time:
+            continue
+
+        if plot:
+            fig, ax = plt.subplots(figsize=(12, 6))  # Histogram of the data
+            ax.hist(data, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 1), color='blue', alpha=0.5, label='Blue Profile')
+            ax.set_xlabel('Wall Current')
+
+        baseline = np.percentile(data, 85)
         # print(f'Baseline: {baseline}')
-        data = baseline - data
+        zero_safety_offset = 2  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
+        data = baseline - data - zero_safety_offset
+
+        if plot:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.plot(data, color='blue' if beam_color == 'blue' else 'orange', label='Profile Data')
+            ax.set_xlabel('Index')
+            ax.set_ylabel('Wall Current')
+
+        data[data < 0] = 0  # Set negative values to zero
+
+        if plot:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.plot(data, color='blue' if beam_color == 'blue' else 'orange', label='Profile Data')
+            ax.set_xlabel('Index')
+            ax.set_ylabel('Wall Current')
 
         time_step = 0.05  # ns
         segment_time = 106.573785  # ns
@@ -381,8 +404,11 @@ def write_bunch_by_bunch_longitudinal_profiles():
         beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
         print(f'{beam_color} from {date} at {time}')
 
-        baseline = np.percentile(data, 90)
-        data = baseline - data
+        baseline = np.percentile(data, 85)
+        zero_safety_offset = 2  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
+        data = baseline - data - zero_safety_offset
+
+        data[data < 0] = 0  # Set negative values to zero
 
         time_step = 0.05  # ns
         segment_time = 106.573785  # ns

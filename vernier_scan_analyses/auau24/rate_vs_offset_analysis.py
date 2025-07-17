@@ -8,6 +8,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/rate_vs_offset_analysis.py
 @author: Dylan Neff, dylan
 """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -25,8 +26,8 @@ def main():
     base_path = set_base_path()
     base_path += 'Vernier_Scans/auau_oct_16_24/'
     # plot_head_on_accuracy_for_corrections(base_path)
-    # fit_beam_widths(base_path)
-    fit_beam_widths_bunch_by_bunch(base_path)
+    fit_beam_widths(base_path)
+    # fit_beam_widths_bunch_by_bunch(base_path)
     # compare_gl1_and_gl1p_rates(base_path)
     # plot_lumi_vs_step_zdc_cor(base_path)
     # lumi_test(base_path)
@@ -252,27 +253,31 @@ def fit_beam_widths(base_path):
     """
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    out_csv_path = f'{base_path}beam_widths_rate_only_fit_results.csv'
 
     f_beam = 78.4  # kHz
     mb_to_um2 = 1e-19
     lumi_z_cut = 200
     # lumi_z_cut = None
-    observed = False  # True for MBD
+    observed = True  # True for MBD
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
+    orientation = 'Vertical'  # 'Horizontal' or 'Vertical'
+
     # scan_steps = np.arange(0, 25, 1)
-    scan_steps = np.arange(0, 12, 1)
-    norm_step = 0  # Step to normalize the rates to
+    # scan_steps = np.arange(0, 12, 1)
+    scan_steps = cad_df['step']
+    norm_step = 0 if orientation == 'Horizontal' else 12  # Step to normalize the rates to
     # scan_steps = np.arange(0, 4, 1)
 
     min_offset = 150  # um
-    max_offset = 850  # um
+    max_offset = 750  # um
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
-    beam_width_x, beam_width_y = 130.0, 130.0
-    beam_width_xs = np.linspace(120, 140, 9)
+    beam_width_x_nom, beam_width_y_nom = 130.0, 130.0
+    beam_widths = np.linspace(120, 140, 9)
     beta_star = 76.4
     bkg = 0.0e-17
     gauss_eff_width = 500
@@ -280,7 +285,7 @@ def fit_beam_widths(base_path):
     # gauss_eff_width = None
     # mbd_resolution = None
 
-    norm_bw = beam_width_xs[len(beam_width_xs) // 2]  # Use the middle beam width for normalization
+    norm_bw = beam_widths[len(beam_widths) // 2]  # Use the middle beam width for normalization
 
     collider_sim.set_bkg(bkg)
     collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
@@ -305,11 +310,13 @@ def fit_beam_widths(base_path):
         # {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'green', 'ls': '--'},
     ]
 
-    lumis, lumi_stds, scan_steps_plt = {bwx: [] for bwx in beam_width_xs}, {bwx: [] for bwx in beam_width_xs}, []
+    lumis, lumi_stds, scan_steps_plt = {bwx: [] for bwx in beam_widths}, {bwx: [] for bwx in beam_widths}, []
     norm_step_lumis = {}
     for scan_step in scan_steps:
         print(f'Scan Step: {scan_step}')
         cad_step_row = cad_df[cad_df['step'] == scan_step].iloc[0]
+        if cad_step_row['orientation'] != orientation:
+            continue
         offset_col = 'set offset h' if cad_step_row['orientation'] == 'Horizontal' else 'set offset v'
         if ((max_offset < abs(cad_step_row[offset_col] * 1e3) or abs(cad_step_row[offset_col] * 1e3) < min_offset)
                 and scan_step != norm_step):
@@ -321,9 +328,15 @@ def fit_beam_widths(base_path):
         profile_paths = get_profile_path(
             longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], True
         )
-        for beam_width_x in beam_width_xs:
+        for beam_width in beam_widths:
             profile_lumis = []
             for profile_path in profile_paths:
+                if orientation == 'Horizontal':
+                    beam_width_x, beam_width_y = beam_width, beam_width_y_nom
+                elif orientation == 'Vertical':
+                    beam_width_x, beam_width_y = beam_width_x_nom, beam_width
+                else:
+                    raise NotImplementedError
                 set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom, em_yel_nom, profile_path)
                 collider_sim.run_sim_parallel()
                 if lumi_z_cut is None:
@@ -339,10 +352,10 @@ def fit_beam_widths(base_path):
                 profile_lumis.append(lumi)
             lumi_mean, lumi_std = np.nanmean(profile_lumis), np.nanstd(profile_lumis)
             if scan_step == norm_step:
-                norm_step_lumis[beam_width_x] = lumi_mean
+                norm_step_lumis[beam_width] = lumi_mean
             else:
-                lumis[beam_width_x].append(lumi_mean)
-                lumi_stds[beam_width_x].append(lumi_std)
+                lumis[beam_width].append(lumi_mean)
+                lumi_stds[beam_width].append(lumi_std)
         for rate_data in rates_data:
             if scan_step == norm_step:
                 rate_data['norm_scale'] = norm_step_lumis[norm_bw] / cad_step_row[rate_data['col_name']]
@@ -352,7 +365,6 @@ def fit_beam_widths(base_path):
                 rate_data['errs'].append(np.sqrt(cad_step_row[rate_data['col_name']] * dur) / dur)
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    # step_0_lumi_scale = lumis[beam_width_xs[len(beam_width_xs) // 2]][0]
     for rate_data in rates_data:
         rate_data['data'] = np.array(rate_data['data'])  # All should be the same for each step, just get mean
         rate_data['errs'] = np.array(rate_data['errs'])
@@ -365,42 +377,43 @@ def fit_beam_widths(base_path):
                     color=rate_data['color'], label=rate_data['name'])
 
     chi2s = {rd['name']: {} for rd in rates_data}
-    for beam_width_x in beam_width_xs:
-        lumis_mean = np.array(lumis[beam_width_x])
-        lumi_std = np.array(lumi_stds[beam_width_x])
-        scale = norm_step_lumis[norm_bw] / norm_step_lumis[beam_width_x]
+    for beam_width in beam_widths:
+        lumis_mean = np.array(lumis[beam_width])
+        lumi_std = np.array(lumi_stds[beam_width])
+        scale = norm_step_lumis[norm_bw] / norm_step_lumis[beam_width]
 
         for rate_data in rates_data:
-            chi2s[rate_data['name']][beam_width_x] = (lumis_mean * scale - rate_data['scaled_rate'])**2 / (rate_data['scaled_errs']**2 + lumi_std**2)
+            chi2s[rate_data['name']][beam_width] = (lumis_mean * scale - rate_data['scaled_rate'])**2 / (rate_data['scaled_errs']**2 + lumi_std**2)
 
         ax.errorbar(scan_steps_plt, lumis_mean * scale, yerr=lumi_std * scale, alpha=0.7,
-                    marker='.', linestyle='-', label=rf'Lumi $\sigma_x=$ {beam_width_x} um')
+                    marker='.', linestyle='-', label=rf'Lumi $\sigma=$ {beam_width:.1f} um')
 
     ax.axhline(0, color='k', ls='-', zorder=0)
     ax.set_xlabel('Scan Step')
     ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$] / Rate [Hz]')
-    ax.set_title(f'Beam Width X Scan')
+    ax.set_title(f'{orientation} Beam Width Scan')
     ax.legend()
     fig.tight_layout()
 
+    df_out = []
     for rate_data in rates_data:
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.axhline(0, color='k', ls='-', zorder=0)
-        chi2_array = np.array([chi2s[rate_data['name']][beam_width_x] for beam_width_x in beam_width_xs])
+        chi2_array = np.array([chi2s[rate_data['name']][beam_width_x] for beam_width_x in beam_widths])
         min_chi2_bws = []
         for step_i, step in enumerate(scan_steps_plt):
             step_chis = chi2_array[:, step_i]
-            l = ax.plot(beam_width_xs, step_chis, linestyle='-', label=f'Step {step}')
-            min_chi2_bw, min_chi2_value = get_minimum_chi2(step_chis, beam_width_xs)
+            l = ax.plot(beam_widths, step_chis, linestyle='-', label=f'Step {step}')
+            min_chi2_bw, min_chi2_value = get_minimum_chi2(step_chis, beam_widths)
             min_chi2_bws.append(min_chi2_bw)
             ax.axvline(min_chi2_bw, color=l[0].get_color(), linestyle='--')
 
         # Plot average chi2 across all steps
         avg_chi2 = np.mean(chi2_array, axis=1)
-        min_chi2_bw, min_chi2_value = get_minimum_chi2(avg_chi2, beam_width_xs)
+        min_chi2_bw, min_chi2_value = get_minimum_chi2(avg_chi2, beam_widths)
         std_min_chi2 = np.std(min_chi2_bws)
         ax.axvspan(min_chi2_bw - std_min_chi2, min_chi2_bw + std_min_chi2, alpha=0.2, color='black')
-        ax.plot(beam_width_xs, avg_chi2, linestyle='-', color='black', label='Average', linewidth=2)
+        ax.plot(beam_widths, avg_chi2, linestyle='-', color='black', label='Average', linewidth=2)
         ax.axvline(min_chi2_bw, color='black', linestyle='--', linewidth=2)
         bw_min = Measure(min_chi2_bw, std_min_chi2)
         ax.annotate(f'Beam Width: {bw_min} μm', xy=(min_chi2_bw, min_chi2_value), xycoords='data',
@@ -408,11 +421,32 @@ def fit_beam_widths(base_path):
                     arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=4),
                     ha='left', va='top', fontsize=10, color='black')
 
-        ax.set_xlabel('Beam Width X [um]')
+        df_out.append({'rate_name': rate_data['name'], 'orientation': orientation, 'beam_width': bw_min.val, 'beam_width_err': bw_min.err})
+
+        ax.set_xlabel(f'{orientation} Beam Width [um]')
         ax.set_ylabel(r'$\chi^2$')
-        ax.set_title(f'Chi2 vs Beam Width X for Each Step : {rate_data["name"]}')
+        ax.set_title(f'Chi2 vs {orientation} Beam Width for Each Step : {rate_data["name"]}')
         ax.legend(loc='upper right')
         fig.tight_layout()
+
+    df_out = pd.DataFrame(df_out)
+    if os.path.exists(out_csv_path):
+        df_existing = pd.read_csv(out_csv_path)
+
+        # Remove existing rows that match any of the new rate_name + orientation combinations
+        mask = pd.Series([True] * len(df_existing))
+
+        for _, row in df_out.iterrows():
+            mask &= ~((df_existing['rate_name'] == row['rate_name']) &
+                      (df_existing['orientation'] == row['orientation']))
+
+        df_existing = df_existing[mask]
+
+        # Append the new rows
+        df_out = pd.concat([df_existing, df_out], ignore_index=True)
+
+    # Save to CSV
+    df_out.to_csv(out_csv_path, index=False)
 
     plt.show()
 

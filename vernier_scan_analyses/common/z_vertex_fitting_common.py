@@ -405,13 +405,16 @@ def get_profile_path(profile_dir_path, start_time, end_time, return_all=False, b
     if isinstance(end_time, str):
         end_time = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
 
+    # Get year from start_time
+    year = start_time.year % 100  # Get last two digits of the year
+
     starts_with = 'avg_' if bunch_num is None else f'bunch_{bunch_num}_'
 
     # Get all files in the directory
     all_files = [f for f in os.listdir(profile_dir_path) if f.endswith('.dat') and f.startswith(starts_with)]
 
     # Filter files that match the expected pattern
-    blue_files = [f for f in all_files if f.startswith(f"{starts_with}blue_profile_24_")]
+    blue_files = [f for f in all_files if f.startswith(f"{starts_with}blue_profile_{year}_")]
     blue_times = [datetime.combine(start_time.date(), extract_time_from_filename(f)) for f in blue_files]
     blue_times, blue_files = zip(*sorted(zip(blue_times, blue_files)))  # Sort blue files and times together by time
     good_files, good_file_times = [], []

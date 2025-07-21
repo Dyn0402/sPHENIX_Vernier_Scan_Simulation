@@ -247,7 +247,7 @@ def write_avg_longitudinal_profiles():
     # profiles_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles/'
     profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
     # profiles_path = f'{base_path}Vernier_Scans/auau_july_17_25/profiles/'
-    plot = False
+    plot = True
 
     for file_name in os.listdir(profiles_path):
         if not file_name.endswith('.dat') or file_name.startswith('avg_') or file_name.startswith('bunch_'):
@@ -266,31 +266,55 @@ def write_avg_longitudinal_profiles():
         # if ':17:' not in time:
         #     continue
 
+        baseline_separator = scan_discrete_hist(data)
         if plot:
             fig, ax = plt.subplots(figsize=(12, 6))  # Histogram of the data
             ax.hist(data, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 1), color='blue', alpha=0.5, label='Blue Profile')
             ax.set_xlabel('Wall Current')
+            ax.axvline(baseline_separator, color='red')
 
             fig, ax = plt.subplots(figsize=(12, 6))  # Line plot of the data
             ax.plot(data, color='blue' if beam_color == 'blue' else 'orange', label='Profile Data')
             ax.set_ylabel('Wall Current')
 
         # baseline = np.percentile(data, 85)
-        baseline = np.max(data)
+        # baseline = np.max(data)
         print(f'Percentiles: 20: {np.percentile(data, 20)}, 30: {np.percentile(data, 30)}, 50: {np.percentile(data, 50)}, 85: {np.percentile(data, 85)}, 90: {np.percentile(data, 90)}')
         print(f'Avg > 20 percentile : {np.mean(data[data > np.percentile(data, 20)])}, {np.mean(data[data > np.percentile(data, 20) + 1])}')
         # print(f'Baseline: {baseline}')
-        baseline = np.mean(data[data > np.percentile(data, 20)])
-        zero_safety_offset = 1  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
-        data = baseline - data - zero_safety_offset
+        # baseline = np.mean(data[data > np.percentile(data, 20)])
+        data = baseline_separator - data
+
+        baseline_mask = data < 0
+        data_indices = np.arange(len(data))
+        n_pts = 5000
+        mv_avg_base_indices, mv_avg_base_vals = moving_average(data_indices[baseline_mask], data[baseline_mask], n_pts)
+        # 1D interpolation of the moving average
+        interp_func = interp1d(mv_avg_base_indices, mv_avg_base_vals, kind='linear', bounds_error=False, fill_value=mv_avg_base_vals[0])
 
         if plot:
+            plt_color = 'blue' if beam_color == 'blue' else 'orange'
             fig, ax = plt.subplots(figsize=(8, 6))
-            ax.plot(data, color='blue' if beam_color == 'blue' else 'orange', label='Profile Data')
+            ax.plot(data, color=plt_color)
             ax.set_xlabel('Index')
             ax.set_ylabel('Wall Current')
+            fig.tight_layout()
 
-        data[data < 0] = 0  # Set negative values to zero
+            fig, ax = plt.subplots(figsize=(12, 6))
+            baseline_mask = data < np.percentile(data, 80)
+            data_indices = np.arange(len(data))
+            ax.plot(data_indices[baseline_mask], data[baseline_mask], color=plt_color)
+            for n_pts in [2000, 5000, 10000]:
+                mv_avg_times, mv_avg_vals = moving_average(data_indices[baseline_mask], data[baseline_mask], n_pts)
+                ax.plot(mv_avg_times, mv_avg_vals, label=f'Moving Average ({n_pts} points)', alpha=0.5)
+            ax.set_xlabel('Index')
+            ax.set_ylabel('Wall Current')
+            ax.legend()
+            fig.tight_layout()
+
+        data -= interp_func(data_indices)
+
+        # data[data < 0] = 0  # Set negative values to zero
 
         if plot:
             fig, ax = plt.subplots(figsize=(8, 6))
@@ -322,9 +346,10 @@ def write_avg_longitudinal_profiles():
 
         norm_vals = []
         for bunch_i, (bunch_times, bunch_vals) in enumerate(zip(times, values)):
-            bin_width = bunch_times[1] - bunch_times[0]
+            # bin_width = bunch_times[1] - bunch_times[0]
             bunch_times, bunch_vals = np.array(bunch_times), np.array(bunch_vals)
-            vals = bunch_vals / np.sum(bunch_vals) / bin_width
+            # vals = bunch_vals / np.sum(bunch_vals) / bin_width
+            vals = bunch_vals / np.trapezoid(bunch_vals, bunch_times)
             norm_vals.extend(list(vals))
 
         times_flat = np.concatenate(times)
@@ -333,12 +358,15 @@ def write_avg_longitudinal_profiles():
         norm_vals = np.array(norm_vals)[sorted_idx]
 
         mv_avg_times, mv_avg_vals = moving_average(times_flat, norm_vals, n_bunches)
+        mv_avg_baseline_mask = ((mv_avg_times > 7.5) & (mv_avg_times < 31)) | ((mv_avg_times > 75) & (mv_avg_times < 100))
+        mv_avg_baseline = np.mean(mv_avg_vals[mv_avg_baseline_mask])
 
         if plot:
             fig_all, ax_all = plt.subplots(figsize=(8, 6))
             plot_color = 'blue' if beam_color == 'blue' else 'orange'
             ax_all.plot(times_flat, norm_vals, color=plot_color, alpha=0.01, ls='none', marker='.', label='CAD Profiles')
             ax_all.plot(mv_avg_times, mv_avg_vals, ls='-', label=f'Moving Average ({n_bunches} points)', color='red')
+            ax_all.axhline(mv_avg_baseline, color='black', ls='-', label='Baseline')
             ax_all.set_xlabel('Time (ns)')
             ax_all.set_ylabel('Probability Density')
             ax_all.set_title(
@@ -347,11 +375,13 @@ def write_avg_longitudinal_profiles():
             ax_all.grid(True)
             fig_all.tight_layout()
 
+        mv_avg_vals -= mv_avg_baseline  # Subtract baseline from moving average values
+        mv_avg_vals[mv_avg_vals < 0] = 0  # Set negative values to zero
+
         interp_func = interp1d(mv_avg_times, mv_avg_vals, kind='linear', bounds_error=False)
         times_interp = np.arange(0, segment_time + 0.01, 0.01)
-        min_interp = np.nanmin(interp_func(times_interp))
 
-        interp_func = interp1d(mv_avg_times, mv_avg_vals - min_interp, kind='linear', bounds_error=False, fill_value=0)
+        interp_func = interp1d(mv_avg_times, mv_avg_vals, kind='linear', bounds_error=False, fill_value=0)
         vals_interp = interp_func(times_interp)
 
         if plot:
@@ -373,6 +403,7 @@ def write_avg_longitudinal_profiles():
         c = 299792458. * 1e6 / 1e9  # um/ns Speed of light
         # zs_interp = c * (times_interp - segment_time / 2)  # Convert to um
         zs_interp = c * times_interp_centered  # Convert to um
+        vals_interp /= c
 
         # Normalize
         vals_integral = np.trapezoid(vals_interp, zs_interp)
@@ -388,6 +419,14 @@ def write_avg_longitudinal_profiles():
             ax.plot(zs_interp, vals_interp, ls='-', label=f'Interpolated ({n_bunches} points)', color='red')
             ax.set_xlabel('z (um)')
             ax.set_ylabel('Probability Density')
+            # Get integral outside of 0.5e7
+            cut_boundary = 0.6e7
+            integral_outside = np.trapezoid(vals_interp[np.abs(zs_interp) > cut_boundary], zs_interp[np.abs(zs_interp) > cut_boundary])
+            ax.axvline(cut_boundary, color='black', ls='--')
+            ax.axvline(-cut_boundary, color='black', ls='--')
+            ax.annotate(f'Integral outside {cut_boundary:.1e}: {integral_outside * 100:.2f}%', xy=(0.05, 0.95),
+                        xycoords='axes fraction', fontsize=12, ha='left', va='top',
+                        bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='white'))
             fig.tight_layout()
             plt.show()
 
@@ -742,6 +781,29 @@ def build_manual_initial_guess(peak_list):
     bounds_upper[-1] = 50  # Last sigma is wide
 
     return p0, (bounds_lower, bounds_upper)
+
+
+def scan_discrete_hist(data):
+    """
+    Pass
+    """
+    # Make numpy histogram
+    counts, bin_edges = np.histogram(data, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 1))
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    # Walk left and find local minimum
+    max_idx = np.argmax(counts)
+
+    min_index = None
+    for i in range(max_idx - 1, 1, -1):
+        # Check if it's a local minimum (lower than both neighbors)
+        if counts[i] < counts[i - 1] and counts[i] < counts[i + 1]:
+            min_index = i
+            break
+    distance = max_idx - min_index
+    print(f'Distance from max to min: {distance}')
+    if distance > 5:
+        print(f'Warning: Distance from max to min is greater than 3 bins, which is unusual.')
+    return bin_centers[min_index]
 
 
 

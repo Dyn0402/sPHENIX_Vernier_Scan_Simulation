@@ -13,18 +13,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from common_logistics import set_base_path
+
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
-    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    base_path = set_base_path()
+    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     emittance_angelika_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
     emittance_file_path = f'{scan_path}emittance.dat'
     # df = read_angelika_emittance_file(emittance_angelika_file_path)
     df = read_emittance_file(emittance_file_path)
-    compare_with_angelika_emittance(emittance_angelika_file_path, emittance_file_path)
+    # compare_with_angelika_emittance(emittance_angelika_file_path, emittance_file_path)
 
     param_df = parametrize_emittances_vs_time(df)
     df = df.merge(param_df, on='Time', how='left')

@@ -246,32 +246,42 @@ def write_avg_longitudinal_profiles():
     base_path = set_base_path()
     # profiles_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles/'
     profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
-    plot = True
+    # profiles_path = f'{base_path}Vernier_Scans/auau_july_17_25/profiles/'
+    plot = False
 
     for file_name in os.listdir(profiles_path):
         if not file_name.endswith('.dat') or file_name.startswith('avg_') or file_name.startswith('bunch_'):
             continue
-        with open(f'{profiles_path}{file_name}', 'r') as f:
-            lines = f.readlines()
-        # print(file_name)
-        data_str_list = lines[-1].split()
-        date = data_str_list[0]
-        time = data_str_list[1]
-        data = np.array([int(x) for x in data_str_list[3:]])
-        beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
+        # with open(f'{profiles_path}{file_name}', 'r') as f:
+        #     lines = f.readlines()
+        # # print(file_name)
+        # data_str_list = lines[-1].split()
+        # date = data_str_list[0]
+        # time = data_str_list[1]
+        # data = np.array([int(x) for x in data_str_list[3:]])
+        # beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
+        data, date, time, beam_color = read_longitudinal_profile_data(f'{profiles_path}{file_name}')
         print(f'{beam_color} from {date} at {time}')
 
-        if ':20:' not in time:
-            continue
+        # if ':17:' not in time:
+        #     continue
 
         if plot:
             fig, ax = plt.subplots(figsize=(12, 6))  # Histogram of the data
             ax.hist(data, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 1), color='blue', alpha=0.5, label='Blue Profile')
             ax.set_xlabel('Wall Current')
 
-        baseline = np.percentile(data, 85)
+            fig, ax = plt.subplots(figsize=(12, 6))  # Line plot of the data
+            ax.plot(data, color='blue' if beam_color == 'blue' else 'orange', label='Profile Data')
+            ax.set_ylabel('Wall Current')
+
+        # baseline = np.percentile(data, 85)
+        baseline = np.max(data)
+        print(f'Percentiles: 20: {np.percentile(data, 20)}, 30: {np.percentile(data, 30)}, 50: {np.percentile(data, 50)}, 85: {np.percentile(data, 85)}, 90: {np.percentile(data, 90)}')
+        print(f'Avg > 20 percentile : {np.mean(data[data > np.percentile(data, 20)])}, {np.mean(data[data > np.percentile(data, 20) + 1])}')
         # print(f'Baseline: {baseline}')
-        zero_safety_offset = 2  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
+        baseline = np.mean(data[data > np.percentile(data, 20)])
+        zero_safety_offset = 1  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
         data = baseline - data - zero_safety_offset
 
         if plot:
@@ -783,6 +793,18 @@ def generate_fit_equation_string(n_gaussians):
     numerator = ' + '.join(terms)
     denominator = '1' + ''.join([f' + a_{i}' for i in range(2, n_gaussians + 1)])
     return fr'$p(t) = \frac{{{numerator}}}{{{denominator}}}$'
+
+
+def read_longitudinal_profile_data(file_path):
+    with open(f'{file_path}', 'r') as f:
+        lines = f.readlines()
+    data_str_list = lines[-1].split()
+    date = data_str_list[0]
+    time = data_str_list[1]
+    data = np.array([int(x) for x in data_str_list[3:]])
+    beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
+
+    return data, date, time, beam_color
 
 
 # Gaussian function for fitting

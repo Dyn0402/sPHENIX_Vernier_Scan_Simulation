@@ -23,6 +23,11 @@ def main():
     scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     root_file_name = 'calofit_54733.root'
 
+    if '/pp_' in scan_path:
+        emittance_poly_order = 0
+    else:
+        emittance_poly_order = 2
+
     if scan_path.split('/')[-2] == 'auau_oct_16_24':
         pre_run_buffer = 100  # seconds to remove from the start of the scan
     else:
@@ -44,7 +49,7 @@ def main():
     # Add emittance information to the dataframe
     # emittance_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
     emittance_file_path = f'{scan_path}emittance.dat'
-    emittance_df = add_emittance_info_to_df(emittance_file_path, times=df['mid_time'])
+    emittance_df = add_emittance_info_to_df(emittance_file_path, times=df['mid_time'], poly_order=emittance_poly_order)
     df = df.merge(emittance_df, on='mid_time', how='left')
 
     # Add rates to the dataframe

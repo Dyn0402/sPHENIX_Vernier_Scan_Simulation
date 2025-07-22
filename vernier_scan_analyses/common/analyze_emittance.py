@@ -18,15 +18,24 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
     # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    scan_path = f'{base_path}Vernier_Scans/pp_july_11_24/'
     emittance_angelika_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
     emittance_file_path = f'{scan_path}emittance.dat'
     # df = read_angelika_emittance_file(emittance_angelika_file_path)
     df = read_emittance_file(emittance_file_path)
     # compare_with_angelika_emittance(emittance_angelika_file_path, emittance_file_path)
 
-    param_df = parametrize_emittances_vs_time(df)
+    if '/pp_' in scan_path:
+        emittance_poly_order = 0
+    else:
+        emittance_poly_order = 2
+
+    print(f'Using polynomial order {emittance_poly_order} for emittance fitting')
+
+    param_df = parametrize_emittances_vs_time(df, poly_order=emittance_poly_order)
     df = df.merge(param_df, on='Time', how='left')
 
     plot_emittances_vs_time(df)
@@ -34,16 +43,17 @@ def main():
     print('donzo')
 
 
-def add_emittance_info_to_df(emittance_file_path, times=None):
+def add_emittance_info_to_df(emittance_file_path, times=None, poly_order=2):
     """
     Add emittance information to the dataframe.
     :param emittance_file_path: Path to the emittance file.
     :param times: Optional list of times to use for parametrization. If None, uses the times from the emittance file.
+    :param poly_order: Order of the polynomial to fit the emittances.
     :return: DataFrame with emittance information added.
     """
     # emittance_df = read_angelika_emittance_file(emittance_file_path)
     emittance_df = read_emittance_file(emittance_file_path)
-    emittance_df = parametrize_emittances_vs_time(emittance_df, times)
+    emittance_df = parametrize_emittances_vs_time(emittance_df, times, poly_order=poly_order)
     emittance_df = emittance_df.rename(columns={'Time': 'mid_time',
                                                 'BlueHoriz_fit': 'blue_horiz_emittance',
                                                 'BlueVert_fit': 'blue_vert_emittance',
@@ -52,7 +62,7 @@ def add_emittance_info_to_df(emittance_file_path, times=None):
     return emittance_df
 
 
-def parametrize_emittances_vs_time(df, times=None):
+def parametrize_emittances_vs_time(df, times=None, poly_order=2):
     """
     Fit each emittance to a polynomial and return the coefficients.
     """
@@ -63,7 +73,7 @@ def parametrize_emittances_vs_time(df, times=None):
     for col in cols:
         # coeffs = np.polyfit(df['Time'].astype(np.int64) // 10**9, df[col], 2)  # Convert time to seconds
         # coeffs = np.polyfit(df['Time'].astype(np.int64), df[col], 2)  # Convert time to seconds
-        coeffs = np.polyfit(df['Time'].astype(np.int64), df[col], 2)  # Convert time to seconds
+        coeffs = np.polyfit(df['Time'].astype(np.int64), df[col], poly_order)  # Convert time to seconds
         print(f'Coefficients for {col}: {coeffs}')
         # df[f'{col}_fit'] = np.polyval(coeffs, df['Time'].astype(np.int64) // 10**9)
         # df[f'{col}_fit'] = np.polyval(coeffs, df['Time'].astype(np.int64))

@@ -25,8 +25,8 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
     base_path += 'Vernier_Scans/auau_oct_16_24/'
-    # plot_head_on_accuracy_for_corrections(base_path)
-    fit_beam_widths(base_path)
+    plot_head_on_accuracy_for_corrections(base_path)
+    # fit_beam_widths(base_path)
     # fit_beam_widths_bunch_by_bunch(base_path)
     # compare_gl1_and_gl1p_rates(base_path)
     # plot_lumi_vs_step_zdc_cor(base_path)
@@ -104,6 +104,7 @@ def plot_head_on_accuracy_for_corrections(base_path):
     # lumi_z_cut = 200
     lumi_z_cut = None
     observed = False  # True for MBD
+    ions = 'dcct'  # 'wcm'
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
@@ -158,7 +159,7 @@ def plot_head_on_accuracy_for_corrections(base_path):
                 naked_lumi = collider_sim.get_naked_luminosity(observed=observed)
                 cut_fraction = np.trapezoid(z_dist_cut, zs_cut) / np.trapezoid(z_dist, zs)
                 naked_lumi *= cut_fraction
-            n_blue, n_yellow = cad_step_row['blue_wcm_ions'], cad_step_row['yellow_wcm_ions']
+            n_blue, n_yellow = cad_step_row[f'blue_{ions}_ions'], cad_step_row[f'yellow_{ions}_ions']
             lumi = naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
             lumis.append(lumi)
             scan_steps_plt.append(scan_step)

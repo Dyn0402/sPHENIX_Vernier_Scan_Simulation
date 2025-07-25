@@ -60,7 +60,7 @@ def main():
     df = make_rate_corrections(df)
 
     # Write the dataframe to a CSV file
-    # df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
+    df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
 
     # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
     gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name)

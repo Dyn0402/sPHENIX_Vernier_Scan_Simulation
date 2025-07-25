@@ -264,31 +264,49 @@ def write_avg_longitudinal_profiles():
 
 
 def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, left_right_zero=False,
-                                     subtract_baseline_std=False, fixed_z_zero=None):
+                                     subtract_baseline_std=False, fixed_z_zero=6e6, recalc_baseline=True):
     data, date, time, beam_color = read_longitudinal_profile_data(file_path)
     print(f'{beam_color} from {date} at {time}')
+
+    time_step = 0.05  # ns
+    segment_time = 106.573785  # ns
 
     baseline_separator = scan_discrete_hist(data)
     if plot:
         fig, ax = plt.subplots(figsize=(12, 6))  # Histogram of the data
         ax.hist(data, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 1), color='blue', alpha=0.5,
                 label='Blue Profile')
+        mv_avg_base_indices, mv_avg_base_vals = moving_average(np.arange(len(data)), data, 100)
+        ax.hist(mv_avg_base_vals, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 1),
+                color='orange', alpha=1, label='Moving Average (3 points)', histtype='step')
         ax.set_xlabel('Wall Current')
+        ax.legend()
+        ax.axvline(baseline_separator, color='red')
+
+        fig, ax = plt.subplots(figsize=(12, 6))  # Histogram of the data
+        ax.hist(data, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 0.1), color='blue', alpha=0.5,
+                label='Blue Profile')
+        ax.hist(mv_avg_base_vals, bins=np.arange(np.min(data) - 0.5, np.max(data) + 0.5, 0.1),
+                color='orange', alpha=1, label='Moving Average (3 points)', histtype='step')
+        ax.set_xlabel('Wall Current')
+        ax.legend()
         ax.axvline(baseline_separator, color='red')
 
         fig, ax = plt.subplots(figsize=(12, 6))  # Line plot of the data
         ax.plot(data, color='blue' if beam_color == 'blue' else 'orange', label='Profile Data')
+        ax.plot(mv_avg_base_indices, mv_avg_base_vals, color='orange', label='Moving Average (3 points)')
+        ax.legend()
         ax.set_ylabel('Wall Current')
 
     data = baseline_separator - data
 
     baseline_mask = data < 0
-    data_indices = np.arange(len(data))
-    n_pts = 5000
-    mv_avg_base_indices, mv_avg_base_vals = moving_average(data_indices[baseline_mask], data[baseline_mask], n_pts)
-    # 1D interpolation of the moving average
-    interp_func = interp1d(mv_avg_base_indices, mv_avg_base_vals, kind='linear', bounds_error=False,
-                           fill_value=mv_avg_base_vals[0])
+    # data_indices = np.arange(len(data))
+    # n_pts = int(segment_time / time_step * 3.0)  # Make an even number of bunches to avoid cycles
+    # mv_avg_base_indices, mv_avg_base_vals = moving_average(data_indices[baseline_mask], data[baseline_mask], n_pts)
+    # # 1D interpolation of the moving average
+    # interp_func = interp1d(mv_avg_base_indices, mv_avg_base_vals, kind='linear', bounds_error=False,
+    #                        fill_value=mv_avg_base_vals[0])
 
     if plot:
         plt_color = 'blue' if beam_color == 'blue' else 'orange'
@@ -301,15 +319,17 @@ def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, le
         fig, ax = plt.subplots(figsize=(12, 6))
         data_indices = np.arange(len(data))
         ax.plot(data_indices[baseline_mask], data[baseline_mask], color=plt_color)
-        for n_pts in [2000, 5000, 10000]:
-            mv_avg_times, mv_avg_vals = moving_average(data_indices[baseline_mask], data[baseline_mask], n_pts)
-            ax.plot(mv_avg_times, mv_avg_vals, label=f'Moving Average ({n_pts} points)', alpha=0.5)
+        for n_pts_i in np.array([1, 2.5, 3.0, 5.0]) * segment_time / time_step:
+            n_pts_i = int(n_pts_i)
+            mv_avg_times, mv_avg_vals = moving_average(data_indices[baseline_mask], data[baseline_mask], n_pts_i)
+            ax.plot(mv_avg_times, mv_avg_vals, label=f'Moving Average ({n_pts_i} points)')
         ax.set_xlabel('Index')
         ax.set_ylabel('Wall Current')
         ax.legend()
         fig.tight_layout()
 
-    data -= interp_func(data_indices)
+    # data -= interp_func(data_indices)
+    # baseline_interp = interp_func(data_indices)
 
     # data[data < 0] = 0  # Set negative values to zero
 
@@ -319,8 +339,6 @@ def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, le
         ax.set_xlabel('Index')
         ax.set_ylabel('Wall Current')
 
-    time_step = 0.05  # ns
-    segment_time = 106.573785  # ns
     bunch_min_peak = np.max(data) * 0.1
     times_flat = np.arange(len(data)) * time_step
 
@@ -330,7 +348,21 @@ def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, le
         n_segs = len(times)
         new_seg_mask = (times_flat >= n_segs * segment_time) & (times_flat < (n_segs + 1) * segment_time)
         new_segment_times, new_segment_values = times_flat[new_seg_mask], data[new_seg_mask]
+        new_baselines = data[new_seg_mask & baseline_mask]
+        # fig, ax = plt.subplots(figsize=(12, 6))  # Histogram of the data
+        # ax.hist(new_segment_values,
+        #         bins=np.arange(np.min(new_segment_values) - 0.5, np.max(new_segment_values) + 0.5, 1), color='blue',
+        #         alpha=1,
+        #         label='Blue Profile')
+        # ax.hist(new_baselines,
+        #         bins=np.arange(np.min(new_segment_values) - 0.5, np.max(new_segment_values) + 0.5, 1), color='red',
+        #         histtype='step')
+        # ax.set_xlabel('Wall Current')
+        # ax.legend()
+        # plt.show()
+        new_segment_values -= np.mean(new_baselines)  # Subtract baseline average over segment
         new_segment_times = new_segment_times - (n_segs * segment_time)
+
         if np.max(new_segment_values) < bunch_min_peak:
             abort_gap = True
         else:
@@ -397,7 +429,8 @@ def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, le
         ax_all.grid(True)
         fig_all.tight_layout()
 
-    mv_avg_vals -= mv_avg_baseline  # Subtract baseline from moving average values
+    if recalc_baseline:
+        mv_avg_vals -= mv_avg_baseline  # Subtract baseline from moving average values
     if subtract_baseline_std:
         mv_avg_vals += mv_avg_std  # Add standard deviation to moving average values
     mv_avg_vals[mv_avg_vals < 0] = 0  # Set negative values to zero

@@ -23,6 +23,7 @@ def main():
 
     sub_dir = 'vertex_data/'
     base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # base_path_auau = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     out_root_file_path = f'{base_path_auau}{sub_dir}54733_vertex_distributions.root'
     out_root_file_path_no_zdc_coinc = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc.root'
     out_root_file_path_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_bunch_by_bunch.root'
@@ -50,8 +51,9 @@ def main():
     # compare_scaled_live_triggers_steps(data, time, cad_df)
     # compare_new_old_root_file(base_path, data, time)
     # get_mbd_zdc_coincident_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
-    df = get_gl1p_bunch_by_bunch_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
-    print(df)
+    # df = get_gl1p_bunch_by_bunch_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
+    # print(df)
+    zdc_mbd_coinc_trigger(base_path_auau, cad_df)
     plt.show()
 
     print('donzo')
@@ -585,35 +587,14 @@ def compare_new_old_root_file(base_path, data, time):
 
 
 def get_gl1p_bunch_by_bunch_step_rates(scan_path, cad_df, root_file_name=None):
-    # data, time = get_root_data_time(scan_path, root_file_name='calofit_54733.root', tree_name='calo_tree',
-    #                                 sub_dir='vertex_data/',
-    #                                 branches=['BCO', 'GL1P_mbd_live_count',
-    #                                           'mbd_live_count', 'zdc_live_count',
-    #                                           'bunch'])
-    #
-    # print(data.columns)
-    # print(data[['bunch', 'GL1P_mbd_live_count']])
-    # print(data['mbd_live_count'])
-    # bunches = data['bunch'].unique()
-    # fig, ax = plt.subplots(figsize=(10, 6))
-    # ax.axhline(0, color='k', zorder=-1)
-    # for bunch in bunches:
-    #     mask = data['bunch'] == bunch
-    #     mbd_live_counts = data['GL1P_mbd_live_count'][mask]
-    #     if bunch >= 111:
-    #         ax.plot(data['BCO'][mask], mbd_live_counts, ls=':')
-    #     else:
-    #         ax.plot(data['BCO'][mask], mbd_live_counts)
-    # ax.set_xlabel('BCO')
-    # ax.set_ylabel('GL1P MBD Live Count')
-    # fig.tight_layout()
-    # plt.show()
-
-    detectors = ['mbd', 'mbd_N', 'mbd_S']
+    detectors = ['zdc', 'mbd', 'zdc_N', 'zdc_S', 'mbd_N', 'mbd_S']
     types = ['raw', 'live', 'cor']
 
     branches = ['BCO', 'GL1P_clock_raw_count', 'GL1P_clock_live_count', 'GL1P_mbd_raw_count', 'GL1P_mbd_live_count',
-                'GL1P_mbd_N_raw_count', 'GL1P_mbd_N_live_count', 'GL1P_mbd_S_raw_count', 'GL1P_mbd_S_live_count', 'bunch']
+                'GL1P_mbd_N_raw_count', 'GL1P_mbd_N_live_count', 'GL1P_mbd_S_raw_count', 'GL1P_mbd_S_live_count',
+                'GL1P_zdc_raw_count', 'GL1P_zdc_live_count', 'GL1P_zdc_N_raw_count', 'GL1P_zdc_N_live_count',
+                'GL1P_zdc_S_raw_count', 'GL1P_zdc_S_live_count', 'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
+                'bunch']
 
     if root_file_name is None:
         data, time = get_root_data_time(scan_path, branches=branches)
@@ -655,10 +636,66 @@ def get_gl1p_bunch_by_bunch_step_rates(scan_path, cad_df, root_file_name=None):
                         rate *= clock_scale
 
                     step_rates[f'{detector}_{count_type}_bunch_{bunch}_rate'] = rate
+            # Get mbd zdc live coincidence rate from live triggers
+            mbd_zdc_coinc_live_sum = np.sum(step_bunch_data['mbd_SN_live_trigger'] & step_bunch_data['zdc_SN_live_trigger'])
+            rate = mbd_zdc_coinc_live_sum / step_fine_dur
+
+            step_rates[f'mbd_zdc_coinc_live_bunch_{bunch}_rate'] = rate
+
+            rate *= clock_scale
+            step_rates[f'mbd_zdc_coinc_cor_bunch_{bunch}_rate'] = rate
 
         rates.append(step_rates)
 
     return pd.DataFrame(rates)
+
+
+
+def zdc_mbd_coinc_trigger(scan_path, cad_df, root_file_name='54733.root'):
+    branches = ['BCO', 'mbd_SN_trigger', 'zdc_SN_trigger', 'mbd_S_live_trigger', 'mbd_N_live_trigger',
+                 'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
+                 'zdc_N_trigger', 'zdc_S_trigger', 'zdc_N_live_trigger', 'zdc_S_live_trigger',
+                 'mbd_raw_count', 'zdc_raw_count', 'mbd_zvtx',
+                 'GL1_clock_count', 'GL1_live_count', 'mbd_live_count', 'zdc_live_count',
+                 'mbd_S_raw_count', 'mbd_N_raw_count', 'mbd_S_live_count', 'mbd_N_live_count',
+                 'zdc_S_raw_count', 'zdc_N_raw_count', 'zdc_S_live_count', 'zdc_N_live_count']
+    data, time = get_root_data_time(scan_path, root_file_name=root_file_name, tree_name='calo_tree',
+                                    sub_dir='vertex_data/', branches=branches)
+
+    print(data.columns)
+    mbd_sn_live_sum = np.cumsum(data['mbd_SN_live_trigger'])
+    mbd_sn_live = data['mbd_live_count'].values
+    print(f'MBD SN Live Trigger Sum: {mbd_sn_live_sum}')
+    print(f'MBD SN Live: {mbd_sn_live}')
+    print(f'Diff: {mbd_sn_live - mbd_sn_live_sum}')
+
+    # Do the same for mbd S and N separately
+    mbd_n_live_sum = np.cumsum(data['mbd_N_live_trigger'])
+    mbd_n_live = data['mbd_N_live_count'].values
+    print(f'MBD N Live Trigger Sum: {mbd_n_live_sum}')
+    print(f'MBD N Live: {mbd_n_live}')
+    print(f'MBD N Live diff: {mbd_n_live - mbd_n_live_sum}')
+
+    mbd_s_live_sum = np.cumsum(data['mbd_S_live_trigger'])
+    mbd_s_live = data['mbd_S_live_count'].values
+    print(f'MBD S Live Trigger Sum: {mbd_s_live_sum}')
+    print(f'MBD S Live: {mbd_s_live}')
+    print(f'MBD S Live diff: {mbd_s_live - mbd_s_live_sum}')
+
+    print(data[['mbd_live_count', 'mbd_N_live_count', 'mbd_S_live_count', 'zdc_live_count', 'zdc_S_live_count', 'zdc_N_live_count']].head(20))
+
+    mbd_live_trigger_sum = np.sum(data['mbd_SN_live_trigger'])
+    mbd_zdc_coinc_live_trigger_sum = np.sum(data['mbd_SN_live_trigger'] & data['zdc_SN_live_trigger'])
+    print(f'MBD Live Trigger Sum: {mbd_live_trigger_sum}, MBD ZDC Coinc Live Trigger Sum: {mbd_zdc_coinc_live_trigger_sum}')
+    print(f'Fraction of MBD ZDC Coinc Live Triggers: {mbd_zdc_coinc_live_trigger_sum / mbd_live_trigger_sum * 100:.2f}%')
+
+    mbd_zvtx_filter = np.abs(data['mbd_zvtx'].values) < 200
+
+    mbd_live_trigger_sum = np.sum(data['mbd_SN_live_trigger'][mbd_zvtx_filter])
+    mbd_zdc_coinc_live_trigger_sum = np.sum((data['mbd_SN_live_trigger'] & data['zdc_SN_live_trigger'])[mbd_zvtx_filter])
+    print(f'MBD Live Trigger Sum: {mbd_live_trigger_sum}, MBD ZDC Coinc Live Trigger Sum: {mbd_zdc_coinc_live_trigger_sum}')
+    print(f'Fraction of MBD ZDC Coinc Live Triggers: {mbd_zdc_coinc_live_trigger_sum / mbd_live_trigger_sum * 100:.2f}%')
+
 
 
 def get_step_rates(scan_path, cad_df, root_file_name=None):
@@ -701,6 +738,15 @@ def get_step_rates(scan_path, cad_df, root_file_name=None):
                     rate *= clock_scale
 
                 step_rates[f'{detector}_{count_type}_rate'] = rate
+
+        # Get mbd zdc live coincidence rate from live triggers
+        mbd_live_sum = np.sum(step_data['mbd_SN_live_trigger'] & step_data['zdc_SN_live_trigger'])
+        rate = mbd_live_sum / step_fine_dur
+
+        step_rates[f'mbd_zdc_coinc_live_rate'] = rate
+
+        rate *= clock_scale
+        step_rates[f'mbd_zdc_coinc_cor_rate'] = rate
 
         rates.append(step_rates)
 

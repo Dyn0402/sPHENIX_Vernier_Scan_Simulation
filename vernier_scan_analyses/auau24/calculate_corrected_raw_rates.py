@@ -33,8 +33,8 @@ def main():
     gl1p_step_rates_csv_path = f'{base_path}gl1p_bunch_by_bunch_step_rates.csv'
     plot_out_path = f'{base_path}Figures/zvertex_cut_plots/'
 
-    # get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
-    # add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)
+    get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
+    add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)
     if gl1p_step_rates_csv_path:
         get_mbd_gl1p_cut_rates(z_vertex_no_zdc_gl1_data_path, gl1p_step_rates_csv_path, combined_cad_step_data_csv_path)
         add_bkg_cor_mbd_rate_to_gl1p_df(gl1p_step_rates_csv_path)

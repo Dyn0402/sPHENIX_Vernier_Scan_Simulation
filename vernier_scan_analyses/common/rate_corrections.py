@@ -35,9 +35,12 @@ def main():
 def make_rate_corrections(cad_df):
     """ Apply rate corrections to the cad_df DataFrame.
     """
-    detectors = ['mbd', 'zdc']
+    detectors = ['mbd', 'zdc', 'mbd_zdc_coinc']
     for detector in detectors:
-        r_ns, r_n, r_s = cad_df[f"{detector}_cor_rate"], cad_df[f'{detector}_N_cor_rate'], cad_df[f'{detector}_S_cor_rate']
+        r_ns = cad_df[f"{detector}_cor_rate"]
+        # Just use MBD, should be close enough for AuAu. Don't use this at all for pp scans.
+        detector_n_s = 'mbd' if detector == 'mbd_zdc_coinc' else detector
+        r_n, r_s = cad_df[f'{detector_n_s}_N_cor_rate'], cad_df[f'{detector_n_s}_S_cor_rate']
 
         r_ns_cor, r_ns_sasha_cor = calculate_rate_corrections(r_ns, r_n, r_s)
 
@@ -51,14 +54,16 @@ def make_rate_corrections(cad_df):
 def make_gl1p_rate_corrections(gl1p_rates_df):
     """ Apply rate corrections to the cad_df DataFrame.
     """
-    detectors = ['mbd']
+    detectors = ['mbd', 'zdc', 'mbd_zdc_coinc']
     bunches = get_bunches_from_gl1p_rates_df(gl1p_rates_df)
     new_columns = {}
     for detector in detectors:
         for bunch in bunches:
             r_ns = gl1p_rates_df[f"{detector}_cor_bunch_{bunch}_rate"]
-            r_n = gl1p_rates_df[f'{detector}_N_cor_bunch_{bunch}_rate']
-            r_s = gl1p_rates_df[f'{detector}_S_cor_bunch_{bunch}_rate']
+
+            detector_n_s = 'mbd' if detector == 'mbd_zdc_coinc' else detector
+            r_n = gl1p_rates_df[f'{detector_n_s}_N_cor_bunch_{bunch}_rate']
+            r_s = gl1p_rates_df[f'{detector_n_s}_S_cor_bunch_{bunch}_rate']
 
             r_ns_cor, r_ns_sasha_cor = calculate_rate_corrections(r_ns, r_n, r_s)
 

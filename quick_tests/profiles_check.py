@@ -191,8 +191,8 @@ def gain_switch_check(base_path):
 
         # baseline_shifts = [0, +0.5e-4, +1e-4, 1.25e-4, 1.5e-4, 1.75e-4, +2e-4]
         # baseline_shifts = [0, +0.5e-4, +1e-4]
-        # baseline_shifts = [0, 1]
-        baseline_shifts = [6e6, 2e7]
+        baseline_shifts = [0, 1]
+        # baseline_shifts = [6e6, 2e7]
         fig_switch_maxes, ax_switch_maxes = plt.subplots(figsize=(10, 5))
         for baseline_shift in baseline_shifts:
             # fig_switch_profiles, ax_switch_profiles = plt.subplots(figsize=(10, 5))
@@ -201,7 +201,8 @@ def gain_switch_check(base_path):
                 bshift_i = baseline_shift if after else 0
                 # zs_interp, vals_interp = get_average_longitudinal_profile(profile_path, baseline_shift=bshift_i)
                 # zs_interp, vals_interp = get_average_longitudinal_profile(profile_path, left_right_zero=baseline_shift)
-                zs_interp, vals_interp = get_average_longitudinal_profile(profile_path, fixed_z_zero=baseline_shift)
+                # zs_interp, vals_interp = get_average_longitudinal_profile(profile_path, fixed_z_zero=baseline_shift)
+                zs_interp, vals_interp = get_average_longitudinal_profile(profile_path, recalc_baseline=baseline_shift)
                 # ax_switch_profiles.plot(zs_interp, vals_interp, label=f'{time.strftime("%H:%M:%S")}')
                 switch_times.append(time)
                 switch_maxes.append(np.max(vals_interp))

@@ -71,17 +71,9 @@ def parametrize_emittances_vs_time(df, times=None, poly_order=2):
     new_df = pd.DataFrame({'Time': pd.Series(times)})
     cols = ['BlueHoriz', 'BlueVert', 'YellowHoriz', 'YellowVert']
     for col in cols:
-        # coeffs = np.polyfit(df['Time'].astype(np.int64) // 10**9, df[col], 2)  # Convert time to seconds
-        # coeffs = np.polyfit(df['Time'].astype(np.int64), df[col], 2)  # Convert time to seconds
         coeffs = np.polyfit(df['Time'].astype(np.int64), df[col], poly_order)  # Convert time to seconds
         print(f'Coefficients for {col}: {coeffs}')
-        # df[f'{col}_fit'] = np.polyval(coeffs, df['Time'].astype(np.int64) // 10**9)
-        # df[f'{col}_fit'] = np.polyval(coeffs, df['Time'].astype(np.int64))
         new_df[f'{col}_fit'] = np.polyval(coeffs, times.astype(np.int64))  # Convert time to seconds
-        # new_df.append(np.polyval(coeffs, times.astype(np.int64)))
-    # new_df = np.array(new_df).T
-    # new_df = pd.DataFrame(new_df, columns=['Time'] + [f'{col}_fit' for col in cols])
-    # new_df = pd.to_datetime(new_df['Time'], errors='coerce')
 
     return new_df
 

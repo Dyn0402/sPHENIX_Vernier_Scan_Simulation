@@ -61,7 +61,7 @@ def bpm_analysis(bpm_file_path, start_time, end_time, plot=True, pre_scan_buffer
                     ax.plot(times, dbpms, label=f'{c}{n}bx_{o}')
 
     times_above_threshold = np.array(bpm_data['Time'])[:-1][np.any(masks, axis=0)]
-    times_above_threshold = get_step_bounds(times_above_threshold, max_gap_seconds=30)
+    times_above_threshold = get_step_bounds(times_above_threshold, max_gap_seconds=25)
 
     if plot:
         ax.axhline(step_derivative_threshold, color='black', ls='--')

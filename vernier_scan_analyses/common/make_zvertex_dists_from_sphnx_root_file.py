@@ -17,22 +17,24 @@ import uproot
 import ROOT
 
 from analyze_sphnx_root_file import get_root_data_time
+from common_logistics import set_base_path
 
 
 def main():
-    if platform.system() == 'Windows':
-        base_path = 'C:/Users/Dylan/Desktop/'
-    else:
-        base_path = '/local/home/dn277127/Bureau/'
+    base_path = set_base_path()
+    run_number = 54733
 
     sub_dir = 'vertex_data/'
-    base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    out_root_file_path = f'{base_path_auau}{sub_dir}54733_vertex_distributions.root'
-    out_root_file_path_no_zdc_coinc = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc.root'
-    out_root_file_path_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_bunch_by_bunch.root'
-    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
+    # base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    base_path_auau = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # file_name = 'calofit_54733.root'
+    file_name = '2024p019_69561.root'
+
+    out_root_file_path = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions.root'
+    out_root_file_path_no_zdc_coinc = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc.root'
+    out_root_file_path_bbb = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions_bunch_by_bunch.root'
+    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
     cad_data_path = f'{base_path_auau}combined_cad_step_data.csv'
-    file_name = 'calofit_54733.root'
 
     cad_df = pd.read_csv(cad_data_path, sep=',')
     print(cad_df)

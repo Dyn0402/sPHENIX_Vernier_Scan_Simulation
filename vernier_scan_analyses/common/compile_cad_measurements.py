@@ -20,8 +20,10 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    root_file_name = 'calofit_54733.root'
+    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # root_file_name = 'calofit_54733.root'
+    root_file_name = '2024p019_69561.root'
 
     if '/pp_' in scan_path:
         emittance_poly_order = 0

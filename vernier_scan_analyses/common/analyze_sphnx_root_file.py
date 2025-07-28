@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import uproot
 
+from bpm_analysis import get_step_bounds
+from longitudinal_profiles import moving_average
 from common_logistics import set_base_path
 
 
@@ -22,21 +24,26 @@ def main():
     base_path = set_base_path()
 
     sub_dir = 'vertex_data/'
-    base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    # base_path_auau = f'{base_path}Vernier_Scans/pp_aug_12_24/'
-    out_root_file_path = f'{base_path_auau}{sub_dir}54733_vertex_distributions.root'
-    out_root_file_path_no_zdc_coinc = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc.root'
-    out_root_file_path_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_bunch_by_bunch.root'
-    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_auau}{sub_dir}54733_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
-    cad_data_path = f'{base_path_auau}combined_cad_step_data.csv'
+    run_number = 54733
+    base_path_scan = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    root_file_name = f'calofit_{run_number}.root'
+    # run_number = 69561
+    # base_path_scan = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # root_file_name = f'2024p019_{run_number}.root'
+    # base_path_scan = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    out_root_file_path = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions.root'
+    out_root_file_path_no_zdc_coinc = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc.root'
+    out_root_file_path_bbb = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions_bunch_by_bunch.root'
+    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
+    cad_data_path = f'{base_path_scan}combined_cad_step_data.csv'
 
     cad_df = pd.read_csv(cad_data_path, sep=',')
     print(cad_df)
 
-    # compare_avg_total_step_rates(base_path_auau, cad_df, sub_dir)
+    # compare_avg_total_step_rates(base_path_scan, cad_df, sub_dir)
     # plt.show()
 
-    # data, time = get_root_data_time(base_path_auau, root_file_name='54733_slimmed.root', tree_name='calo_tree', sub_dir=sub_dir,
+    # data, time = get_root_data_time(base_path_scan, root_file_name='54733_slimmed.root', tree_name='calo_tree', sub_dir=sub_dir,
     #                                 branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
     #                                           'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
     #                                           'GL1_clock_count', 'GL1_live_count',
@@ -50,17 +57,18 @@ def main():
     # compare_scaled_live_triggers(data, time, cad_df)
     # compare_scaled_live_triggers_steps(data, time, cad_df)
     # compare_new_old_root_file(base_path, data, time)
-    # get_mbd_zdc_coincident_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
-    # df = get_gl1p_bunch_by_bunch_step_rates(base_path_auau, cad_df, 'calofit_54733.root')
+    # get_mbd_zdc_coincident_step_rates(base_path_scan, cad_df, 'calofit_54733.root')
+    # df = get_gl1p_bunch_by_bunch_step_rates(base_path_scan, cad_df, 'calofit_54733.root')
     # print(df)
-    zdc_mbd_coinc_trigger(base_path_auau, cad_df)
+    # zdc_mbd_coinc_trigger(base_path_scan, cad_df)
+    get_bco_offset(base_path_scan, cad_df, root_file_name=root_file_name, plot=True)
     plt.show()
 
     print('donzo')
 
 
 def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name='calo_tree', branches=None,
-                       sub_dir='vertex_data/'):
+                       sub_dir='vertex_data/', bco_offset=2.0):
     """
     Get the data and time from the ROOT file.
     :param scan_path: Path to the directory with the ROOT file.
@@ -68,6 +76,7 @@ def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name
     :param tree_name: Name of the tree in the ROOT file.
     :param branches: List of branches to extract from the tree.
     :param sub_dir: Subdirectory within the scan path where the ROOT file is located.
+
     :return: DataFrame with the data and time.
     """
     if branches is None:
@@ -87,9 +96,8 @@ def get_root_data_time(scan_path, root_file_name='54733_slimmed.root', tree_name
         data = tree.arrays(branches, library='pd')
 
     bco_step = 106.57377e-9  # BCO step in s
-    constant_offset = 2.0  # Constant offset in s
 
-    time = (data['BCO'] - data['BCO'][0]) * bco_step + constant_offset  # Convert BCO to time in seconds
+    time = (data['BCO'] - data['BCO'][0]) * bco_step + bco_offset  # Convert BCO to time in seconds
 
     return data, time
 
@@ -586,7 +594,7 @@ def compare_new_old_root_file(base_path, data, time):
             print(f'Index {i}: New MBD Z Vtx: {mbd_z_vtx}, Old MBD Z Vtx: {mbd_z_vtx_old}')
 
 
-def get_gl1p_bunch_by_bunch_step_rates(scan_path, cad_df, root_file_name=None):
+def get_gl1p_bunch_by_bunch_step_rates(scan_path, cad_df, root_file_name=None, bco_offset=0):
     detectors = ['zdc', 'mbd', 'zdc_N', 'zdc_S', 'mbd_N', 'mbd_S']
     types = ['raw', 'live', 'cor']
 
@@ -597,9 +605,9 @@ def get_gl1p_bunch_by_bunch_step_rates(scan_path, cad_df, root_file_name=None):
                 'bunch']
 
     if root_file_name is None:
-        data, time = get_root_data_time(scan_path, branches=branches)
+        data, time = get_root_data_time(scan_path, branches=branches, bco_offset=bco_offset)
     else:
-        data, time = get_root_data_time(scan_path, root_file_name, branches=branches)
+        data, time = get_root_data_time(scan_path, root_file_name, branches=branches, bco_offset=bco_offset)
 
     step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
     cad_df['start'] = pd.to_datetime(cad_df['start'])
@@ -698,7 +706,7 @@ def zdc_mbd_coinc_trigger(scan_path, cad_df, root_file_name='54733.root'):
 
 
 
-def get_step_rates(scan_path, cad_df, root_file_name=None):
+def get_step_rates(scan_path, cad_df, root_file_name=None, bco_offset=0):
     """
     Get the rates at each step from the data, using step boundaries defined in cad_df.
     """
@@ -706,9 +714,9 @@ def get_step_rates(scan_path, cad_df, root_file_name=None):
     types = ['raw', 'live', 'cor']
 
     if root_file_name is None:
-        data, time = get_root_data_time(scan_path)
+        data, time = get_root_data_time(scan_path, bco_offset=bco_offset)
     else:
-        data, time = get_root_data_time(scan_path, root_file_name)
+        data, time = get_root_data_time(scan_path, root_file_name, bco_offset=bco_offset)
 
     step_time_cushion = 1.0  # Time cushion in seconds to avoid transitions
     cad_df['start'] = pd.to_datetime(cad_df['start'])
@@ -805,6 +813,128 @@ def get_mbd_zdc_coincident_step_rates(scan_path, cad_df, root_file_name=None):
         rates.append(step_rates)
 
     return pd.DataFrame(rates)
+
+
+def get_bco_offset(scan_path, cad_df, root_file_name='calofit_54733.root', tree_name='calo_tree', sub_dir='vertex_data/',
+                   plot=False):
+    """
+    Get the BCO offset from the data.
+    """
+    rate_time_step = 0.1  # for example
+    derivative_step_threshold = 0.65
+    data, time = get_root_data_time(scan_path, root_file_name=root_file_name, tree_name=tree_name, sub_dir=sub_dir,
+                                    branches=['BCO', 'zdc_raw_count'], bco_offset=0.0)
+
+    cad_df['start'] = pd.to_datetime(cad_df['start'])
+    cad_df['end'] = pd.to_datetime(cad_df['end'])
+    run_start = cad_df.iloc[0]['start']
+
+    cad_df = cad_df[cad_df['step'] >= 0]
+
+    col_name = 'zdc_raw_count'
+
+    # Create bin edges and assign each time point to a bin
+    bin_edges = np.arange(time.min(), time.max() + rate_time_step, rate_time_step)
+    data = data.copy()
+    data['time'] = time
+    data['bin'] = pd.cut(data['time'], bins=bin_edges, include_lowest=True)
+
+    # Group by bin
+    grouped = data.groupby('bin')
+
+    # Compute rates and mean times per bin
+    def compute_rate(group):
+        times = group['time']
+        if len(times) < 2:
+            return pd.Series({'mean_time': np.nan, 'rate': np.nan})
+        duration = times.iloc[-1] - times.iloc[0]
+        rate = (group[col_name].iloc[-1] - group[col_name].iloc[0]) / duration
+        return pd.Series({'mean_time': times.mean(), 'rate': rate})
+
+    result = grouped.apply(compute_rate).dropna()
+    times = result['mean_time'].astype('float64').to_numpy()
+    rates = result['rate'].to_numpy()
+
+    times_avg, rates_avg = moving_average(times, rates, window_size=30)
+
+    rate_changes_avg = np.abs(np.diff(rates_avg)) / np.sqrt((rates_avg[1:] + rates_avg[:-1]) / 2)
+    times_over_threshold = ((times_avg[1:] + times_avg[:-1]) / 2)[rate_changes_avg > derivative_step_threshold]
+    times_over_threshold = run_start + (times_over_threshold * 1000).astype('timedelta64[ms]')  # Convert to datetime
+    step_changes = get_step_bounds(times_over_threshold, max_gap_seconds=25)
+
+    root_means = [start_i + (end_i - start_i) / 2 for start_i, end_i in step_changes]
+    bpm_means = [start_i + (end_i - start_i) / 2 for start_i, end_i in
+                 zip(cad_df['start'].iloc[1:], cad_df['end'].iloc[:-1])]
+
+    if len(root_means) != len(bpm_means):
+        print(f'Warning: Number of root means ({len(root_means)}) does not match number of BPM means ({len(bpm_means)})')
+        step_offsets = [0]
+    else:
+        step_offsets = np.array(root_means) - np.array(bpm_means)
+        step_offsets = [x.total_seconds() for x in step_offsets]
+    mean_step_offset = np.mean(step_offsets)
+
+    if plot:
+        # Convert to seconds for plotting
+        step_chages_plt = [((start - run_start).total_seconds(), (end - run_start).total_seconds()) for start, end in step_changes]
+        fig, ax = plt.subplots()
+        ax.plot(times, rates, 'o-', markersize=1, label='ZDC Raw Rate')
+        ax.plot(times_avg, rates_avg, 'o-', markersize=1, color='green', label='ZDC Raw Rate (Avg)')
+        ax_d = ax.twinx()
+        for start_i, end_i in step_chages_plt:
+            ax.axvspan(start_i, end_i, color='red', alpha=0.5)
+        ax_d.axhline(derivative_step_threshold, color='black', ls='--')
+        ax_d.plot(times_avg[1:], rate_changes_avg, 'o-', markersize=1, color='purple', label='Rate Change (Avg)')
+
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('ZDC Raw Rate (Hz)')
+        ax.legend()
+
+        fig, ax = plt.subplots()
+        for start_i, end_i in step_changes:
+            ax.axvspan(start_i, end_i, color='red', alpha=0.5)
+
+        for end_i, start_i in zip(cad_df['start'].iloc[1:], cad_df['end'].iloc[:-1]):
+            ax.axvspan(start_i, end_i, color='purple', alpha=0.5)
+        fig.tight_layout()
+
+        fig, ax = plt.subplots()
+        ax.plot(step_offsets, 'o', color='blue', label='Root - BPM Means')
+        ax.axhline(mean_step_offset, color='red', linestyle='--', label='Mean Offset')
+        ax.annotate(f'Mean Offset: {mean_step_offset:.2f} s', xy=(0.05, 0.95), xycoords='axes fraction',
+                    fontsize=12, color='black', ha='left', va='top')
+        ax.set_xlabel('Step Index')
+        ax.legend()
+        ax.set_ylabel('Root - BPM Means (s)')
+        fig.tight_layout()
+
+        plt.show()
+
+    return mean_step_offset
+
+
+# def get_step_bounds(time_array, max_gap_seconds=2):
+#     """
+#     Reduce consecutive float timestamps to (start, end) pairs.
+#
+#     Args:
+#         time_array (array-like): Sequence of timestamps (floats, in seconds).
+#         max_gap_seconds (float): Max allowed gap between steps in a sequence.
+#
+#     Returns:
+#         list of tuples: Each tuple contains (start_time, end_time) of a detected sequence.
+#     """
+#     times = np.sort(np.asarray(time_array, dtype='float64'))
+#
+#     time_diffs = np.diff(times, prepend=times[0])
+#
+#     boundaries = np.where(time_diffs > max_gap_seconds)[0]
+#
+#     starts = np.insert(boundaries, 0, 0)
+#     ends = np.append(boundaries - 1, len(times) - 1)
+#
+#     return [(times[start], times[end]) for start, end in zip(starts, ends)]
+
 
 
 def average_counts_in_time_windows(time_array, counts_array, window_size, bin_stat='mean'):

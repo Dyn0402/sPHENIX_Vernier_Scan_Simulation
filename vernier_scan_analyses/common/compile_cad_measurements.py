@@ -13,7 +13,7 @@ import pandas as pd
 from bpm_analysis import bpm_analysis, get_start_end_times
 from analyze_ions import analyze_ions
 from analyze_emittance import add_emittance_info_to_df
-from analyze_sphnx_root_file import get_step_rates, get_gl1p_bunch_by_bunch_step_rates
+from analyze_sphnx_root_file import get_step_rates, get_gl1p_bunch_by_bunch_step_rates, get_bco_offset
 from rate_corrections import make_rate_corrections, make_gl1p_rate_corrections
 from common_logistics import set_base_path
 
@@ -21,9 +21,11 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
     # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
     # root_file_name = 'calofit_54733.root'
-    root_file_name = '2024p019_69561.root'
+    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # root_file_name = '2024p019_69561.root'
+    scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    root_file_name = 'calofitting_51195.root'
 
     if '/pp_' in scan_path:
         emittance_poly_order = 0
@@ -54,8 +56,11 @@ def main():
     emittance_df = add_emittance_info_to_df(emittance_file_path, times=df['mid_time'], poly_order=emittance_poly_order)
     df = df.merge(emittance_df, on='mid_time', how='left')
 
+    # Get BCO offset by comparing bpm steps to zdc steps
+    bco_offset = get_bco_offset(scan_path, df, root_file_name)
+
     # Add rates to the dataframe
-    rates_df = get_step_rates(scan_path, df, root_file_name)
+    rates_df = get_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
     df = df.merge(rates_df, on='step', how='left')
 
     # Apply rate corrections to the dataframe
@@ -65,7 +70,7 @@ def main():
     df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
 
     # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
-    gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name)
+    gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
     gl1p_rates_df = make_gl1p_rate_corrections(gl1p_rates_df)
     gl1p_rates_df.to_csv(f'{scan_path}gl1p_bunch_by_bunch_step_rates.csv', index=False)
 

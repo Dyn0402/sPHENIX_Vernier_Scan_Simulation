@@ -139,6 +139,7 @@ def plot_head_on_accuracy_for_corrections(base_path):
         {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '--'},
         {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '-'},
         {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '--'},
+        {'col_name': 'mbd_zdc_coinc_sasha_cor_rate', 'name': 'MBD ZDC Coinc Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color': 'red', 'ls': '--'},
     ]
 
     lumis, scan_steps_plt = [], []

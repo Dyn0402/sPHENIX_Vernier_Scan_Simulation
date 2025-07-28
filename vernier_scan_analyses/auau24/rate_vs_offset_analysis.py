@@ -25,9 +25,11 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
     base_path += 'Vernier_Scans/auau_oct_16_24/'
-    plot_head_on_accuracy_for_corrections(base_path)
+    # base_path += 'Vernier_Scans/auau_july_17_25/'
+    # plot_head_on_accuracy_for_corrections(base_path)
     # fit_beam_widths(base_path)
     # fit_beam_widths_bunch_by_bunch(base_path)
+    plot_fit_beam_widths(base_path)
     # compare_gl1_and_gl1p_rates(base_path)
     # plot_lumi_vs_step_zdc_cor(base_path)
     # lumi_test(base_path)
@@ -113,7 +115,7 @@ def plot_head_on_accuracy_for_corrections(base_path):
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
     beam_width_x, beam_width_y = 130.0, 130.0
-    beta_star = 76.4
+    beta_star = 77.6
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
@@ -186,6 +188,23 @@ def plot_head_on_accuracy_for_corrections(base_path):
     ax2.set_ylim(bottom=0)
     plt.tight_layout()
 
+    fig, ax = plt.subplots()
+    ax2 = ax.twinx()
+    ax.plot(scan_steps_plt, lumis, marker='o', linestyle='-', color='b', label='Luminosity')
+    max_step_0 = np.max([rate_data['data'][0] for rate_data in rates_data])
+    for rate_data in rates_data:
+        scale = max_step_0 / rate_data['data'][0]
+        ax2.plot(scan_steps_plt, np.array(rate_data['data']) * scale, marker='o', linestyle='-', label=rate_data['name'])
+    ax.set_xlabel('Scan Step')
+    ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$]')
+    ax2.set_ylabel('ZDC Rate [Hz]')
+    ax.set_title('Luminosity vs Scan Step')
+    ax.legend(loc='upper center')
+    ax2.legend(loc='upper right')
+    ax.set_ylim(bottom=0, top=1.2 * np.max(lumis))
+    ax2.set_ylim(bottom=0, top=1.2 * max_step_0)
+    plt.tight_layout()
+
     steps = np.array([0, 6, 12, 18, 24])
     step_mask = np.isin(scan_steps_plt, steps)
     norm_step = 0
@@ -255,6 +274,7 @@ def fit_beam_widths(base_path):
     """
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
+    out_fig_path = f'{base_path}Figures/Beam_Param_Inferences/'
     out_csv_path = f'{base_path}beam_widths_rate_only_fit_results.csv'
 
     f_beam = 78.4  # kHz
@@ -262,9 +282,11 @@ def fit_beam_widths(base_path):
     lumi_z_cut = 200
     # lumi_z_cut = None
     observed = True  # True for MBD
+    # observed = False  # True for MBD
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
+    # orientation = 'Horizontal'  # 'Horizontal' or 'Vertical'
     orientation = 'Vertical'  # 'Horizontal' or 'Vertical'
 
     # scan_steps = np.arange(0, 25, 1)
@@ -279,8 +301,13 @@ def fit_beam_widths(base_path):
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
     beam_width_x_nom, beam_width_y_nom = 130.0, 130.0
-    beam_widths = np.linspace(120, 140, 9)
-    beta_star = 76.4
+    if orientation == 'Horizontal':
+        beam_widths = np.linspace(120, 150, 9)
+    elif orientation == 'Vertical':
+        beam_widths = np.linspace(110, 140, 9)
+    else:
+        raise NotImplementedError(f'Orientation {orientation} not implemented.')
+    beta_star = 77.6
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
@@ -309,7 +336,8 @@ def fit_beam_widths(base_path):
         # {'col_name': 'mbd_z200_rate', 'name': 'MBD |z|<200 Angelika Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'orange', 'ls': '-'},
         # {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'orange', 'ls': '--'},
         {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'green', 'ls': '-'},
-        # {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'green', 'ls': '--'},
+        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'green', 'ls': '--'},
+        {'col_name': 'mbd_zdc_coinc_sasha_cor_rate', 'name': 'MBD ZDC Coinc Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color': 'red', 'ls': '--'},
     ]
 
     lumis, lumi_stds, scan_steps_plt = {bwx: [] for bwx in beam_widths}, {bwx: [] for bwx in beam_widths}, []
@@ -396,6 +424,8 @@ def fit_beam_widths(base_path):
     ax.set_title(f'{orientation} Beam Width Scan')
     ax.legend()
     fig.tight_layout()
+    fig.savefig(f'{out_fig_path}bw_{orientation}_rates_vs_step.png')
+    fig.savefig(f'{out_fig_path}bw_{orientation}_rates_vs_step.pdf')
 
     df_out = []
     for rate_data in rates_data:
@@ -430,6 +460,8 @@ def fit_beam_widths(base_path):
         ax.set_title(f'Chi2 vs {orientation} Beam Width for Each Step : {rate_data["name"]}')
         ax.legend(loc='upper right')
         fig.tight_layout()
+        fig.savefig(f'{out_fig_path}bw_{orientation}_rate_only_chi2_vs_bw_{rate_data["col_name"]}.png')
+        fig.savefig(f'{out_fig_path}bw_{orientation}_rate_only_chi2_vs_bw_{rate_data["col_name"]}.pdf')
 
     df_out = pd.DataFrame(df_out)
     if os.path.exists(out_csv_path):
@@ -490,7 +522,7 @@ def fit_beam_widths_bunch_by_bunch(base_path):
     collider_sim.set_grid_size(31, 31, 101, 31)
     beam_width_x, beam_width_y = 130.0, 130.0
     beam_width_xs = np.linspace(120, 145, 15)
-    beta_star = 76.4
+    beta_star = 77.6
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
@@ -718,6 +750,31 @@ def fit_beam_widths_bunch_by_bunch(base_path):
         ax.set_title(f'Bunch by Bunch Beam Width X for {rate_data_name}')
         fig.tight_layout()
 
+
+    plt.show()
+
+
+def plot_fit_beam_widths(base_path):
+    """
+    Plot the fitted beam widths for the various rates.
+    :param base_path: Base path to the vernier scan data.
+    """
+    out_csv_path = f'{base_path}beam_widths_rate_only_fit_results.csv'
+    out_fig_path = f'{base_path}Figures/Beam_Param_Inferences/'
+    df = pd.read_csv(out_csv_path)
+    orientations = ['Horizontal', 'Vertical']
+    fig_both, ax_both = plt.subplots(figsize=(10, 6))
+    for orientation in orientations:
+        df_orientation = df[df['orientation'] == orientation]
+        df_orientation = df_orientation.sort_values(by='rate_name')  # Sort by rate_name
+        ax_both.errorbar(df_orientation['rate_name'], df_orientation['beam_width'], yerr=df_orientation['beam_width_err'],
+                         marker='s', linestyle='none', label=f'{orientation} Beam Widths')
+    ax_both.set_ylabel('Beam Width [um]')
+    ax_both.set_title('Fitted Beam Widths for Different Relative Rate Estimates')
+    ax_both.legend()
+    fig_both.tight_layout()
+    fig_both.savefig(f'{out_fig_path}fitted_rate_only_beam_widths.png')
+    fig_both.savefig(f'{out_fig_path}fitted_rate_only_beam_widths.pdf')
 
     plt.show()
 

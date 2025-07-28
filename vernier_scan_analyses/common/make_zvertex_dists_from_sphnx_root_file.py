@@ -22,7 +22,8 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    run_number = 54733
+    # run_number = 54733
+    run_number = 69561
 
     sub_dir = 'vertex_data/'
     # base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'

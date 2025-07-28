@@ -51,7 +51,7 @@ def calculate_default_cross_sections(base_path):
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
-    beta_star = 76.4
+    beta_star = 77.6
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0

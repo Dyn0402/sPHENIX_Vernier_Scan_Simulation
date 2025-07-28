@@ -401,9 +401,11 @@ def get_profile_path(profile_dir_path, start_time, end_time, return_all=False, b
     where both a blue_ and yellow_ version exist for the same time.
     """
     if isinstance(start_time, str):
-        start_time = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+        # start_time = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+        start_time = datetime.fromisoformat(start_time)
     if isinstance(end_time, str):
-        end_time = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
+        # end_time = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
+        end_time = datetime.fromisoformat(end_time)
 
     # Get year from start_time
     year = start_time.year % 100  # Get last two digits of the year

@@ -23,12 +23,14 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
 
-    base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    base_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    run_number = 69561
 
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
-    z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
-    z_vertex_no_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
-    z_vertex_no_zdc_gl1_data_path = f'{base_path}vertex_data/54733_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
+    z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
+    z_vertex_no_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
+    z_vertex_no_zdc_gl1_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     gl1p_step_rates_csv_path = f'{base_path}gl1p_bunch_by_bunch_step_rates.csv'
     plot_out_path = f'{base_path}Figures/zvertex_cut_plots/'
@@ -111,8 +113,8 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
     vertex_data_with_zdc = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column=None)
 
     collider_sim = BunchCollider()
-    collider_sim.set_grid_size(71, 71, 1001, 81)
-    # collider_sim.set_grid_size(71, 71, 101, 81)
+    # collider_sim.set_grid_size(71, 71, 1001, 81)
+    collider_sim.set_grid_size(51, 51, 101, 51)
     z_sim_range = np.array([-805., 805.])
     collider_sim.set_z_bounds(z_sim_range * 1e4)
     beta_star = 76.7  # cm

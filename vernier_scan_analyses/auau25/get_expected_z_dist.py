@@ -397,8 +397,8 @@ def auau_pull_cad_step_data():
 def auau_plot_all_steps():
     base_path = set_base_path()
 
-    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
 
     if scan_path.split('/')[-2] == 'auau_oct_16_24':
         run_number = 54733
@@ -409,6 +409,9 @@ def auau_plot_all_steps():
     else:
         raise ValueError(f'Unknown run number for base path: {base_path}')
 
+    # rate_col = 'zdc_cor_rate'
+    rate_col = 'mbd_zdc_coinc_sasha_cor_rate'
+
     longitudinal_profiles_dir_path = f'{scan_path}profiles/'
     z_vertex_data_path = f'{scan_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
     z_vertex_zdc_data_path = f'{scan_path}vertex_data/{run_number}_vertex_distributions.root'
@@ -418,8 +421,8 @@ def auau_plot_all_steps():
 
     fit_range = [-230, 230]
 
-    for scan_type, steps in zip(["horizontal", "vertical"], [range(12), range(12, 24)]):
-        fig, axes = plt.subplots(nrows=6, ncols=2, figsize=(13.3, 7.5), sharex=True)
+    for scan_type, steps in zip(["horizontal", "vertical"], [range(16), range(16, 32)]):
+        fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(13.3, 7.5), sharex=True)
         axes = axes.T.flatten()  # Fill columns first
 
         collider_sim = BunchCollider()
@@ -451,7 +454,7 @@ def auau_plot_all_steps():
                 count_errs[count_errs == 0] = 1
 
             # Normalize counts to ZDC rate
-            zdc_raw_rate = cad_step_row['zdc_cor_rate']
+            zdc_raw_rate = cad_step_row[rate_col]
             zdc_hist_counts = np.sum(counts)
             hist_scaling_factor = zdc_raw_rate / zdc_hist_counts
 
@@ -466,7 +469,7 @@ def auau_plot_all_steps():
             counts_no_zdc *= dcct_scale
 
             # beam_width_scale = 0.9
-            beta_star = 77.15  # cm
+            beta_star = 90  # cm
             bkg = 0.0e-17
             gauss_eff_width = 500
             mbd_resolution = 1.0
@@ -543,9 +546,9 @@ def auau_plot_all_steps():
 
             if i == 0:  # top row
                 ax.legend()
-            if i == 5 or i == 11:  # bottom row
+            if i == 4 or i == 8 or i == 12:  # bottom row
                 ax.set_xlabel('z (cm)')
-            if i < 6:  # left column
+            if i < 4:  # left column
                 ax.set_ylabel('Rate (Hz)')
 
             # Adjust Y-axis upper limit
@@ -555,7 +558,7 @@ def auau_plot_all_steps():
         fig.suptitle(f'{scan_type.capitalize()} Scan Steps', fontsize=16)
         fig.subplots_adjust(left=0.06, right=0.995, top=0.95, bottom=0.06, wspace=0.1, hspace=0.02)
 
-        save_base = f'{scan_path}{scan_type}_scan_all_steps'
+        save_base = f'{scan_path}Figures/{scan_type}_scan_all_steps'
         fig.savefig(f'{save_base}.png')
         fig.savefig(f'{save_base}.pdf')
         # plt.show()

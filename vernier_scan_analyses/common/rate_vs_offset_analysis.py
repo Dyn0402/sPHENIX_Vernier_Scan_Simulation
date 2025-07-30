@@ -15,6 +15,7 @@ import pandas as pd
 from scipy.optimize import curve_fit as cf
 from time import time
 from datetime import datetime, timedelta
+from itertools import product
 
 from BunchCollider import BunchCollider
 from z_vertex_fitting_common import (fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2,
@@ -24,8 +25,8 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    base_path += 'Vernier_Scans/auau_oct_16_24/'
-    # base_path += 'Vernier_Scans/auau_july_17_25/'
+    # base_path += 'Vernier_Scans/auau_oct_16_24/'
+    base_path += 'Vernier_Scans/auau_july_17_25/'
     # base_path += 'Vernier_Scans/pp_aug_12_24/'
     # plot_head_on_accuracy_for_corrections(base_path)
     fit_beam_widths(base_path)
@@ -112,6 +113,15 @@ def plot_head_on_accuracy_for_corrections(base_path):
     # ions = 'wcm'  # 'wcm'
     norm_step = 8
 
+    if base_path.split('/')[-2] == 'auau_oct_16_24':
+        beta_star = 80.3  # in cm
+    elif base_path.split('/')[-2] == 'auau_july_17_25':
+        beta_star = 82.1  # in cm
+    elif base_path.split('/')[-2] == 'pp_aug_12_24':
+        beta_star = 80.3 # in cm
+    else:
+        raise ValueError(f'Unknown run number for base path: {base_path}')
+
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
     scan_steps = np.arange(0, cad_df['step'].max() + 1, 1)
@@ -120,7 +130,6 @@ def plot_head_on_accuracy_for_corrections(base_path):
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
     beam_width_x, beam_width_y = 130.0, 130.0
-    beta_star = 77.6
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
@@ -286,214 +295,227 @@ def fit_beam_widths(base_path):
     """
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
-    out_fig_path = f'{base_path}Figures/Beam_Param_Inferences/'
+    out_fig_path = f'{base_path}Figures/Beam_Param_Inferences/Beam_Width_Rate_Only_Fits/'
+    os.makedirs(out_fig_path, exist_ok=True)
     out_csv_path = f'{base_path}beam_widths_rate_only_fit_results.csv'
 
     f_beam = 78.4  # kHz
     mb_to_um2 = 1e-19
     lumi_z_cut = 200
-    # lumi_z_cut = None
-    observed = True  # True for MBD
-    # observed = False  # True for MBD
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
     # orientation = 'Horizontal'  # 'Horizontal' or 'Vertical'
-    orientation = 'Vertical'  # 'Horizontal' or 'Vertical'
+    # orientation = 'Vertical'  # 'Horizontal' or 'Vertical'
+    orientations = ['Horizontal', 'Vertical']
 
-    # scan_steps = np.arange(0, 25, 1)
-    # scan_steps = np.arange(0, 12, 1)
-    scan_steps = cad_df['step']
-    norm_step = 0 if orientation == 'Horizontal' else 12  # Step to normalize the rates to
-    # scan_steps = np.arange(0, 4, 1)
-
-    min_offset = 150  # um
-    max_offset = 750  # um
-
-    collider_sim = BunchCollider()
-    collider_sim.set_grid_size(31, 31, 101, 31)
-    beam_width_x_nom, beam_width_y_nom = 130.0, 130.0
-    if orientation == 'Horizontal':
-        beam_widths = np.linspace(120, 150, 9)
-    elif orientation == 'Vertical':
-        beam_widths = np.linspace(110, 140, 9)
+    if base_path.split('/')[-2] == 'auau_oct_16_24':
+        beta_stars = [80.3, 79, 81.5]  # in cm
+    elif base_path.split('/')[-2] == 'auau_july_17_25':
+        beta_stars = [82.1, 81.6, 82.6]  # in cm
+    elif base_path.split('/')[-2] == 'pp_aug_12_24':
+        beta_stars = [80.3, 79, 81.5]  # in cm
     else:
-        raise NotImplementedError(f'Orientation {orientation} not implemented.')
-    beta_star = 77.6
-    bkg = 0.0e-17
-    gauss_eff_width = 500
-    mbd_resolution = 1.0
-    # gauss_eff_width = None
-    # mbd_resolution = None
+        raise ValueError(f'Unknown run number for base path: {base_path}')
 
-    norm_bw = beam_widths[len(beam_widths) // 2]  # Use the middle beam width for normalization
+    scan_steps = cad_df['step']
+    norm_steps = [row['step'] for _, row in cad_df.iterrows() if row['set offset h'] == 0 and row['set offset v'] == 0]
 
-    collider_sim.set_bkg(bkg)
-    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
-    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
-    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+    min_offset, max_offset = 150, 750  # um
 
-    # Get nominal dcct ions and emittances
-    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
-    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
-    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
-    em_blue_nom = (em_blue_horiz_nom, em_blue_vert_nom)
-    em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
+    for beta_star, orientation in product(beta_stars, orientations):
+        collider_sim = BunchCollider()
+        collider_sim.set_grid_size(31, 31, 101, 31)
+        # collider_sim.set_grid_size(21, 21, 51, 21)
+        beam_width_x_nom, beam_width_y_nom = 130.0, 130.0
+        if orientation == 'Horizontal':
+            beam_widths = np.linspace(120, 150, 9)
+        elif orientation == 'Vertical':
+            beam_widths = np.linspace(110, 140, 9)
+            # beam_widths = np.linspace(110, 140, 5)
+        else:
+            raise NotImplementedError(f'Orientation {orientation} not implemented.')
+        # beta_star = 80.3
+        bkg = 0.0e-17
+        gauss_eff_width = 500
+        mbd_resolution = 1.0
 
-    rates_data = [
-        # {'col_name': 'zdc_cor_rate', 'name': 'ZDC Uncorrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 's', 'color':'black', 'ls': '-'},
-        # {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 's', 'color':'orange', 'ls': '-'},
-        # {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 's', 'color':'green', 'ls': '-'},
-        # {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'black', 'ls': '-'},
-        # {'col_name': 'mbd_z200_rate', 'name': 'MBD |z|<200 Angelika Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'orange', 'ls': '-'},
-        # {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'orange', 'ls': '--'},
-        {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'green', 'ls': '-'},
-        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'norm_scale': None, 'marker': 'o', 'color':'green', 'ls': '--'},
-        {'col_name': 'mbd_zdc_coinc_sasha_cor_rate', 'name': 'MBD ZDC Coinc Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color': 'red', 'ls': '--'},
-    ]
+        norm_bw = beam_widths[len(beam_widths) // 2]  # Use the middle beam width for normalization
 
-    lumis, lumi_stds, scan_steps_plt = {bwx: [] for bwx in beam_widths}, {bwx: [] for bwx in beam_widths}, []
-    norm_step_lumis = {}
-    for scan_step in scan_steps:
-        print(f'Scan Step: {scan_step}')
-        cad_step_row = cad_df[cad_df['step'] == scan_step].iloc[0]
-        if cad_step_row['orientation'] != orientation:
-            continue
-        offset_col = 'set offset h' if cad_step_row['orientation'] == 'Horizontal' else 'set offset v'
-        if ((max_offset < abs(cad_step_row[offset_col] * 1e3) or abs(cad_step_row[offset_col] * 1e3) < min_offset)
-                and scan_step != norm_step):
-            print(f'Skipping scan step {scan_step} with offset |{cad_step_row[offset_col] * 1e3}| < {min_offset}')
-            continue
-        if scan_step != norm_step:
-            scan_steps_plt.append(scan_step)
+        collider_sim.set_bkg(bkg)
+        collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+        collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+        collider_sim.set_bunch_beta_stars(beta_star, beta_star)
 
-        profile_paths = get_profile_path(
-            longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], True
-        )
-        for beam_width in beam_widths:
-            profile_lumis = []
-            for profile_path in profile_paths:
-                if orientation == 'Horizontal':
-                    beam_width_x, beam_width_y = beam_width, beam_width_y_nom
-                elif orientation == 'Vertical':
-                    beam_width_x, beam_width_y = beam_width_x_nom, beam_width
-                else:
-                    raise NotImplementedError
-                set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom, em_yel_nom, profile_path)
-                collider_sim.run_sim_parallel()
-                if lumi_z_cut is None:
+        # Get nominal dcct ions and emittances
+        step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+        em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+        em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+        em_blue_nom = (em_blue_horiz_nom, em_blue_vert_nom)
+        em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
+
+        rates_data = [
+            {'col_name': 'zdc_cor_rate', 'name': 'ZDC Uncorrected', 'lumi_type': 'lumi', 'marker': 's', 'color':'black', 'ls': '-'},
+            {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'lumi_type': 'lumi', 'marker': 's', 'color':'orange', 'ls': '-'},
+            {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'lumi_type': 'lumi', 'marker': 's', 'color':'green', 'ls': '-'},
+            {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'lumi_type': 'lumi_observed', 'marker': 'o', 'color':'black', 'ls': '-'},
+            {'col_name': 'mbd_z200_rate', 'name': 'MBD |z|<200 Angelika Corrected', 'lumi_type': 'lumi_z_cut', 'marker': 'o', 'color':'orange', 'ls': '-'},
+            {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'lumi_type': 'lumi_observed', 'marker': 'o', 'color':'orange', 'ls': '--'},
+            {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'lumi_type': 'lumi_z_cut', 'marker': 'o', 'color':'green', 'ls': '-'},
+            {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'lumi_type': 'lumi_observed', 'marker': 'o', 'color':'green', 'ls': '--'},
+            {'col_name': 'mbd_zdc_coinc_sasha_cor_rate', 'name': 'MBD ZDC Coinc Sasha Corrected', 'lumi_type': 'lumi_observed', 'marker': 'o', 'color': 'red', 'ls': '--'},
+        ]
+
+        for rate_data in rates_data:
+            rate_data.update({'data': [], 'errs': [], 'norm_scale': None,
+                              'lumis': {bwx: [] for bwx in beam_widths}, 'lumi_stds': {bwx: [] for bwx in beam_widths},
+                              'norm_step_lumis': {}})
+
+        scan_steps_plt = []
+        for scan_step in scan_steps:
+            print(f'Scan Step: {scan_step}')
+            cad_step_row = cad_df[cad_df['step'] == scan_step].iloc[0]
+            if cad_step_row['orientation'] != orientation:
+                continue
+            offset_col = 'set offset h' if cad_step_row['orientation'] == 'Horizontal' else 'set offset v'
+            if ((max_offset < abs(cad_step_row[offset_col] * 1e3) or abs(cad_step_row[offset_col] * 1e3) < min_offset)
+                    and scan_step not in norm_steps):
+                print(f'Skipping scan step {scan_step} with offset |{cad_step_row[offset_col] * 1e3}| < {min_offset}')
+                continue
+            if scan_step not in norm_steps:
+                scan_steps_plt.append(scan_step)
+
+            profile_paths = get_profile_path(
+                longitudinal_profiles_dir_path, cad_step_row['start'], cad_step_row['end'], True
+            )
+            for beam_width in beam_widths:
+                profile_lumis = {'lumi': [], 'lumi_observed': [], 'lumi_z_cut': []}
+                for profile_path in profile_paths:
+                    if orientation == 'Horizontal':
+                        beam_width_x, beam_width_y = beam_width, beam_width_y_nom
+                    elif orientation == 'Vertical':
+                        beam_width_x, beam_width_y = beam_width_x_nom, beam_width
+                    else:
+                        raise NotImplementedError
+                    set_sim(collider_sim, cad_step_row, beam_width_x, beam_width_y, em_blue_nom, em_yel_nom, profile_path)
+                    collider_sim.run_sim_parallel()
                     naked_lumi = collider_sim.get_naked_luminosity()
-                else:
                     zs, z_dist = collider_sim.get_z_density_dist()
                     zs_cut, z_dist_cut = zs[np.abs(zs) < lumi_z_cut], z_dist[np.abs(zs) < lumi_z_cut]
-                    naked_lumi = collider_sim.get_naked_luminosity(observed=observed)
+                    naked_lumi_obs = collider_sim.get_naked_luminosity(observed=True)
                     cut_fraction = np.trapezoid(z_dist_cut, zs_cut) / np.trapezoid(z_dist, zs)
-                    naked_lumi *= cut_fraction
-                n_blue, n_yellow = cad_step_row['blue_wcm_ions'], cad_step_row['yellow_wcm_ions']
-                lumi = naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
-                profile_lumis.append(lumi)
-            lumi_mean, lumi_std = np.nanmean(profile_lumis), np.nanstd(profile_lumis)
-            if scan_step == norm_step:
-                norm_step_lumis[beam_width] = lumi_mean
-            else:
-                lumis[beam_width].append(lumi_mean)
-                lumi_stds[beam_width].append(lumi_std)
-        for rate_data in rates_data:
-            if scan_step == norm_step:
-                rate_data['norm_scale'] = norm_step_lumis[norm_bw] / cad_step_row[rate_data['col_name']]
-            else:
-                rate_data['data'].append(cad_step_row[rate_data['col_name']])
-                dur = cad_step_row['rate_calc_duration']
-                rate_data['errs'].append(np.sqrt(cad_step_row[rate_data['col_name']] * dur) / dur)
+                    naked_lumi_z_cut = naked_lumi_obs * cut_fraction
+                    n_blue, n_yellow = cad_step_row['blue_wcm_ions'], cad_step_row['yellow_wcm_ions']
+                    profile_lumis['lumi'].append(naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+                    profile_lumis['lumi_observed'].append(naked_lumi_obs * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+                    profile_lumis['lumi_z_cut'].append(naked_lumi_z_cut * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+                for rate_data in rates_data:
+                    if scan_step in norm_steps:
+                        rate_data['norm_step_lumis'][beam_width] = np.nanmean(profile_lumis[rate_data['lumi_type']])
+                    else:
+                        rate_data['lumis'][beam_width].append(np.nanmean(profile_lumis[rate_data['lumi_type']]))
+                        rate_data['lumi_stds'][beam_width].append(np.nanstd(profile_lumis[rate_data['lumi_type']]))
+            for rate_data in rates_data:
+                if scan_step in norm_steps:
+                    rate_data['norm_scale'] = rate_data['norm_step_lumis'][norm_bw] / cad_step_row[rate_data['col_name']]
+                else:
+                    rate_data['data'].append(cad_step_row[rate_data['col_name']])
+                    dur = cad_step_row['rate_calc_duration']
+                    rate_data['errs'].append(np.sqrt(cad_step_row[rate_data['col_name']] * dur) / dur)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    for rate_data in rates_data:
-        rate_data['data'] = np.array(rate_data['data'])  # All should be the same for each step, just get mean
-        rate_data['errs'] = np.array(rate_data['errs'])
-
-        rate_data['scaled_rate'] = rate_data['data'] * rate_data['norm_scale']
-        rate_data['scaled_errs'] = rate_data['errs'] * rate_data['norm_scale']
-
-        ax.errorbar(scan_steps_plt, rate_data['scaled_rate'], yerr=rate_data['scaled_errs'],
-                    marker=rate_data['marker'], linestyle=rate_data['ls'],
-                    color=rate_data['color'], label=rate_data['name'])
-
-    chi2s = {rd['name']: {} for rd in rates_data}
-    for beam_width in beam_widths:
-        lumis_mean = np.array(lumis[beam_width])
-        lumi_std = np.array(lumi_stds[beam_width])
-        scale = norm_step_lumis[norm_bw] / norm_step_lumis[beam_width]
-
-        for rate_data in rates_data:
-            chi2s[rate_data['name']][beam_width] = (lumis_mean * scale - rate_data['scaled_rate'])**2 / (rate_data['scaled_errs']**2 + lumi_std**2)
-
-        ax.errorbar(scan_steps_plt, lumis_mean * scale, yerr=lumi_std * scale, alpha=0.7,
-                    marker='.', linestyle='-', label=rf'Lumi $\sigma=$ {beam_width:.1f} um')
-
-    ax.axhline(0, color='k', ls='-', zorder=0)
-    ax.set_xlabel('Scan Step')
-    ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$] / Rate [Hz]')
-    ax.set_title(f'{orientation} Beam Width Scan')
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(f'{out_fig_path}bw_{orientation}_rates_vs_step.png')
-    fig.savefig(f'{out_fig_path}bw_{orientation}_rates_vs_step.pdf')
-
-    df_out = []
-    for rate_data in rates_data:
         fig, ax = plt.subplots(figsize=(10, 6))
+        for rate_data in rates_data:
+            rate_data['data'] = np.array(rate_data['data'])  # All should be the same for each step, just get mean
+            rate_data['errs'] = np.array(rate_data['errs'])
+
+            rate_data['scaled_rate'] = rate_data['data'] * rate_data['norm_scale']
+            rate_data['scaled_errs'] = rate_data['errs'] * rate_data['norm_scale']
+
+            ax.errorbar(scan_steps_plt, rate_data['scaled_rate'], yerr=rate_data['scaled_errs'],
+                        marker=rate_data['marker'], linestyle=rate_data['ls'],
+                        color=rate_data['color'], label=rate_data['name'])
+
+        chi2s = {rd['name']: {} for rd in rates_data}
+        for beam_width in beam_widths:
+            for rate_data in rates_data:
+                lumis_mean = np.array(rate_data['lumis'][beam_width])
+                lumi_std = np.array(rate_data['lumi_stds'][beam_width])
+                scale = rate_data['norm_step_lumis'][norm_bw] / rate_data['norm_step_lumis'][beam_width]
+                chi2s[rate_data['name']][beam_width] = (lumis_mean * scale - rate_data['scaled_rate'])**2 / (rate_data['scaled_errs']**2 + lumi_std**2)
+
+            ax.errorbar(scan_steps_plt, lumis_mean * scale, yerr=lumi_std * scale, alpha=0.7,
+                        marker='.', linestyle='-', label=rf'Lumi $\sigma=$ {beam_width:.1f} um')
+
         ax.axhline(0, color='k', ls='-', zorder=0)
-        chi2_array = np.array([chi2s[rate_data['name']][beam_width_x] for beam_width_x in beam_widths])
-        min_chi2_bws = []
-        for step_i, step in enumerate(scan_steps_plt):
-            step_chis = chi2_array[:, step_i]
-            l = ax.plot(beam_widths, step_chis, linestyle='-', label=f'Step {step}')
-            min_chi2_bw, min_chi2_value = get_minimum_chi2(step_chis, beam_widths)
-            min_chi2_bws.append(min_chi2_bw)
-            ax.axvline(min_chi2_bw, color=l[0].get_color(), linestyle='--')
-
-        # Plot average chi2 across all steps
-        avg_chi2 = np.mean(chi2_array, axis=1)
-        min_chi2_bw, min_chi2_value = get_minimum_chi2(avg_chi2, beam_widths)
-        std_min_chi2 = np.std(min_chi2_bws)
-        ax.axvspan(min_chi2_bw - std_min_chi2, min_chi2_bw + std_min_chi2, alpha=0.2, color='black')
-        ax.plot(beam_widths, avg_chi2, linestyle='-', color='black', label='Average', linewidth=2)
-        ax.axvline(min_chi2_bw, color='black', linestyle='--', linewidth=2)
-        bw_min = Measure(min_chi2_bw, std_min_chi2)
-        ax.annotate(f'Beam Width: {bw_min} μm', xy=(min_chi2_bw, min_chi2_value), xycoords='data',
-                    xytext=(0.1, 0.93), textcoords='axes fraction',
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=4),
-                    ha='left', va='top', fontsize=10, color='black')
-
-        df_out.append({'rate_name': rate_data['name'], 'orientation': orientation, 'beta_star': beta_star,
-                       'beam_width': bw_min.val, 'beam_width_err': bw_min.err})
-
-        ax.set_xlabel(f'{orientation} Beam Width [um]')
-        ax.set_ylabel(r'$\chi^2$')
-        ax.set_title(f'Chi2 vs {orientation} Beam Width for Each Step : {rate_data["name"]}')
-        ax.legend(loc='upper right')
+        ax.set_xlabel('Scan Step')
+        ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$] / Rate [Hz]')
+        ax.set_title(f'{orientation} Beam Width Scan')
+        ax.legend()
         fig.tight_layout()
-        fig.savefig(f'{out_fig_path}bw_{orientation}_rate_only_chi2_vs_bw_{rate_data["col_name"]}.png')
-        fig.savefig(f'{out_fig_path}bw_{orientation}_rate_only_chi2_vs_bw_{rate_data["col_name"]}.pdf')
+        fig.savefig(f'{out_fig_path}bw_{orientation}_rates_vs_step_betastar_{beta_star:.1f}.png')
+        fig.savefig(f'{out_fig_path}bw_{orientation}_rates_vs_step_betastar_{beta_star:.1f}.pdf')
 
-    df_out = pd.DataFrame(df_out)
-    if os.path.exists(out_csv_path):
-        df_existing = pd.read_csv(out_csv_path)
+        df_out = []
+        for rate_data in rates_data:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.axhline(0, color='k', ls='-', zorder=0)
+            chi2_array = np.array([chi2s[rate_data['name']][beam_width_x] for beam_width_x in beam_widths])
+            min_chi2_bws = []
+            for step_i, step in enumerate(scan_steps_plt):
+                step_chis = chi2_array[:, step_i]
+                l = ax.plot(beam_widths, step_chis, linestyle='-', label=f'Step {step}')
+                min_chi2_bw, min_chi2_value = get_minimum_chi2(step_chis, beam_widths)
+                min_chi2_bws.append(min_chi2_bw)
+                ax.axvline(min_chi2_bw, color=l[0].get_color(), linestyle='--')
 
-        # Remove existing rows that match any of the new rate_name + orientation combinations
-        mask = pd.Series([True] * len(df_existing))
+            # Plot average chi2 across all steps
+            avg_chi2 = np.mean(chi2_array, axis=1)
+            min_chi2_bw, min_chi2_value = get_minimum_chi2(avg_chi2, beam_widths)
+            std_min_chi2 = np.std(min_chi2_bws)
+            ax.axvspan(min_chi2_bw - std_min_chi2, min_chi2_bw + std_min_chi2, alpha=0.2, color='black')
+            ax.plot(beam_widths, avg_chi2, linestyle='-', color='black', label='Average', linewidth=2)
+            ax.axvline(min_chi2_bw, color='black', linestyle='--', linewidth=2)
+            bw_min = Measure(min_chi2_bw, std_min_chi2)
+            ax.annotate(f'Beam Width: {bw_min} μm', xy=(min_chi2_bw, min_chi2_value), xycoords='data',
+                        xytext=(0.1, 0.93), textcoords='axes fraction',
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=4),
+                        ha='left', va='top', fontsize=10, color='black')
 
-        for _, row in df_out.iterrows():
-            mask &= ~((df_existing['rate_name'] == row['rate_name']) &
-                      (df_existing['orientation'] == row['orientation']))
+            df_out.append({'rate_name': rate_data['name'], 'orientation': orientation, 'beta_star': beta_star,
+                           'transverse_beam_width': beam_width_x_nom if orientation == 'Horizontal' else beam_width_y_nom,
+                           'lumi_type': rate_data['lumi_type'], 'lumi_z_cut': lumi_z_cut,
+                           'beam_width': bw_min.val, 'beam_width_err': bw_min.err})
 
-        df_existing = df_existing[mask]
+            ax.set_xlabel(f'{orientation} Beam Width [um]')
+            ax.set_ylabel(r'$\chi^2$')
+            ax.set_title(f'Chi2 vs {orientation} Beam Width for Each Step : {rate_data["name"]}')
+            ax.legend(loc='upper right')
+            fig.tight_layout()
+            fig.savefig(f'{out_fig_path}bw_{orientation}_rate_only_chi2_vs_bw_{rate_data["col_name"]}_betastar_{beta_star:.1f}.png')
+            fig.savefig(f'{out_fig_path}bw_{orientation}_rate_only_chi2_vs_bw_{rate_data["col_name"]}_betastar_{beta_star:.1f}.pdf')
 
-        # Append the new rows
-        df_out = pd.concat([df_existing, df_out], ignore_index=True)
+        df_out = pd.DataFrame(df_out)
+        if os.path.exists(out_csv_path):
+            df_existing = pd.read_csv(out_csv_path)
 
-    # Save to CSV
-    df_out.to_csv(out_csv_path, index=False)
+            # Remove existing rows that match any of the new rate_name + orientation combinations
+            mask = pd.Series([True] * len(df_existing))
+
+            for _, row in df_out.iterrows():
+                mask &= ~((df_existing['rate_name'] == row['rate_name']) &
+                          (df_existing['orientation'] == row['orientation']) &
+                          (df_existing['beta_star'] == row['beta_star']) &
+                          (df_existing['transverse_beam_width'] == row['transverse_beam_width']) &
+                          (df_existing['lumi_type'] == row['lumi_type']) &
+                          (df_existing['lumi_z_cut'] == row['lumi_z_cut']))
+
+            df_existing = df_existing[mask]
+
+            # Append the new rows
+            df_out = pd.concat([df_existing, df_out], ignore_index=True)
+
+        # Save to CSV
+        df_out.to_csv(out_csv_path, index=False)
 
     plt.show()
 
@@ -777,12 +799,15 @@ def plot_fit_beam_widths(base_path):
     df = pd.read_csv(out_csv_path)
     orientations = ['Horizontal', 'Vertical']
     fig_both, ax_both = plt.subplots(figsize=(10, 6))
+
     for orientation in orientations:
         df_orientation = df[df['orientation'] == orientation]
         df_orientation = df_orientation.sort_values(by='rate_name')  # Sort by rate_name
-        ax_both.errorbar(df_orientation['rate_name'], df_orientation['beam_width'], yerr=df_orientation['beam_width_err'],
+        ax_both.errorbar(df_orientation['beam_width'], df_orientation['rate_name'],
+                         xerr=df_orientation['beam_width_err'],
                          marker='s', linestyle='none', label=f'{orientation} Beam Widths')
-    ax_both.set_ylabel('Beam Width [um]')
+
+    ax_both.set_xlabel('Beam Width [um]')
     ax_both.set_title('Fitted Beam Widths for Different Relative Rate Estimates')
     ax_both.legend()
     fig_both.tight_layout()

@@ -32,7 +32,8 @@ def main():
     scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     # file_name = 'calofit_54733.root'
     # file_name = '69561.root'
-    file_name = 'calofitting_51195.root'
+    # file_name = 'calofitting_51195.root'
+    file_name = 'original_51195.root'
 
     out_root_file_path = f'{scan_path}{sub_dir}{run_number}_vertex_distributions.root'
     out_root_file_path_no_zdc_coinc = f'{scan_path}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc.root'

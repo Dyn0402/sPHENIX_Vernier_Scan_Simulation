@@ -25,7 +25,8 @@ def main():
     # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
     # root_file_name = '69561.root'
     scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
-    root_file_name = 'calofitting_51195.root'
+    # root_file_name = 'calofitting_51195.root'
+    root_file_name = 'original_51195.root'
 
     if '/pp_' in scan_path:
         emittance_poly_order = 0
@@ -51,7 +52,6 @@ def main():
     df = df.merge(set_offsets_df, on='step', how='left')
 
     # Add emittance information to the dataframe
-    # emittance_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
     emittance_file_path = f'{scan_path}emittance.dat'
     emittance_df = add_emittance_info_to_df(emittance_file_path, times=df['mid_time'], poly_order=emittance_poly_order)
     df = df.merge(emittance_df, on='mid_time', how='left')

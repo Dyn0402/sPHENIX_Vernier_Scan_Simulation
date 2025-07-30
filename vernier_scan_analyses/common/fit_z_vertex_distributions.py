@@ -16,6 +16,7 @@ from scipy.optimize import minimize, differential_evolution
 from scipy.interpolate import interp1d
 import uproot
 from datetime import datetime, time
+from time import time
 
 from BunchCollider import BunchCollider
 from z_vertex_fitting_common import (fit_amp_shift, fit_shift_only, get_profile_path, compute_total_chi2,
@@ -26,15 +27,16 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    # base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     # base_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    base_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    # base_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
 
     # fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
     # fit_beam_widths(base_path)
     plot_beta_star_head_on_fit_results(base_path)
     # plot_beam_width_fit_results(base_path)
+    # compile_beta_star_fit_results(base_path, plot=True)
     plt.show()
     print('donzo')
 
@@ -160,34 +162,31 @@ def fit_beta_star_to_head_on_steps(base_path):
 
     if base_path.split('/')[-2] == 'auau_oct_16_24':
         run_number = 54733
-        bws = [130, 110]
-        beta_stars = np.linspace(60, 95, 30)
+        bws_x, bws_y = np.linspace(100, 140, 3), np.linspace(100, 140, 3)
+        beta_stars = np.linspace(60, 95, 20)
         z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
     elif base_path.split('/')[-2] == 'auau_july_17_25':
         run_number = 69561
-        bws = [130, 110]
-        beta_stars = np.linspace(60, 95, 30)
+        # bws_x, bws_y = np.linspace(100, 140, 3), np.linspace(100, 140, 3)
+        bws_x, bws_y = [130], [130]  # Nominal beam widths
+        beta_stars = np.linspace(60, 95, 20)
         z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
     elif base_path.split('/')[-2] == 'pp_aug_12_24':
         run_number = 51195
-        bws = [130, 110]
-        beta_stars = np.linspace(90, 130, 30)
+        bws_x, bws_y = np.linspace(100, 140, 9), np.linspace(100, 140, 9)
+        beta_stars = np.linspace(90, 130, 20)
         z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
     else:
         raise ValueError(f'Unknown run number for base path: {base_path}')
 
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
-    # out_name = 'beta_star_fit_results.csv'
-    # out_name = 'beta_star_fit_results_zdc_cor_rate_bw130.csv'
-    # out_name = 'beta_star_fit_results_zdc_raw_rate_bw130.csv'
+    out_dir = f'{base_path}beta_star_fits/'
+    os.makedirs(out_dir, exist_ok=True)
     out_name_base = 'beta_star_fit_results_'
-    # out_name = 'beta_star_fit_results_mbd_z200_rate_bw110.csv'
-    # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
-    # rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
 
     # rate_cols = ['mbd_zdc_coinc_sasha_cor_rate', 'zdc_sasha_cor_rate', 'mbd_sasha_z200_rate', 'mbd_sasha_bkg_cor_rate']
-    rate_cols = ['mbd_zdc_coinc_sasha_cor_rate']
+    rate_cols = ['zdc_sasha_cor_rate']
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
@@ -213,42 +212,58 @@ def fit_beta_star_to_head_on_steps(base_path):
         # Preload data and histograms here
         vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column)
 
-        for bw in bws:
-            beam_width_x, beam_width_y = bw, bw
-            out_name = f'{out_name_base}{rate_column}_bw{bw}.csv'
+        total_bws = len(bws_x) * len(bws_y)
+        bw_i = 0
+        start_time = time()
 
-            sim_settings = {
-                'steps': steps,
-                'fit_range': fit_range,
-                'profiles_path': longitudinal_profiles_dir_path,
-                'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
-                'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
-                'plot': False  # Set to True if you want to plot the results
-            }
+        # for bw in bws:
+        for bw_x in bws_x:
+            for bw_y in bws_y:
+                if bw_i > 0:
+                    elapsed_time = time() - start_time
+                    avg_time_per_step = elapsed_time / bw_i
+                    time_remaining = avg_time_per_step * (total_bws - bw_i)
+                    finish_time = datetime.now() + pd.Timedelta(seconds=time_remaining)
 
-            results = []
-            for beta_star in beta_stars:  # For given beta_star, amplitude is fixed at step=0 and stays there.
-                for step in steps:
-                    sim_settings['steps'] = [step]
-                    centers, counts, count_errs = vertex_data[step]
-                    initial_guess = np.array([beam_width_x, beam_width_y, beta_star, beta_star, 0.0, 0.0, 0.0, 0.0])
+                    print(f'\nStarting bwx {bw_x:.2f} um, bwy {bw_y:.2f} um ({bw_i + 1}/{total_bws}), elapsed: '
+                          f'{elapsed_time / 60:.1f} min, estimated finish time: {finish_time.strftime("%H:%M")}\n')
 
-                    chi2, log_like, resid = compute_total_chi2(
-                        initial_guess,
-                        collider_sim,
-                        cad_df,
-                        {step: centers},
-                        {step: counts},
-                        {step: count_errs},
-                        sim_settings,
-                        metrics=('chi2', 'log_like', 'scaled_resid'),
-                        fit_amp=True
-                    )
-                    results.append({'step': step, 'beta_star': beta_star, 'chi2': chi2, 'log_like': log_like, 'resids': resid})
+                # beam_width_x, beam_width_y = bw, bw
+                out_name = f'{out_name_base}{rate_column}_bwx{bw_x}_bwy{bw_y}.csv'
 
-            # Write results to a CSV file
-            results_df = pd.DataFrame(results)
-            results_df.to_csv(f'{base_path}{out_name}', index=False)
+                sim_settings = {
+                    'steps': steps,
+                    'fit_range': fit_range,
+                    'profiles_path': longitudinal_profiles_dir_path,
+                    'em_blue_nom': (em_blue_horiz_nom, em_blue_vert_nom),
+                    'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
+                    'plot': False  # Set to True if you want to plot the results
+                }
+
+                results = []
+                for beta_star in beta_stars:  # Amplitude is now fit for each step. Just the shape, not the relative rate.
+                    for step in steps:
+                        sim_settings['steps'] = [step]
+                        centers, counts, count_errs = vertex_data[step]
+                        initial_guess = np.array([bw_x, bw_y, beta_star, beta_star, 0.0, 0.0, 0.0, 0.0])
+
+                        chi2, log_like, resid = compute_total_chi2(
+                            initial_guess,
+                            collider_sim,
+                            cad_df,
+                            {step: centers},
+                            {step: counts},
+                            {step: count_errs},
+                            sim_settings,
+                            metrics=('chi2', 'log_like', 'scaled_resid'),
+                            fit_amp=True
+                        )
+                        results.append({'step': step, 'beta_star': beta_star, 'chi2': chi2, 'log_like': log_like, 'resids': resid})
+
+                # Write results to a CSV file
+                results_df = pd.DataFrame(results)
+                results_df.to_csv(f'{out_dir}{out_name}', index=False)
+                bw_i += 1
 
     plt.show()
 
@@ -339,7 +354,7 @@ def plot_beta_star_head_on_fit_results(base_path):
 
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw130.csv')  # Nominal
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_zdc_coinc_sasha_cor_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_zdc_coinc_sasha_cor_rate_bw130.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_zdc_coinc_sasha_cor_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw130.csv')
@@ -347,6 +362,10 @@ def plot_beta_star_head_on_fit_results(base_path):
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_z200_rate_bw130.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_bkg_cor_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_bkg_cor_rate_bw130.csv')
+
+    # results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx100.0_bwy105.0.csv')  # Nominal
+    results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx110.0_bwy105.0.csv')  # Nominal
+    # results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx130_bwy130.csv')  # Nominal
 
     # Plot chi2 vs beta star for each step
     fig, axs = plt.subplots(figsize=(10, 6), nrows=3, sharex='all')
@@ -403,6 +422,80 @@ def plot_beta_star_head_on_fit_results(base_path):
     fig.tight_layout()
     fig.subplots_adjust(left=0.07, right=0.995, bottom=0.075, top=0.995, hspace=0.0)
 
+
+def compile_beta_star_fit_results(base_path, plot=False):
+    """
+    Plot the results of the beta star fit.
+    :param base_path: Base path to the vernier scan data.
+    :param plot: Whether to plot the results or not.
+    """
+    fit_dir = 'beta_star_fits'
+    base_name = 'beta_star_fit_results_'
+    df = []
+    for file_name in os.listdir(f'{base_path}{fit_dir}'):
+        if file_name.startswith(base_name) and file_name.endswith('.csv'):  # Extract bw_x and bw_y from the file name
+            rate_bwxy_name = file_name.replace(base_name, '').replace('.csv', '')
+            rate_name, bwxy = rate_bwxy_name.split('_bwx')
+            bw_x, bw_y = bwxy.split('_bwy')
+            bw_x, bw_y = float(bw_x), float(bw_y)
+            opt_beta_star = get_beta_star_head_on_fit_results(f'{base_path}{fit_dir}/{file_name}')
+            print(f'Rate: {rate_name}, Beam Widths: {bw_x:.2f} um, {bw_y:.2f} um, Opt Beta Star: {opt_beta_star}')
+            df.append({'rate_name': rate_name, 'bw_x': bw_x, 'bw_y': bw_y,
+                       'opt_beta_star': opt_beta_star.val, 'opt_beta_star_err': opt_beta_star.err})
+
+    # Create a DataFrame from the results
+    df = pd.DataFrame(df)
+    df.to_csv(f'{base_path}{fit_dir}/beta_star_fit_results.csv', index=False)
+
+    if plot:
+        for rate_name, group in df.groupby('rate_name'):
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for bw_y, bw_y_group in group.groupby('bw_y'):
+                ax.errorbar(bw_y_group['bw_x'], bw_y_group['opt_beta_star'], yerr=bw_y_group['opt_beta_star_err'],
+                            label=f'bw_y={bw_y}', fmt='o', capsize=5)
+            ax.set_xlabel('Beam Width X (um)')
+            ax.set_ylabel('Optimal Beta Star (cm)')
+            ax.set_title(f'Optimal Beta Star vs Beam Width X for {rate_name}')
+            ax.legend()
+            fig.tight_layout()
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for bw_x, bw_x_group in group.groupby('bw_x'):
+                ax.errorbar(bw_x_group['bw_y'], bw_x_group['opt_beta_star'], yerr=bw_x_group['opt_beta_star_err'],
+                            label=f'bw_x={bw_x}', fmt='o', capsize=5)
+            ax.set_xlabel('Beam Width Y (um)')
+            ax.set_ylabel('Optimal Beta Star (cm)')
+            ax.set_title(f'Optimal Beta Star vs Beam Width Y for {rate_name}')
+            ax.legend()
+            fig.tight_layout()
+
+        plt.show()
+
+
+def get_beta_star_head_on_fit_results(file_path):
+    """
+    Get beta_star head-on fit results from a CSV file.
+    """
+    results_df = pd.read_csv(file_path)
+
+    min_bses = []
+    for step in results_df['step'].unique():
+        step_data = results_df[results_df['step'] == step]
+        min_chi2_beta_star = step_data['beta_star'][step_data['chi2'].idxmin()]
+        min_log_like_beta_star = step_data['beta_star'][step_data['log_like'].idxmin()]
+        min_resid_beta_star = step_data['beta_star'][step_data['resids'].idxmin()]
+        min_bses.append(min_chi2_beta_star)
+        min_bses.append(min_log_like_beta_star)
+        min_bses.append(min_resid_beta_star)
+
+    # Group by beta_star and compute the mean chi2
+    step_avg_df = results_df.groupby('beta_star')[['chi2', 'log_like', 'resids']].mean().reset_index()
+
+    min_resid_avg_beta_star = step_avg_df['beta_star'][step_avg_df['resids'].idxmin()]
+
+    opt_beta_star = Measure(min_resid_avg_beta_star, np.std(min_bses))
+
+    return opt_beta_star
 
 def plot_beam_width_fit_results(base_path):
     """

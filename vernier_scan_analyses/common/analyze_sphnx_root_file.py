@@ -24,13 +24,15 @@ def main():
     base_path = set_base_path()
 
     sub_dir = 'vertex_data/'
-    run_number = 54733
-    base_path_scan = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    root_file_name = f'calofit_{run_number}.root'
-    # run_number = 69561
-    # base_path_scan = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    # root_file_name = f'2024p019_{run_number}.root'
+    # run_number = 54733
+    # base_path_scan = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # root_file_name = f'calofit_{run_number}.root'
+    run_number = 69561
+    base_path_scan = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    root_file_name = f'{run_number}.root'
+    # run_number = 51195
     # base_path_scan = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    # root_file_name = f'calofitting_{run_number}.root'
     out_root_file_path = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions.root'
     out_root_file_path_no_zdc_coinc = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc.root'
     out_root_file_path_bbb = f'{base_path_scan}{sub_dir}{run_number}_vertex_distributions_bunch_by_bunch.root'
@@ -723,6 +725,21 @@ def get_step_rates(scan_path, cad_df, root_file_name=None, bco_offset=0):
     cad_df['end'] = pd.to_datetime(cad_df['end'])
     run_start = cad_df.iloc[0]['start']
 
+    # Check first start time. If time[0] > cad_df['start'].iloc[0], then we need to shift the start time
+    if time.iloc[0] > (cad_df['start'].iloc[0] - run_start).total_seconds():
+        print(f'Start time of data ({time.iloc[0]}) is greater than first step start time '
+              f'({(cad_df["start"].iloc[0] - run_start).total_seconds()}). '
+              f'Shifting start time of first step to match data.')
+        cad_df.loc[0, 'start'] = run_start + pd.Timedelta(seconds=round(time.iloc[0], 3))
+        cad_df.loc[0, 'duration'] = (cad_df.loc[0, 'end'] - cad_df.loc[0, 'start']).total_seconds()
+    # Do the same for the end time
+    if time.iloc[-1] < (cad_df['end'].iloc[-1] - run_start).total_seconds():
+        print(f'End time of data ({time.iloc[-1]}) is less than last step end time '
+              f'({(cad_df["end"].iloc[-1] - run_start).total_seconds()}). '
+              f'Shifting end time of last step to match data.')
+        cad_df.loc[cad_df.index[-1], 'end'] = run_start + pd.Timedelta(seconds=round(time.iloc[-1], 3))
+        cad_df.loc[cad_df.index[-1], 'duration'] = (cad_df.loc[cad_df.index[-1], 'end'] - cad_df.loc[cad_df.index[-1], 'start']).total_seconds()
+
     rates = []
     for index, row in cad_df.iterrows():
         start_time = (row['start'] - run_start).total_seconds() + step_time_cushion
@@ -820,18 +837,23 @@ def get_bco_offset(scan_path, cad_df, root_file_name='calofit_54733.root', tree_
     """
     Get the BCO offset from the data.
     """
-    rate_time_step = 0.1  # for example
-    derivative_step_threshold = 0.65
+    rate_time_step = 0.1
+
+    if 'auau_' in scan_path.split('/')[-2]:
+        col_name = 'zdc_raw_count'
+        derivative_step_threshold = 0.68
+    else:
+        col_name = 'mbd_raw_count'
+        derivative_step_threshold = 1.5
+
     data, time = get_root_data_time(scan_path, root_file_name=root_file_name, tree_name=tree_name, sub_dir=sub_dir,
-                                    branches=['BCO', 'zdc_raw_count'], bco_offset=0.0)
+                                    branches=['BCO', col_name], bco_offset=0.0)
 
     cad_df['start'] = pd.to_datetime(cad_df['start'])
     cad_df['end'] = pd.to_datetime(cad_df['end'])
     run_start = cad_df.iloc[0]['start']
 
     cad_df = cad_df[cad_df['step'] >= 0]
-
-    col_name = 'zdc_raw_count'
 
     # Create bin edges and assign each time point to a bin
     bin_edges = np.arange(time.min(), time.max() + rate_time_step, rate_time_step)
@@ -855,12 +877,12 @@ def get_bco_offset(scan_path, cad_df, root_file_name='calofit_54733.root', tree_
     times = result['mean_time'].astype('float64').to_numpy()
     rates = result['rate'].to_numpy()
 
-    times_avg, rates_avg = moving_average(times, rates, window_size=30)
+    times_avg, rates_avg = moving_average(times, rates, window_size=30)  # 3 seconds window
 
     rate_changes_avg = np.abs(np.diff(rates_avg)) / np.sqrt((rates_avg[1:] + rates_avg[:-1]) / 2)
     times_over_threshold = ((times_avg[1:] + times_avg[:-1]) / 2)[rate_changes_avg > derivative_step_threshold]
     times_over_threshold = run_start + (times_over_threshold * 1000).astype('timedelta64[ms]')  # Convert to datetime
-    step_changes = get_step_bounds(times_over_threshold, max_gap_seconds=25)
+    step_changes = get_step_bounds(times_over_threshold, max_gap_seconds=20)
 
     root_means = [start_i + (end_i - start_i) / 2 for start_i, end_i in step_changes]
     bpm_means = [start_i + (end_i - start_i) / 2 for start_i, end_i in
@@ -870,7 +892,7 @@ def get_bco_offset(scan_path, cad_df, root_file_name='calofit_54733.root', tree_
         print(f'Warning: Number of root means ({len(root_means)}) does not match number of BPM means ({len(bpm_means)})')
         step_offsets = [0]
     else:
-        step_offsets = np.array(root_means) - np.array(bpm_means)
+        step_offsets = np.array(bpm_means) - np.array(root_means)
         step_offsets = [x.total_seconds() for x in step_offsets]
     mean_step_offset = np.mean(step_offsets)
 
@@ -905,7 +927,7 @@ def get_bco_offset(scan_path, cad_df, root_file_name='calofit_54733.root', tree_
                     fontsize=12, color='black', ha='left', va='top')
         ax.set_xlabel('Step Index')
         ax.legend()
-        ax.set_ylabel('Root - BPM Means (s)')
+        ax.set_ylabel('BPM Means (s) - Root Means (s)')
         fig.tight_layout()
 
         plt.show()

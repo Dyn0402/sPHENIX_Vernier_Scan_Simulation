@@ -26,7 +26,9 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # base_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    base_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
 
     # fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
@@ -156,8 +158,25 @@ def fit_beta_star_to_head_on_steps(base_path):
     :return: None
     """
 
+    if base_path.split('/')[-2] == 'auau_oct_16_24':
+        run_number = 54733
+        bws = [130, 110]
+        beta_stars = np.linspace(60, 95, 30)
+        z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
+    elif base_path.split('/')[-2] == 'auau_july_17_25':
+        run_number = 69561
+        bws = [130, 110]
+        beta_stars = np.linspace(60, 95, 30)
+        z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
+    elif base_path.split('/')[-2] == 'pp_aug_12_24':
+        run_number = 51195
+        bws = [130, 110]
+        beta_stars = np.linspace(90, 130, 30)
+        z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
+    else:
+        raise ValueError(f'Unknown run number for base path: {base_path}')
+
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
-    z_vertex_zdc_data_path = f'{base_path}vertex_data/54733_vertex_distributions.root'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     # out_name = 'beta_star_fit_results.csv'
     # out_name = 'beta_star_fit_results_zdc_cor_rate_bw130.csv'
@@ -167,13 +186,14 @@ def fit_beta_star_to_head_on_steps(base_path):
     # rate_column = 'zdc_raw_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
     # rate_column = 'mbd_z200_rate'  # 'zdc_raw_rate', 'zdc_cor_rate', 'mbd_z200_rate', or 'mbd_bkg_cor_rate'
 
-    rate_cols = ['zdc_sasha_cor_rate', 'mbd_sasha_z200_rate', 'mbd_sasha_bkg_cor_rate']
-    bws = [130, 110]
+    # rate_cols = ['mbd_zdc_coinc_sasha_cor_rate', 'zdc_sasha_cor_rate', 'mbd_sasha_z200_rate', 'mbd_sasha_bkg_cor_rate']
+    rate_cols = ['mbd_zdc_coinc_sasha_cor_rate']
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
     fit_range = [-200, 200]
-    steps = [0, 6, 12, 18, 24]
+    # steps = [0, 6, 12, 18, 24]
+    steps = [row['step'] for _, row in cad_df.iterrows() if row['set offset h'] == 0 and row['set offset v'] == 0]
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
@@ -194,7 +214,6 @@ def fit_beta_star_to_head_on_steps(base_path):
         vertex_data = load_vertex_distributions(z_vertex_zdc_data_path, steps, cad_df, rate_column)
 
         for bw in bws:
-            # beam_width_x, beam_width_y = 130.0, 130.0
             beam_width_x, beam_width_y = bw, bw
             out_name = f'{out_name_base}{rate_column}_bw{bw}.csv'
 
@@ -206,8 +225,6 @@ def fit_beta_star_to_head_on_steps(base_path):
                 'em_yel_nom': (em_yel_horiz_nom, em_yel_vert_nom),
                 'plot': False  # Set to True if you want to plot the results
             }
-
-            beta_stars = np.linspace(60, 95, 150)
 
             results = []
             for beta_star in beta_stars:  # For given beta_star, amplitude is fixed at step=0 and stays there.
@@ -224,7 +241,8 @@ def fit_beta_star_to_head_on_steps(base_path):
                         {step: counts},
                         {step: count_errs},
                         sim_settings,
-                        metrics=('chi2', 'log_like', 'scaled_resid')
+                        metrics=('chi2', 'log_like', 'scaled_resid'),
+                        fit_amp=True
                     )
                     results.append({'step': step, 'beta_star': beta_star, 'chi2': chi2, 'log_like': log_like, 'resids': resid})
 
@@ -320,7 +338,9 @@ def plot_beta_star_head_on_fit_results(base_path):
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results.csv')
 
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw110.csv')
-    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw130.csv')  # Nominal
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_sasha_cor_rate_bw130.csv')  # Nominal
+    results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_zdc_coinc_sasha_cor_rate_bw130.csv')
+    # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_zdc_coinc_sasha_cor_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw110.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_zdc_raw_rate_bw130.csv')
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_z200_rate_bw110.csv')

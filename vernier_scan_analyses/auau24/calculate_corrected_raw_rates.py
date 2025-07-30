@@ -105,7 +105,8 @@ def get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_data_path, z_vert
     z_cut = 200  # cm, cut for the MBD
     # steps = [5]
     # steps = [0, 6, 12, 18]
-    steps = np.arange(0, 25)
+    # steps = np.arange(0, 25)
+    steps = [step for step in cad_df['step'].unique() if step >= 0]
     # plot_out_path = None
 
     # Get the vz fraction outside of the cut for data from no ZDC coincidence and from simulation with ZDC coincidence

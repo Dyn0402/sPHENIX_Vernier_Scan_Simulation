@@ -23,7 +23,7 @@ def main():
     # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     # root_file_name = 'calofit_54733.root'
     # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    # root_file_name = '2024p019_69561.root'
+    # root_file_name = '69561.root'
     scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     root_file_name = 'calofitting_51195.root'
 
@@ -58,6 +58,7 @@ def main():
 
     # Get BCO offset by comparing bpm steps to zdc steps
     bco_offset = get_bco_offset(scan_path, df, root_file_name)
+    print(f'BCO offset: {bco_offset} s')
 
     # Add rates to the dataframe
     rates_df = get_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
@@ -69,10 +70,11 @@ def main():
     # Write the dataframe to a CSV file
     df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
 
-    # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
-    gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
-    gl1p_rates_df = make_gl1p_rate_corrections(gl1p_rates_df)
-    gl1p_rates_df.to_csv(f'{scan_path}gl1p_bunch_by_bunch_step_rates.csv', index=False)
+    if scan_path.split('/')[-2] != 'pp_aug_12_24':
+        # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
+        gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
+        gl1p_rates_df = make_gl1p_rate_corrections(gl1p_rates_df)
+        gl1p_rates_df.to_csv(f'{scan_path}gl1p_bunch_by_bunch_step_rates.csv', index=False)
 
     # For auau24 next run calculate_corrected_raw_rates to deal with mbd background
 

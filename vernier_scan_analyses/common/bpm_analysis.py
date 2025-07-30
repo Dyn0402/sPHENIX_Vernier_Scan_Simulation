@@ -18,10 +18,10 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
     # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     # scan_path = f'{base_path}Vernier_Scans/sphenix_magnet_off/'
-    # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     # scan_path = f'{base_path}Vernier_Scans/pp_july_11_24/'
     bpm_file_path = f'{scan_path}bpms.dat'
 
@@ -35,7 +35,14 @@ def bpm_analysis(bpm_file_path, start_time, end_time, plot=True, pre_scan_buffer
     """
     Read BMP file and extract Vernier scan steps and crossing angles.
     """
-    step_derivative_threshold = 10
+    if bpm_file_path.split('/')[-2] == 'auau_oct_16_24':
+        step_derivative_threshold = 10
+    elif bpm_file_path.split('/')[-2] == 'auau_july_17_25':
+        step_derivative_threshold = 10
+    elif bpm_file_path.split('/')[-2] == 'pp_aug_12_24':
+        step_derivative_threshold = 25
+    else:
+        step_derivative_threshold = 10
     bpm_data, blue_xing_h, yellow_xing_h, blue_xing_v, yellow_xing_v, rel_xing_h, rel_xing_v = (
         read_bpm_file(bpm_file_path, start_time, end_time))
 
@@ -68,7 +75,7 @@ def bpm_analysis(bpm_file_path, start_time, end_time, plot=True, pre_scan_buffer
     print(f'Size of avg_time: {avg_time.size}, size of bpm_data: {bpm_data["Time"].size}, size of masks: {masks[0].size}')
     # times_above_threshold = np.array(bpm_data['Time'])[:-1][np.any(masks, axis=0)]
     times_above_threshold = avg_time[np.any(masks, axis=0)]
-    times_above_threshold = get_step_bounds(times_above_threshold, max_gap_seconds=25)
+    times_above_threshold = get_step_bounds(times_above_threshold, max_gap_seconds=20)
 
     if plot:
         ax.axhline(step_derivative_threshold, color='black', ls='--')

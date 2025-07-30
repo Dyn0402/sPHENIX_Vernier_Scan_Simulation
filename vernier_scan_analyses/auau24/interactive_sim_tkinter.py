@@ -37,11 +37,23 @@ class PlotSimulatorApp:
 
         base_path = set_base_path()
 
-        base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-        self.longitudinal_profiles_dir_path = f'{base_path_auau}profiles/'
-        self.z_vertex_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions_no_zdc_coinc.root'
-        self.z_vertex_zdc_data_path = f'{base_path_auau}vertex_data/54733_vertex_distributions.root'
-        combined_cad_step_data_csv_path = f'{base_path_auau}combined_cad_step_data.csv'
+        # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+        # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+        scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+
+        if scan_path.split('/')[-2] == 'auau_oct_16_24':
+            run_number = 54733
+        elif scan_path.split('/')[-2] == 'auau_july_17_25':
+            run_number = 69561
+        elif scan_path.split('/')[-2] == 'pp_aug_12_24':
+            run_number = 51195
+        else:
+            raise ValueError(f'Unknown run number for base path: {base_path}')
+
+        self.longitudinal_profiles_dir_path = f'{scan_path}profiles/'
+        self.z_vertex_data_path = f'{scan_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
+        self.z_vertex_zdc_data_path = f'{scan_path}vertex_data/{run_number}_vertex_distributions.root'
+        combined_cad_step_data_csv_path = f'{scan_path}combined_cad_step_data.csv'
 
         self.cad_df = pd.read_csv(combined_cad_step_data_csv_path)
         self.step_0 = self.cad_df[self.cad_df['step'] == 0].iloc[0]
@@ -49,10 +61,15 @@ class PlotSimulatorApp:
         self.em_blue_horiz_nom, self.em_blue_vert_nom = self.step_0['blue_horiz_emittance'], self.step_0['blue_vert_emittance']
         self.em_yel_horiz_nom, self.em_yel_vert_nom = self.step_0['yellow_horiz_emittance'], self.step_0['yellow_vert_emittance']
 
+        # self.rate_col = 'zdc_cor_rate'  # Column in CAD data for relative rate
+        # self.rate_col = 'mbd_zdc_coinc_sasha_cor_rate'  # Column in CAD data for relative rate
+        self.rate_col = 'mbd_sasha_cor_rate'  # Column in CAD data for relative rate
+
         # Steps: fill this with your real data
-        self.steps = [0, 2, 3, 4, 5]
+        # self.steps = [0, 2, 3, 4, 5]
         # self.steps = [0, 2, 4, 5, 6]
-        # self.steps = [0, 6, 12, 18, 24]
+        self.steps = [0, 6, 12, 18, 24]
+        # self.steps = [0, 8, 16, 24, 32]
         self.raw_data = {}  # Map from step -> (centers_no_zdc, counts_no_zdc, centers, counts)
 
         self.last_sim_zs = {step: None for step in self.steps}
@@ -163,7 +180,7 @@ class PlotSimulatorApp:
                 count_errs[count_errs == 0] = 1
 
             # Normalize counts to ZDC rate
-            zdc_raw_rate = cad_step_row['zdc_cor_rate']
+            zdc_raw_rate = cad_step_row[self.rate_col]
             zdc_hist_counts = np.sum(counts)
             hist_scaling_factor = zdc_raw_rate / zdc_hist_counts
 
@@ -228,23 +245,23 @@ class PlotSimulatorApp:
                 em_yel_horiz, em_yel_vert = cad_step_row['yellow_horiz_emittance'], cad_step_row[
                     'yellow_vert_emittance']
 
-                # blue_widths = np.array([
-                #     self.beam_width_x.get() * np.sqrt(em_blue_horiz / self.em_blue_horiz_nom),
-                #     self.beam_width_y.get() * np.sqrt(em_blue_vert / self.em_blue_vert_nom)
-                # ])
-                # yellow_widths = np.array([
-                #     self.beam_width_x.get() * np.sqrt(em_yel_horiz / self.em_yel_horiz_nom),
-                #     self.beam_width_y.get() * np.sqrt(em_yel_vert / self.em_yel_vert_nom)
-                # ])
-
                 blue_widths = np.array([
-                    self.beam_width_x.get() * (em_blue_horiz / self.em_blue_horiz_nom),
-                    self.beam_width_y.get() * (em_blue_vert / self.em_blue_vert_nom)
+                    self.beam_width_x.get() * np.sqrt(em_blue_horiz / self.em_blue_horiz_nom),
+                    self.beam_width_y.get() * np.sqrt(em_blue_vert / self.em_blue_vert_nom)
                 ])
                 yellow_widths = np.array([
-                    self.beam_width_x.get() * (em_yel_horiz / self.em_yel_horiz_nom),
-                    self.beam_width_y.get() * (em_yel_vert / self.em_yel_vert_nom)
+                    self.beam_width_x.get() * np.sqrt(em_yel_horiz / self.em_yel_horiz_nom),
+                    self.beam_width_y.get() * np.sqrt(em_yel_vert / self.em_yel_vert_nom)
                 ])
+
+                # blue_widths = np.array([
+                #     self.beam_width_x.get() * (em_blue_horiz / self.em_blue_horiz_nom),
+                #     self.beam_width_y.get() * (em_blue_vert / self.em_blue_vert_nom)
+                # ])
+                # yellow_widths = np.array([
+                #     self.beam_width_x.get() * (em_yel_horiz / self.em_yel_horiz_nom),
+                #     self.beam_width_y.get() * (em_yel_vert / self.em_yel_vert_nom)
+                # ])
 
                 # blue_widths = np.array([
                 #     self.beam_width_x.get() * 1,

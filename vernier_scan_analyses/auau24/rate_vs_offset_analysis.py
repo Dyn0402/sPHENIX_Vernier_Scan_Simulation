@@ -26,10 +26,11 @@ def main():
     base_path = set_base_path()
     base_path += 'Vernier_Scans/auau_oct_16_24/'
     # base_path += 'Vernier_Scans/auau_july_17_25/'
+    # base_path += 'Vernier_Scans/pp_aug_12_24/'
     # plot_head_on_accuracy_for_corrections(base_path)
-    # fit_beam_widths(base_path)
+    fit_beam_widths(base_path)
     # fit_beam_widths_bunch_by_bunch(base_path)
-    plot_fit_beam_widths(base_path)
+    # plot_fit_beam_widths(base_path)
     # compare_gl1_and_gl1p_rates(base_path)
     # plot_lumi_vs_step_zdc_cor(base_path)
     # lumi_test(base_path)
@@ -106,11 +107,15 @@ def plot_head_on_accuracy_for_corrections(base_path):
     # lumi_z_cut = 200
     lumi_z_cut = None
     observed = False  # True for MBD
+    # observed = True  # True for MBD
     ions = 'dcct'  # 'wcm'
+    # ions = 'wcm'  # 'wcm'
+    norm_step = 8
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
-    scan_steps = np.arange(0, 25, 1)
+    scan_steps = np.arange(0, cad_df['step'].max() + 1, 1)
+    head_on_steps = [row['step'] for _, row in cad_df.iterrows() if row['set offset h'] == 0 and row['set offset v'] == 0]
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
@@ -137,12 +142,22 @@ def plot_head_on_accuracy_for_corrections(base_path):
         {'col_name': 'zdc_acc_multi_cor_rate', 'name': 'ZDC Angelika Corrected', 'data': [], 'errs': [], 'marker': 's', 'color':'orange', 'ls': '-'},
         {'col_name': 'zdc_sasha_cor_rate', 'name': 'ZDC Sasha Corrected', 'data': [], 'errs': [], 'marker': 's', 'color':'green', 'ls': '-'},
         {'col_name': 'mbd_cor_rate', 'name': 'MBD Uncorrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'black', 'ls': '-'},
-        {'col_name': 'mbd_z200_rate', 'name': 'MBD |z|<200 Angelika Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '-'},
-        {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '--'},
-        {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '-'},
-        {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '--'},
-        {'col_name': 'mbd_zdc_coinc_sasha_cor_rate', 'name': 'MBD ZDC Coinc Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color': 'red', 'ls': '--'},
     ]
+    if 'pp_' in base_path:
+        rates_data.extend([
+            {'col_name': 'mbd_acc_multi_cor_rate', 'name': 'MBD Angelika Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color': 'orange', 'ls': '-'},
+            {'col_name': 'mbd_sasha_cor_rate', 'name': 'MBD Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color': 'green', 'ls': '-'},
+        ])
+    if 'auau_' in base_path:
+        rates_data.extend([
+            {'col_name': 'mbd_z200_rate', 'name': 'MBD |z|<200 Angelika Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '-'},
+            {'col_name': 'mbd_bkg_cor_rate', 'name': 'MBD Angelika Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'orange', 'ls': '--'},
+            {'col_name': 'mbd_sasha_z200_rate', 'name': 'MBD |z|<200 Sasha Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '-'},
+            {'col_name': 'mbd_sasha_bkg_cor_rate', 'name': 'MBD Sasha Bkg Corrected', 'data': [], 'errs': [], 'marker': 'o', 'color':'green', 'ls': '--'},
+            {'col_name': 'mbd_zdc_coinc_cor_rate', 'name': 'MBD ZDC Coinc Uncorrected', 'data': [], 'errs': [], 'marker': '^', 'color': 'black', 'ls': '--'},
+            {'col_name': 'mbd_zdc_coinc_acc_multi_cor_rate', 'name': 'MBD ZDC Coinc Angelika Corrected', 'data': [], 'errs': [], 'marker': '^', 'color': 'orange', 'ls': '--'},
+            {'col_name': 'mbd_zdc_coinc_sasha_cor_rate', 'name': 'MBD ZDC Coinc Sasha Corrected', 'data': [], 'errs': [], 'marker': '^', 'color': 'green', 'ls': '--'},
+        ])
 
     lumis, scan_steps_plt = [], []
     for scan_step in scan_steps:
@@ -205,9 +220,7 @@ def plot_head_on_accuracy_for_corrections(base_path):
     ax2.set_ylim(bottom=0, top=1.2 * max_step_0)
     plt.tight_layout()
 
-    steps = np.array([0, 6, 12, 18, 24])
-    step_mask = np.isin(scan_steps_plt, steps)
-    norm_step = 0
+    step_mask = np.isin(scan_steps_plt, np.array(head_on_steps))
 
     fig, ax = plt.subplots()
     ax.axhline(0, color='k', ls='-', zorder=0)
@@ -234,8 +247,7 @@ def plot_head_on_accuracy_for_corrections(base_path):
         rate_data['err_step'] = np.array([np.mean(rate_data['errs'][scan_steps_plt == step]) for step in scan_steps])
         rate_data['data_measures'] = np.array([Measure(rate_data['data_step'][i], rate_data['err_step'][i]) for i in range(len(rate_data['data_step']))])
 
-    step_mask = np.isin(scan_steps, steps)
-    norm_step = 0
+    step_mask = np.isin(scan_steps, head_on_steps)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.axhline(0, color='k', ls='-', zorder=0)
@@ -453,7 +465,8 @@ def fit_beam_widths(base_path):
                     arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=4),
                     ha='left', va='top', fontsize=10, color='black')
 
-        df_out.append({'rate_name': rate_data['name'], 'orientation': orientation, 'beam_width': bw_min.val, 'beam_width_err': bw_min.err})
+        df_out.append({'rate_name': rate_data['name'], 'orientation': orientation, 'beta_star': beta_star,
+                       'beam_width': bw_min.val, 'beam_width_err': bw_min.err})
 
         ax.set_xlabel(f'{orientation} Beam Width [um]')
         ax.set_ylabel(r'$\chi^2$')

@@ -18,7 +18,7 @@ from common_logistics import set_base_path
 from analyze_ions import read_ions_file
 from analyze_emittance import read_emittance_file, parametrize_emittances_vs_time
 from bpm_analysis import read_bpm_file
-from analyze_sphnx_root_file import get_root_data_time
+from analyze_sphnx_root_file import get_root_data_time, get_bco_offset
 from rate_corrections import solve_sasha_equation
 from z_vertex_fitting_common import get_profile_path
 from BunchCollider import BunchCollider
@@ -26,13 +26,17 @@ from BunchCollider import BunchCollider
 
 def main():
     base_path = set_base_path()
-    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # root_file_name = 'calofit_54733.root'
+    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    root_file_name = '69561.root'
     # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
-    plot_lumi_decay(scan_path)
+    # root_file_name = 'calofitting_51195.root'
+    plot_lumi_decay(scan_path, root_file_name)
     print('donzo')
 
 
-def plot_lumi_decay(base_path):
+def plot_lumi_decay(base_path, root_file_name='calofit_69561.root'):
     """
     Plot the luminosity decay over time from the ions data.
     """
@@ -41,7 +45,6 @@ def plot_lumi_decay(base_path):
     ions_path = f'{base_path}COLOR_ions.dat'
     emittance_file_path = f'{base_path}emittance.dat'
     bpm_file_path = f'{base_path}bpms.dat'
-    root_file_name = 'calofit_54733.root'
 
     ions_data = {'blue': None, 'yellow': None}
     for color in ions_data.keys():
@@ -50,9 +53,6 @@ def plot_lumi_decay(base_path):
         ions_data[color] = ion_data
 
     emittance_df = read_emittance_file(emittance_file_path)
-    root_branches = ['BCO', 'GL1_clock_count', 'GL1_live_count','mbd_live_count', 'mbd_S_live_count',
-                     'mbd_N_live_count', 'zdc_live_count', 'zdc_S_live_count', 'zdc_N_live_count']
-    rate_data, rate_times = get_root_data_time(base_path, root_file_name, branches=root_branches)
 
     f_beam = 78.4 * 1e3  # kHz
     n_bunch = 111
@@ -61,14 +61,28 @@ def plot_lumi_decay(base_path):
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
 
+    bco_offset = get_bco_offset(base_path, cad_df, root_file_name)
+    print(f'BCO offset: {bco_offset}')
+    root_branches = ['BCO', 'GL1_clock_count', 'GL1_live_count', 'mbd_live_count', 'mbd_S_live_count',
+                     'mbd_N_live_count', 'zdc_live_count', 'zdc_S_live_count', 'zdc_N_live_count']
+    rate_data, rate_times = get_root_data_time(base_path, root_file_name, branches=root_branches, bco_offset=bco_offset)
+
     profile_paths, profile_times = get_profile_path(
         longitudinal_profiles_dir_path, cad_df['start'].min(), cad_df['end'].max(), True, return_times=True
     )
+    # profile_paths, profile_times = get_profile_path(
+    #     longitudinal_profiles_dir_path, cad_df['start'].min(), cad_df['end'].iloc[2], True, return_times=True
+    # )
 
     bpm_data, blue_xing_h, yellow_xing_h, blue_xing_v, yellow_xing_v, rel_xing_h, rel_xing_v = (
         read_bpm_file(bpm_file_path, cad_df['start'].min(), cad_df['end'].max()))
 
-    emittance_df = parametrize_emittances_vs_time(emittance_df, pd.array(profile_times))
+    if '/pp_' in base_path:
+        emittance_poly_order = 0
+    else:
+        emittance_poly_order = 2
+
+    emittance_df = parametrize_emittances_vs_time(emittance_df, pd.array(profile_times), poly_order=emittance_poly_order)
     # Replace column names
     emittance_df = emittance_df.rename(columns={'BlueHoriz_fit': 'blue_horiz_emittance', 'BlueVert_fit': 'blue_vert_emittance',
                                                     'YellowHoriz_fit': 'yellow_horiz_emittance', 'YellowVert_fit': 'yellow_vert_emittance'})
@@ -126,31 +140,40 @@ def plot_lumi_decay(base_path):
     ]
 
     mbd_rates, zdc_rates, mbd_uncor_rates, zdc_uncor_rates = [], [], [], []
-    lumi_baseline = None
-    for profile_path, time in zip(profile_paths, profile_times):
+    lumi_baseline, baseline_i, rate_data_exists = None, None, True
+    for profile_i, (profile_path, time) in enumerate(zip(profile_paths, profile_times)):
         print(f'Time: {time}')
         time_low, time_high = time - ions_avg_window / 2, time + ions_avg_window / 2
         time_low_sec, time_high_sec = (time_low - run_start).total_seconds(), (time_high - run_start).total_seconds()
         rate_period_data = rate_data[(rate_times >= time_low_sec) & (rate_times <= time_high_sec)]
         rate_period_times = rate_times[(rate_times >= time_low_sec) & (rate_times <= time_high_sec)]
-        step_fine_dur = rate_period_times.iloc[-1] - rate_period_times.iloc[0]
-        clock_raw_rate = (rate_period_data['GL1_clock_count'].iloc[-1] - rate_period_data['GL1_clock_count'].iloc[0]) / step_fine_dur
-        clock_live_rate = (rate_period_data['GL1_live_count'].iloc[-1] - rate_period_data['GL1_live_count'].iloc[0]) / step_fine_dur
-        clock_scale = clock_raw_rate / clock_live_rate
+        if rate_period_data.empty:
+            print(f'No rate data for time {time}')
+            rate_data_exists = False
+            mbd_rates.append(np.nan)
+            zdc_rates.append(np.nan)
+            mbd_uncor_rates.append(np.nan)
+            zdc_uncor_rates.append(np.nan)
+        else:
+            rate_data_exists = True
+            step_fine_dur = rate_period_times.iloc[-1] - rate_period_times.iloc[0]
+            clock_raw_rate = (rate_period_data['GL1_clock_count'].iloc[-1] - rate_period_data['GL1_clock_count'].iloc[0]) / step_fine_dur
+            clock_live_rate = (rate_period_data['GL1_live_count'].iloc[-1] - rate_period_data['GL1_live_count'].iloc[0]) / step_fine_dur
+            clock_scale = clock_raw_rate / clock_live_rate
 
-        zdc_rate = (rate_period_data['zdc_live_count'].iloc[-1] - rate_period_data['zdc_live_count'].iloc[0]) / step_fine_dur * clock_scale
-        zdc_n_rate = (rate_period_data['zdc_N_live_count'].iloc[-1] - rate_period_data['zdc_N_live_count'].iloc[0]) / step_fine_dur * clock_scale
-        zdc_s_rate = (rate_period_data['zdc_S_live_count'].iloc[-1] - rate_period_data['zdc_S_live_count'].iloc[0]) / step_fine_dur * clock_scale
-        mbd_rate = (rate_period_data['mbd_live_count'].iloc[-1] - rate_period_data['mbd_live_count'].iloc[0]) / step_fine_dur * clock_scale
-        mbd_n_rate = (rate_period_data['mbd_N_live_count'].iloc[-1] - rate_period_data['mbd_N_live_count'].iloc[0]) / step_fine_dur * clock_scale
-        mbd_s_rate = (rate_period_data['mbd_S_live_count'].iloc[-1] - rate_period_data['mbd_S_live_count'].iloc[0]) / step_fine_dur * clock_scale
+            zdc_rate = (rate_period_data['zdc_live_count'].iloc[-1] - rate_period_data['zdc_live_count'].iloc[0]) / step_fine_dur * clock_scale
+            zdc_n_rate = (rate_period_data['zdc_N_live_count'].iloc[-1] - rate_period_data['zdc_N_live_count'].iloc[0]) / step_fine_dur * clock_scale
+            zdc_s_rate = (rate_period_data['zdc_S_live_count'].iloc[-1] - rate_period_data['zdc_S_live_count'].iloc[0]) / step_fine_dur * clock_scale
+            mbd_rate = (rate_period_data['mbd_live_count'].iloc[-1] - rate_period_data['mbd_live_count'].iloc[0]) / step_fine_dur * clock_scale
+            mbd_n_rate = (rate_period_data['mbd_N_live_count'].iloc[-1] - rate_period_data['mbd_N_live_count'].iloc[0]) / step_fine_dur * clock_scale
+            mbd_s_rate = (rate_period_data['mbd_S_live_count'].iloc[-1] - rate_period_data['mbd_S_live_count'].iloc[0]) / step_fine_dur * clock_scale
 
-        zdc_cor_rate = solve_sasha_equation(zdc_n_rate, zdc_s_rate, zdc_rate, n_bunch * f_beam, plot=False)
-        mbd_cor_rate = solve_sasha_equation(mbd_n_rate, mbd_s_rate, mbd_rate, n_bunch * f_beam, plot=False)
-        mbd_rates.append(mbd_cor_rate)
-        zdc_rates.append(zdc_cor_rate)
-        mbd_uncor_rates.append(mbd_rate)
-        zdc_uncor_rates.append(zdc_rate)
+            zdc_cor_rate = solve_sasha_equation(zdc_n_rate, zdc_s_rate, zdc_rate, n_bunch * f_beam, plot=False)
+            mbd_cor_rate = solve_sasha_equation(mbd_n_rate, mbd_s_rate, mbd_rate, n_bunch * f_beam, plot=False)
+            mbd_rates.append(mbd_cor_rate)
+            zdc_rates.append(zdc_cor_rate)
+            mbd_uncor_rates.append(mbd_rate)
+            zdc_uncor_rates.append(zdc_rate)
 
         for lumi_run in lumi_runs:
             if lumi_run['emittance']:
@@ -164,13 +187,21 @@ def plot_lumi_decay(base_path):
             em_blue_horiz, em_blue_vert = emittance_time['blue_horiz_emittance'], emittance_time['blue_vert_emittance']
             em_yel_horiz, em_yel_vert = emittance_time['yellow_horiz_emittance'], emittance_time['yellow_vert_emittance']
 
+            # blue_widths = np.array([
+            #     beam_width_x * (em_blue_horiz / em_blue_horiz_nom),
+            #     beam_width_y * (em_blue_vert / em_blue_vert_nom)
+            # ])
+            # yellow_widths = np.array([
+            #     beam_width_x * (em_yel_horiz / em_yel_horiz_nom),
+            #     beam_width_y * (em_yel_vert / em_yel_vert_nom)
+            # ])
             blue_widths = np.array([
-                beam_width_x * (em_blue_horiz / em_blue_horiz_nom),
-                beam_width_y * (em_blue_vert / em_blue_vert_nom)
+                beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+                beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
             ])
             yellow_widths = np.array([
-                beam_width_x * (em_yel_horiz / em_yel_horiz_nom),
-                beam_width_y * (em_yel_vert / em_yel_vert_nom)
+                beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+                beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
             ])
 
             collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
@@ -222,20 +253,24 @@ def plot_lumi_decay(base_path):
             lumi = naked_lumi * mb_to_um2 * f_beam * n_blue * n_yellow
             lumi_run['lumis'].append(lumi)
 
-            if lumi_baseline is None and lumi_run['name'] == 'Baseline':
-                lumi_baseline = lumi
+            if lumi_baseline is None and lumi_run['name'] == 'Baseline' and rate_data_exists:
+                lumi_baseline, baseline_i = lumi, profile_i
+                print(f'Baseline luminosity: {lumi_baseline:.2e} mb^-1 s^-1')
 
     mbd_rates, zdc_rates = np.array(mbd_rates), np.array(zdc_rates)
     mbd_uncor_rates, zdc_uncor_rates = np.array(mbd_uncor_rates), np.array(zdc_uncor_rates)
 
+    cad_step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    step_0_mask = (np.array(profile_times) >= cad_step_0['start']) & (np.array(profile_times) <= cad_step_0['end'])
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(profile_times, mbd_uncor_rates / mbd_uncor_rates[0] * lumi_baseline, label='MBD Uncorrected',
+    ax.plot(profile_times, mbd_uncor_rates / np.mean(mbd_uncor_rates[step_0_mask]) * lumi_baseline, label='MBD Uncorrected',
             linestyle='--', alpha=0.5, color='blue')
-    ax.plot(profile_times, zdc_uncor_rates / zdc_uncor_rates[0] * lumi_baseline, label='ZDC Uncorrected',
+    ax.plot(profile_times, zdc_uncor_rates / np.mean(zdc_uncor_rates[step_0_mask]) * lumi_baseline, label='ZDC Uncorrected',
             linestyle='--', alpha=0.5, color='red')
-    ax.plot(profile_times, mbd_rates / mbd_rates[0] * lumi_baseline, label='MBD Rate (No z vertex cut)',
+    ax.plot(profile_times, mbd_rates / np.mean(mbd_rates[step_0_mask]) * lumi_baseline, label='MBD Rate (No z vertex cut)',
             color='blue')
-    ax.plot(profile_times, zdc_rates / zdc_rates[0] * lumi_baseline, label='ZDC Rate', color='red')
+    ax.plot(profile_times, zdc_rates /np.mean( zdc_rates[step_0_mask]) * lumi_baseline, label='ZDC Rate', color='red')
     for lumi_run in lumi_runs:
         ax.plot(profile_times, lumi_run['lumis'], label=lumi_run['name'], color=lumi_run['color'],
                 linestyle=lumi_run['ls'], linewidth=lumi_run['lw'])

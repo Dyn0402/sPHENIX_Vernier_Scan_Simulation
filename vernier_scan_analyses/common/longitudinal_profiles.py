@@ -245,11 +245,11 @@ def plot_abort_gaps():
 def write_avg_longitudinal_profiles():
     base_path = set_base_path()
     # profiles_path = f'{base_path}vernier_scan_AuAu24/CAD_Measurements/profiles/'
-    profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    # profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
     # profiles_path = f'{base_path}Vernier_Scans/auau_july_17_25/profiles/'
-    # profiles_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
+    profiles_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
     # profiles_path = f'{base_path}Vernier_Scans/pp_july_11_24/profiles/'
-    plot = True
+    plot = False
 
     for file_name in os.listdir(profiles_path):
         if not file_name.endswith('.dat') or file_name.startswith('avg_') or file_name.startswith('bunch_'):
@@ -266,7 +266,7 @@ def write_avg_longitudinal_profiles():
 def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, left_right_zero=False,
                                      subtract_baseline_std=False, fixed_z_zero=6e6, recalc_baseline=True):
     data, date, time, beam_color = read_longitudinal_profile_data(file_path)
-    print(f'{beam_color} from {date} at {time}')
+    print(f'{beam_color} from {date} at {time} -- {file_path.split("/")[-1]}')
 
     time_step = 0.05  # ns
     segment_time = 106.573785  # ns

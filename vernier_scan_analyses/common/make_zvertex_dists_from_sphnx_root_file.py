@@ -23,24 +23,27 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
     # run_number = 54733
-    run_number = 69561
+    # run_number = 69561
+    run_number = 51195
 
     sub_dir = 'vertex_data/'
-    # base_path_auau = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    base_path_auau = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     # file_name = 'calofit_54733.root'
-    file_name = '2024p019_69561.root'
+    # file_name = '69561.root'
+    file_name = 'calofitting_51195.root'
 
-    out_root_file_path = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions.root'
-    out_root_file_path_no_zdc_coinc = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc.root'
-    out_root_file_path_bbb = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions_bunch_by_bunch.root'
-    out_root_file_path_no_zdc_coinc_bbb = f'{base_path_auau}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
-    cad_data_path = f'{base_path_auau}combined_cad_step_data.csv'
+    out_root_file_path = f'{scan_path}{sub_dir}{run_number}_vertex_distributions.root'
+    out_root_file_path_no_zdc_coinc = f'{scan_path}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc.root'
+    out_root_file_path_bbb = f'{scan_path}{sub_dir}{run_number}_vertex_distributions_bunch_by_bunch.root'
+    out_root_file_path_no_zdc_coinc_bbb = f'{scan_path}{sub_dir}{run_number}_vertex_distributions_no_zdc_coinc_bunch_by_bunch.root'
+    cad_data_path = f'{scan_path}combined_cad_step_data.csv'
 
     cad_df = pd.read_csv(cad_data_path, sep=',')
     print(cad_df)
 
-    data, time = get_root_data_time(base_path_auau, root_file_name=file_name, tree_name='calo_tree', sub_dir=sub_dir,
+    data, time = get_root_data_time(scan_path, root_file_name=file_name, tree_name='calo_tree', sub_dir=sub_dir,
                                     branches=['BCO', 'mbd_zvtx', 'mbd_SN_trigger', 'zdc_SN_trigger',
                                               'mbd_SN_live_trigger', 'zdc_SN_live_trigger',
                                               'GL1_clock_count', 'GL1_live_count',

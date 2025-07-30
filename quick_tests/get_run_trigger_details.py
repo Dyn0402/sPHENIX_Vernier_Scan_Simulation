@@ -21,6 +21,7 @@ def main():
     base_path = set_base_path() + 'Vernier_Scans/'
     # run_number = 69561
     run_number = 54733
+    # run_number = 51195
     out_html_path = f'{base_path}run_{run_number}_trigger_details.html'
 
     # Construct the URL with the parameters

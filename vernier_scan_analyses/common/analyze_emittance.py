@@ -19,9 +19,9 @@ from common_logistics import set_base_path
 def main():
     base_path = set_base_path()
     # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
-    scan_path = f'{base_path}Vernier_Scans/pp_july_11_24/'
+    # scan_path = f'{base_path}Vernier_Scans/pp_july_11_24/'
     emittance_angelika_file_path = f'{scan_path}Emittance_IPM_Fill35240.dat'
     emittance_file_path = f'{scan_path}emittance.dat'
     # df = read_angelika_emittance_file(emittance_angelika_file_path)
@@ -84,17 +84,17 @@ def plot_emittances_vs_time(df, ax=None, make_labels=True):
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(df['Time'], df['BlueHoriz'], marker='o', ls='none', label='Blue Horizontal Emittance', color='blue')
+    ax.plot(df['Time'], df['BlueHoriz'], marker='s', ls='none', label='Blue Horizontal Emittance', color='blue')
     ax.plot(df['Time'], df['BlueVert'], marker='o', ls='none',  label='Blue Vertical Emittance', color='blue')
-    ax.plot(df['Time'], df['YellowHoriz'], marker='o', ls='none', label='Yellow Horizontal Emittance', color='orange')
+    ax.plot(df['Time'], df['YellowHoriz'], marker='s', ls='none', label='Yellow Horizontal Emittance', color='orange')
     ax.plot(df['Time'], df['YellowVert'], marker='o', ls='none', label='Yellow Vertical Emittance', color='orange')
 
     if 'BlueHoriz_fit' in df.columns:
-        ax.plot(df['Time'], df['BlueHoriz_fit'], ls='--', color='blue', label='Blue Horiz Fit')
+        ax.plot(df['Time'], df['BlueHoriz_fit'], ls=':', color='blue', label='Blue Horiz Fit')
     if 'BlueVert_fit' in df.columns:
         ax.plot(df['Time'], df['BlueVert_fit'], ls='--', color='blue', label='Blue Vert Fit')
     if 'YellowHoriz_fit' in df.columns:
-        ax.plot(df['Time'], df['YellowHoriz_fit'], ls='--', color='orange', label='Yellow Horiz Fit')
+        ax.plot(df['Time'], df['YellowHoriz_fit'], ls=':', color='orange', label='Yellow Horiz Fit')
     if 'YellowVert_fit' in df.columns:
         ax.plot(df['Time'], df['YellowVert_fit'], ls='--', color='orange', label='Yellow Vert Fit')
 

@@ -402,15 +402,18 @@ def auau_plot_all_steps():
 
     if scan_path.split('/')[-2] == 'auau_oct_16_24':
         run_number = 54733
+        n_steps, n_rows, n_cols = 12, 4, 3
+        rate_col = 'mbd_zdc_coinc_sasha_cor_rate'
     elif scan_path.split('/')[-2] == 'auau_july_17_25':
         run_number = 69561
+        n_steps, n_rows, n_cols = 16, 4, 4
+        rate_col = 'mbd_zdc_coinc_sasha_cor_rate'
     elif scan_path.split('/')[-2] == 'pp_aug_12_24':
         run_number = 51195
+        n_steps, n_rows, n_cols = 12, 4, 3
+        rate_col = 'mbd_sasha_cor_rate'
     else:
         raise ValueError(f'Unknown run number for base path: {base_path}')
-
-    # rate_col = 'zdc_cor_rate'
-    rate_col = 'mbd_zdc_coinc_sasha_cor_rate'
 
     longitudinal_profiles_dir_path = f'{scan_path}profiles/'
     z_vertex_data_path = f'{scan_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
@@ -421,8 +424,8 @@ def auau_plot_all_steps():
 
     fit_range = [-230, 230]
 
-    for scan_type, steps in zip(["horizontal", "vertical"], [range(16), range(16, 32)]):
-        fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(13.3, 7.5), sharex=True)
+    for scan_type, steps in zip(["horizontal", "vertical"], [range(n_steps), range(n_steps, 2 * n_steps)]):
+        fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(13.3, 7.5), sharex=True)
         axes = axes.T.flatten()  # Fill columns first
 
         collider_sim = BunchCollider()

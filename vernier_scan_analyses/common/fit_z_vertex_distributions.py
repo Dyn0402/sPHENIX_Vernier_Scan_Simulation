@@ -27,9 +27,9 @@ from common_logistics import set_base_path
 
 def main():
     base_path = set_base_path()
-    base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    # base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     # base_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    # base_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    base_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
 
     # fit_beta_star_to_head_on_steps(base_path)
     # fit_beta_stars_bws_to_all_steps(base_path)
@@ -173,8 +173,9 @@ def fit_beta_star_to_head_on_steps(base_path):
         z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
     elif base_path.split('/')[-2] == 'pp_aug_12_24':
         run_number = 51195
-        bws_x, bws_y = np.linspace(100, 140, 9), np.linspace(100, 140, 9)
-        beta_stars = np.linspace(90, 130, 20)
+        # bws_x, bws_y = np.linspace(100, 140, 9), np.linspace(100, 140, 9)
+        bws_x, bws_y = [160], [160]  # Nominal beam widths
+        beta_stars = np.linspace(80, 130, 20)
         z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions_no_zdc_coinc.root'
     else:
         raise ValueError(f'Unknown run number for base path: {base_path}')
@@ -364,7 +365,8 @@ def plot_beta_star_head_on_fit_results(base_path):
     # results_df = pd.read_csv(f'{base_path}beta_star_fit_results_mbd_sasha_bkg_cor_rate_bw130.csv')
 
     # results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx100.0_bwy105.0.csv')  # Nominal
-    results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx110.0_bwy105.0.csv')  # Nominal
+    # results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx110.0_bwy105.0.csv')  # Nominal
+    results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx160_bwy160.csv')  # Nominal
     # results_df = pd.read_csv(f'{base_path}beta_star_fits/beta_star_fit_results_zdc_sasha_cor_rate_bwx130_bwy130.csv')  # Nominal
 
     # Plot chi2 vs beta star for each step

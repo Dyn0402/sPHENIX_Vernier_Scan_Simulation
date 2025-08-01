@@ -8,7 +8,7 @@ Created as sPHENIX_Vernier_Scan_Simulation/calculate_raw_rates
 @author: Dylan Neff, dn277127
 """
 
-import platform
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
@@ -24,8 +24,10 @@ def main():
     base_path = set_base_path()
 
     # base_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    base_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    run_number = 69561
+    # base_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # run_number = 69561
+    base_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    run_number = 51195
 
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     z_vertex_zdc_data_path = f'{base_path}vertex_data/{run_number}_vertex_distributions.root'
@@ -34,6 +36,7 @@ def main():
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     gl1p_step_rates_csv_path = f'{base_path}gl1p_bunch_by_bunch_step_rates.csv'
     plot_out_path = f'{base_path}Figures/zvertex_cut_plots/'
+    os.makedirs(plot_out_path, exist_ok=True)
 
     get_mbd_cut_rates(longitudinal_profiles_dir_path, z_vertex_no_zdc_data_path, z_vertex_zdc_data_path, combined_cad_step_data_csv_path, plot_out_path)
     add_bkg_cor_mbd_rate_to_cad_df(combined_cad_step_data_csv_path)

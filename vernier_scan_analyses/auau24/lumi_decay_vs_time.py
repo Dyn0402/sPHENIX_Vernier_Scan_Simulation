@@ -26,10 +26,10 @@ from BunchCollider import BunchCollider
 
 def main():
     base_path = set_base_path()
-    # scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
-    # root_file_name = 'calofit_54733.root'
-    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    root_file_name = '69561.root'
+    scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
+    root_file_name = 'calofit_54733.root'
+    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    # root_file_name = '69561.root'
     # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
     # root_file_name = 'calofitting_51195.root'
     plot_lumi_decay(scan_path, root_file_name)
@@ -87,10 +87,26 @@ def plot_lumi_decay(base_path, root_file_name='calofit_69561.root'):
     emittance_df = emittance_df.rename(columns={'BlueHoriz_fit': 'blue_horiz_emittance', 'BlueVert_fit': 'blue_vert_emittance',
                                                     'YellowHoriz_fit': 'yellow_horiz_emittance', 'YellowVert_fit': 'yellow_vert_emittance'})
 
+    if base_path.split('/')[-2] == 'auau_oct_16_24':
+        run_name = 'AuAu 2024'
+        beta_star = 80.3  # in cm
+        beam_width_x, beam_width_y = 130.0, 130.0
+    elif base_path.split('/')[-2] == 'auau_july_17_25':
+        run_name = 'AuAu 25'
+        beta_star = 82.1  # in cm
+        beam_width_x, beam_width_y = 130.0, 130.0
+    elif base_path.split('/')[-2] == 'pp_aug_12_24':
+        run_name = 'pp 24'
+        beta_star = 111.6 # in cm
+        beam_width_x, beam_width_y = 130.0, 130.0
+    else:
+        raise ValueError(f'Unknown run number for base path: {base_path}')
+
+
     collider_sim = BunchCollider()
-    collider_sim.set_grid_size(31, 31, 101, 31)
-    beam_width_x, beam_width_y = 130.0, 130.0
-    beta_star = 76.7
+    # collider_sim.set_grid_size(31, 31, 101, 31)
+    collider_sim.set_grid_size(21, 21, 51, 21)
+    # beta_star = 76.7
     bkg = 0.0e-17
     # gauss_eff_width = 500
     # mbd_resolution = 1.0
@@ -275,7 +291,7 @@ def plot_lumi_decay(base_path, root_file_name='calofit_69561.root'):
         ax.plot(profile_times, lumi_run['lumis'], label=lumi_run['name'], color=lumi_run['color'],
                 linestyle=lumi_run['ls'], linewidth=lumi_run['lw'])
     ax.set_ylabel(r'Luminosity [$mb^{-1} s^{-1}$] (all quantities normalized to baseline)')
-    ax.set_title('Luminosity Decay Over Time')
+    ax.set_title(f'Luminosity Decay Over Time - {run_name}')
     ax.legend(loc='lower left')
     # Format x-axis to show only hour:minute
     time_format = mdates.DateFormatter('%H:%M')

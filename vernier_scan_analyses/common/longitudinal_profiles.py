@@ -22,8 +22,8 @@ from Measure import Measure
 
 
 def main():
-    write_avg_longitudinal_profiles()
-    # write_bunch_by_bunch_longitudinal_profiles()
+    # write_avg_longitudinal_profiles()
+    write_bunch_by_bunch_longitudinal_profiles()
     # compare_direct_profiles()
     # plot_abort_gaps()
     # plot_profiles_for_an()
@@ -499,7 +499,8 @@ def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, le
 
 def write_bunch_by_bunch_longitudinal_profiles():
     base_path = set_base_path()
-    profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    # profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
+    profiles_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
     plot = False
 
     for file_name in os.listdir(profiles_path):

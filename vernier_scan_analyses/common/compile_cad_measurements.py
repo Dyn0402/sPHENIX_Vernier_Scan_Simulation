@@ -70,11 +70,11 @@ def main():
     # Write the dataframe to a CSV file
     df.to_csv(f'{scan_path}combined_cad_step_data.csv', index=False)
 
-    if scan_path.split('/')[-2] != 'pp_aug_12_24':
-        # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
-        gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
-        gl1p_rates_df = make_gl1p_rate_corrections(gl1p_rates_df)
-        gl1p_rates_df.to_csv(f'{scan_path}gl1p_bunch_by_bunch_step_rates.csv', index=False)
+    # if scan_path.split('/')[-2] != 'pp_aug_12_24':
+    # Get GL1P bunch-by-bunch step rates and put in a separate dataframe
+    gl1p_rates_df = get_gl1p_bunch_by_bunch_step_rates(scan_path, df, root_file_name, bco_offset=bco_offset)
+    gl1p_rates_df = make_gl1p_rate_corrections(gl1p_rates_df)
+    gl1p_rates_df.to_csv(f'{scan_path}gl1p_bunch_by_bunch_step_rates.csv', index=False)
 
     # For auau24 next run calculate_corrected_raw_rates to deal with mbd background
 

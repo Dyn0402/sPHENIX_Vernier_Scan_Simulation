@@ -20,7 +20,9 @@ from Measure import Measure
 
 def main():
     base_path = set_base_path()
-    base_path += 'Vernier_Scans/auau_oct_16_24/'
+    # base_path += 'Vernier_Scans/auau_oct_16_24/'
+    # base_path += 'Vernier_Scans/auau_july_17_25/'
+    base_path += 'Vernier_Scans/pp_aug_12_24/'
     calculate_default_cross_sections(base_path)
     # compare_to_gaus_lumi(base_path)
     # compare_to_gaus_lumi_simpler(base_path)
@@ -42,6 +44,20 @@ def calculate_default_cross_sections(base_path):
     # lumi_z_cut = 200
     lumi_z_cut = None
     observed = False  # Should always be False for cross section calculations
+    # ions = 'dcct'
+    ions = 'wcm'
+
+    if base_path.split('/')[-2] == 'auau_oct_16_24':
+        beta_star = 80.3  # in cm
+        unit = 'b'
+    elif base_path.split('/')[-2] == 'auau_july_17_25':
+        beta_star = 82.1  # in cm
+        unit = 'b'
+    elif base_path.split('/')[-2] == 'pp_aug_12_24':
+        beta_star = 111.6  # in cm
+        unit = 'mb'
+    else:
+        raise ValueError(f'Unknown run number for base path: {base_path}')
 
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
     beam_width_df = pd.read_csv(beam_width_csv_path)
@@ -51,12 +67,13 @@ def calculate_default_cross_sections(base_path):
 
     collider_sim = BunchCollider()
     collider_sim.set_grid_size(31, 31, 101, 31)
-    beta_star = 80.3
+    # beta_star = 80.3
     bkg = 0.0e-17
     gauss_eff_width = 500
     mbd_resolution = 1.0
 
     beam_width_df_rate = beam_width_df[beam_width_df['rate_name'] == rate_name_for_beam_width]
+    beam_width_df_rate = beam_width_df_rate[beam_width_df_rate['beta_star'] == beta_star]
     beam_width_x = beam_width_df_rate[beam_width_df['orientation'] == 'Horizontal'].iloc[0]['beam_width']
     beam_width_y = beam_width_df_rate[beam_width_df['orientation'] == 'Vertical'].iloc[0]['beam_width']
 
@@ -96,8 +113,7 @@ def calculate_default_cross_sections(base_path):
                 naked_lumi = collider_sim.get_naked_luminosity(observed=observed)
                 cut_fraction = np.trapezoid(z_dist_cut, zs_cut) / np.trapezoid(z_dist, zs)
                 naked_lumi *= cut_fraction
-            # n_blue, n_yellow = cad_step_row['blue_wcm_ions'], cad_step_row['yellow_wcm_ions']  # Total for all bunches
-            n_blue, n_yellow = cad_step_row['blue_dcct_ions'], cad_step_row['yellow_dcct_ions']  # Total for all bunches
+            n_blue, n_yellow = cad_step_row[f'blue_{ions}_ions'], cad_step_row[f'yellow_{ions}_ions']  # Total for all bunches
             lumi = naked_lumi * mb_to_um2 * f_beam * n_blue * n_yellow / n_bunches * 1e3  # in b⁻¹s⁻¹
             profile_lumis.append(lumi)
         lumi_mean, lumi_std = np.nanmean(profile_lumis), np.nanstd(profile_lumis)
@@ -111,6 +127,10 @@ def calculate_default_cross_sections(base_path):
             rates[rate_col].append(rate_val)
             rate_errs[rate_col].append(rate_err)
 
+    if unit == 'mb':
+        lumis = [lumi * 1e-3 for lumi in lumis]  # Convert to mb⁻¹s⁻¹
+        lumi_errs = [lumi_err * 1e-3 for lumi_err in lumi_errs]  # Convert to mb⁻¹s⁻¹
+
     # Plot rates and lumis vs step
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.errorbar(steps_plt, lumis, yerr=lumi_errs, fmt='o', label='Lumi')
@@ -119,7 +139,7 @@ def calculate_default_cross_sections(base_path):
         scale = lumis[0] / rates[rate_col][0]  # Scale rates to match lumi
         ax.errorbar(steps_plt, np.array(rates[rate_col]) * scale, yerr=np.array(rate_errs[rate_col]) * scale, fmt='o',
                     label=rate_col)
-    ax.set_ylabel('Lumi ($b^-1s^-1$) & Rate (Hz) (scaled)')
+    ax.set_ylabel(f'Lumi (${unit}^-1s^-1$) & Rate (Hz) (scaled)')
     ax.set_title('Lumi and Rates vs Step')
     ax.legend()
     fig.tight_layout()
@@ -137,7 +157,7 @@ def calculate_default_cross_sections(base_path):
         ax.errorbar(steps_plt, [cs.val for cs in cross_sections[rate_col]],
                     yerr=[cs.err for cs in cross_sections[rate_col]], fmt='o')
         ax.set_xlabel('Step')
-        ax.set_ylabel('Cross Section (b)')
+        ax.set_ylabel(f'Cross Section ({unit})')
         ax.set_title(f'Cross Section for {rate_col}')
         fig.tight_layout()
 

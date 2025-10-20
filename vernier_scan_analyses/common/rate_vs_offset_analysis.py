@@ -1181,9 +1181,18 @@ def bunch_by_bunch_cross_section(base_path):
     # ions = 'wcm'
     average_profiles = False  # If False, just take the middle
 
+    # rate_name_for_beam_width = 'MBD |z|<200 Sasha Corrected'
+    # rate_names_for_absolute_rate = ['mbd_sasha_bkg_cor_bunch_x_rate', 'zdc_sasha_cor_bunch_x_rate']
+    analysis_rates = [
+        {'name': 'MBD', 'bw_rate_name': 'MBD |z|<200 Sasha Corrected', 'abs_rate_name': 'mbd_sasha_bkg_cor_bunch_x_rate', 'lumi_type': 'MBD'},
+        {'name': 'ZDC', 'bw_rate_name': 'ZDC Sasha Corrected', 'abs_rate_name': 'zdc_sasha_cor_bunch_x_rate', 'lumi_type': 'ZDC'},
+    ]
+
     cad_df = pd.read_csv(combined_cad_step_data_csv_path)
     gl1p_df = pd.read_csv(gl1p_rate_data_csv_path)
     cad_df = pd.merge(cad_df, gl1p_df, how='left', on='step')
+
+    bunch_width_df = pd.read_csv(bunch_width_csv_path)
 
     if base_path.split('/')[-2] == 'auau_oct_16_24':
         beta_star = 80.3  # in cm
@@ -1193,6 +1202,181 @@ def bunch_by_bunch_cross_section(base_path):
         beta_star = 111.6  # in cm
     else:
         raise ValueError(f'Unknown run number for base path: {base_path}')
+
+    print(bunch_width_df)
+    print(bunch_width_df.columns)
+
+    bunch_width_df = bunch_width_df[bunch_width_df['ions'] == ions]
+    bunch_width_df = bunch_width_df[bunch_width_df['beta_star'] == beta_star]
+    bunch_width_df = bunch_width_df[bunch_width_df['average_profiles'] == average_profiles]
+    # bunch_width_df = bunch_width_df[bunch_width_df['rate_name'] == rate_name_for_beam_width]
+
+    head_on_steps = [row['step'] for _, row in cad_df.iterrows() if row['set offset h'] == 0 and row['set offset v'] == 0]
+
+    print(f'Head-on steps: {head_on_steps}')
+    print(cad_df.columns)
+
+    df_out = []
+    df_summary_out = []
+
+    collider_sim = BunchCollider()
+    collider_sim.set_grid_size(31, 31, 101, 31)
+    bkg = 0.0e-17
+    gauss_eff_width = 500
+    mbd_resolution = 1.0
+
+    collider_sim.set_bkg(bkg)
+    collider_sim.set_gaus_z_efficiency_width(gauss_eff_width)
+    collider_sim.set_gaus_smearing_sigma(mbd_resolution)
+    collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+
+    # Get nominal dcct ions and emittances
+    step_0 = cad_df[cad_df['step'] == 0].iloc[0]
+    em_blue_horiz_nom, em_blue_vert_nom = step_0['blue_horiz_emittance'], step_0['blue_vert_emittance']
+    em_yel_horiz_nom, em_yel_vert_nom = step_0['yellow_horiz_emittance'], step_0['yellow_vert_emittance']
+    em_blue_nom = (em_blue_horiz_nom, em_blue_vert_nom)
+    em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
+
+    for step in head_on_steps:
+        cad_df_step = cad_df[cad_df['step'] == step].iloc[0]
+        print(f'Processing step {step}')
+        # rates = {abs_rate_name: [] for abs_rate_name in rate_names_for_absolute_rate}
+        # rates = {analysis_rate['name']: [] for analysis_rate in analysis_rates}
+        # beam_widths = {'horizontal': [], 'vertical': []}
+        n_protons = {'blue': [], 'yellow': []}
+        # lumis = {'naked': [], 'lumi': [], 'observed': [], 'z_cut': []}
+        analysis_data = {analysis_rate['name']: {
+            'rate': [], 'beam_widths': {'horizontal': [], 'vertical': []}, 'lumis': {'naked': [], 'lumi': [], 'observed': [], 'z_cut': []}
+        } for analysis_rate in analysis_rates}
+        for bunch_i in bunches:
+            profile_path = get_profile_path(longitudinal_profiles_dir_path, cad_df_step['start'], cad_df_step['end'],
+                                            False, bunch_num=bunch_i)
+            bunch_n_proton_fracs = {}
+            for color in ['blue', 'yellow']:
+                file_name = os.path.basename(profile_path).replace(f'bunch_{bunch_i}_', '').replace('COLOR', color)
+                bunch_rel_n_protons = np.loadtxt(f'{longitudinal_profiles_dir_path}bunch_norm_factors_{file_name}',
+                                                 dtype=float,
+                                                 delimiter=',')
+                bunch_n_proton_frac = bunch_rel_n_protons[bunch_i] / np.sum(bunch_rel_n_protons)
+                bunch_n_proton_fracs[color] = bunch_n_proton_frac
+
+            n_blue, n_yellow = cad_df_step['blue_wcm_ions'], cad_df_step['yellow_wcm_ions']
+            n_blue *= bunch_n_proton_fracs['blue']
+            n_yellow *= bunch_n_proton_fracs['yellow']
+            n_protons['blue'].append(n_blue)
+            n_protons['yellow'].append(n_yellow)
+
+            # for absolute_rate_name in rate_names_for_absolute_rate:
+            for analysis_rate in analysis_rates:
+                absolute_rate_name = analysis_rate['abs_rate_name']
+                print(f'Processing bunch {bunch_i} for absolute rate {absolute_rate_name}')
+                rate_data = cad_df_step[absolute_rate_name.replace('bunch_x', f'bunch_{bunch_i}')]
+                # rates[absolute_rate_name].append(rate_data)
+                analysis_data[analysis_rate['name']]['rate'].append(rate_data)
+
+                bunch_widths = bunch_width_df[(bunch_width_df['bunch'] == bunch_i) & (bunch_width_df['rate_name'] == analysis_rate['bw_rate_name'])]
+                bunch_width_horizontal = bunch_widths[bunch_widths['orientation'] == 'Horizontal'].iloc[0]['beam_width']
+                bunch_width_vertical = bunch_widths[bunch_widths['orientation'] == 'Vertical'].iloc[0]['beam_width']
+                # beam_widths['horizontal'].append(bunch_width_horizontal)
+                # beam_widths['vertical'].append(bunch_width_vertical)
+                analysis_data[analysis_rate['name']]['beam_widths']['horizontal'].append(bunch_width_horizontal)
+                analysis_data[analysis_rate['name']]['beam_widths']['vertical'].append(bunch_width_vertical)
+
+                set_sim(collider_sim, cad_df_step, bunch_width_horizontal, bunch_width_vertical, em_blue_nom, em_yel_nom, profile_path)
+                collider_sim.run_sim_parallel()
+                naked_lumi = collider_sim.get_naked_luminosity()
+
+                zs, z_dist = collider_sim.get_z_density_dist()
+                zs_cut, z_dist_cut = zs[np.abs(zs) < lumi_z_cut], z_dist[np.abs(zs) < lumi_z_cut]
+                naked_lumi_obs = collider_sim.get_naked_luminosity(observed=True)
+                cut_fraction = np.trapezoid(z_dist_cut, zs_cut) / np.trapezoid(z_dist, zs)
+                naked_lumi_z_cut = naked_lumi_obs * cut_fraction
+
+                # lumis['naked'].append(naked_lumi)
+                # lumis['lumi'].append(naked_lumi * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+                # lumis['observed'].append(naked_lumi_obs * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+                # lumis['z_cut'].append(naked_lumi_z_cut * mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow)
+                lumi_factor = mb_to_um2 * f_beam * 1e3 * n_blue * n_yellow
+                analysis_data[analysis_rate['name']]['lumis']['naked'].append(naked_lumi)
+                analysis_data[analysis_rate['name']]['lumis']['lumi'].append(naked_lumi * lumi_factor)
+                analysis_data[analysis_rate['name']]['lumis']['observed'].append(naked_lumi_obs * lumi_factor)
+                analysis_data[analysis_rate['name']]['lumis']['z_cut'].append(naked_lumi_z_cut * lumi_factor)
+
+        # for absolute_rate_name, rate_data in rates.items():
+        for absolute_rate_name, analysis_data_rate in analysis_data.items():
+            rate_data = analysis_data_rate['rate']
+            beam_widths = analysis_data_rate['beam_widths']
+            lumis = analysis_data_rate['lumis']
+
+            cross_sections = np.array(rate_data) / np.array(lumis['lumi'])
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.plot(bunches, rate_data, marker='o', label=absolute_rate_name)
+            ax_bw = ax.twinx()
+            ax_bw.plot(bunches, beam_widths['horizontal'], marker='s', linestyle='--', color='orange', label='Horizontal Beam Width')
+            ax_bw.plot(bunches, beam_widths['vertical'], marker='^', linestyle='--', color='green', label='Vertical Beam Width')
+            ax_bw.set_ylabel('Beam Width [μm]')
+            ax.set_xlabel('Bunch Number')
+            ax.set_ylabel('Rate')
+            ax.set_title(f'Absolute Rates for Step {step}')
+            ax.legend()
+            ax_bw.legend()
+            fig.tight_layout()
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.plot(bunches, n_protons['blue'], marker='o', color='blue', label='Blue Protons')
+            ax.plot(bunches, n_protons['yellow'], marker='s', color='orange', label='Yellow Protons')
+            ax.set_xlabel('Bunch Number')
+            ax.set_ylabel('Number of Protons')
+            ax.legend()
+            fig.tight_layout()
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.plot(bunches, lumis['lumi'], marker='o', label='Lumi')
+            ax.plot(bunches, lumis['observed'], marker='s', linestyle='--', color='orange', label='Observed Lumi')
+            ax.plot(bunches, lumis['z_cut'], marker='^', linestyle='--', color='green', label='Lumi |z|<200')
+            ax.set_xlabel('Bunch Number')
+            ax.set_ylabel('Luminosity [cm⁻² s⁻¹]')
+            ax.legend()
+            fig.tight_layout()
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.plot(bunches, cross_sections, marker='o', label=f'Cross Sections for {absolute_rate_name}')
+            ax.set_xlabel('Bunch Number')
+            ax.set_ylabel('Cross Section [cm²]')
+            ax.set_title(f'Cross Sections for {absolute_rate_name} at Step {step}')
+            ax.legend()
+            fig.tight_layout()
+    plt.show()
+
+
+    # for step in cad_df['step'].unique():
+    #     print(f'Processing step {step}')
+    #     cad_step_row = cad_df[cad_df['step'] == step].iloc[0]
+    #     orientation = cad_step_row['orientation']
+        # if orientation == 'Horizontal':
+        #     beam_width_x_nom = cad_step_row['beam_width_x']
+        #     beam_width_y_nom = cad_step_row['beam_width_y']
+        # else:
+        #     beam_width_x_nom = cad_step_row['beam_width_y']
+        #     beam_width_y_nom = cad_step_row['beam_width_x']
+        #
+        # # Get nominal emittances
+        # em_blue_horiz_nom, em_blue_vert_nom = cad_step_row['blue_horiz_emittance'], cad_step_row['blue_vert_emittance']
+        # em_yel_horiz_nom, em_yel_vert_nom = cad_step_row['yellow_horiz_emittance'], cad_step_row['yellow_vert_emittance']
+        # em_blue_nom = (em_blue_horiz_nom, em_blue_vert_nom)
+        # em_yel_nom = (em_yel_horiz_nom, em_yel_vert_nom)
+        #
+        # # Set up collider sim
+        # collider_sim = BunchCollider()
+        # collider_sim.set_grid_size(31, 31, 101, 31)
+        # collider_sim.set_bkg(0.0e-17)
+        # collider_sim.set_gaus_z_efficiency_width(500)
+        # collider_sim.set_gaus_smearing_sigma(1.0)
+        # collider_sim.set_bunch_beta_stars(beta_star, beta_star)
+        #
+        # # Get the beam widths for this step
+        # beam_widths = np.linspace(120, 170, 9)
 
 
 def get_minimum_chi2(chi2s, xs, n_pts=5):

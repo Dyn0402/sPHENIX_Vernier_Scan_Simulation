@@ -497,7 +497,7 @@ def get_average_longitudinal_profile(file_path, plot=False, baseline_shift=0, le
     return zs_interp, vals_interp
 
 
-def write_bunch_by_bunch_longitudinal_profiles():
+def write_bunch_by_bunch_longitudinal_profiles(fixed_z_zero=6e6):
     base_path = set_base_path()
     # profiles_path = f'{base_path}Vernier_Scans/auau_oct_16_24/profiles/'
     profiles_path = f'{base_path}Vernier_Scans/pp_aug_12_24/profiles/'
@@ -515,11 +515,15 @@ def write_bunch_by_bunch_longitudinal_profiles():
         beam_color = 'blue' if 'bo2' in lines[2] else 'yellow'
         print(f'{beam_color} from {date} at {time}')
 
-        baseline = np.percentile(data, 85)
-        zero_safety_offset = 2  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
-        data = baseline - data - zero_safety_offset
+        baseline_separator = scan_discrete_hist(data)
+        data = baseline_separator - data
+        baseline_mask = data < 0
 
-        data[data < 0] = 0  # Set negative values to zero
+        # baseline = np.percentile(data, 85)
+        # zero_safety_offset = 2  # Go two ADC up from the baseline to avoid a baseline. Better to have zeros
+        # data = baseline - data - zero_safety_offset
+
+        # data[data < 0] = 0  # Set negative values to zero
 
         time_step = 0.05  # ns
         segment_time = 106.573785  # ns
@@ -533,6 +537,8 @@ def write_bunch_by_bunch_longitudinal_profiles():
             n_segs = len(times)
             new_seg_mask = (times_flat >= n_segs * segment_time) & (times_flat < (n_segs + 1) * segment_time)
             new_segment_times, new_segment_values = times_flat[new_seg_mask], data[new_seg_mask]
+            new_segment_baselines = data[new_seg_mask & baseline_mask]
+            new_segment_values -= np.mean(new_segment_baselines)  # Subtract baseline average over segment
             new_segment_times = new_segment_times - (n_segs * segment_time)
             if np.max(new_segment_values) < bunch_min_peak:
                 abort_gap = True
@@ -555,6 +561,8 @@ def write_bunch_by_bunch_longitudinal_profiles():
             if beam_color == 'blue':
                 zs = -zs[::-1]  # Reverse for blue beam
                 bunch_vals = bunch_vals[::-1]
+            if fixed_z_zero:  # If a fixed z zero is provided, set values outside of it to zero
+                bunch_vals[abs(zs) > fixed_z_zero] = 0
             norm_factor = np.trapezoid(bunch_vals, zs)
             vals = bunch_vals / norm_factor
             norm_factors.append(norm_factor)

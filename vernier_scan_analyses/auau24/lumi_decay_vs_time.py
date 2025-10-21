@@ -35,7 +35,8 @@ def main():
     plot_lumi_decay(scan_path, root_file_name)
     plot_lumi_decay(scan_path, root_file_name, em_sqrt=True)
     scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
-    root_file_name = 'calofitting_51195.root'
+    # root_file_name = 'calofitting_51195.root'
+    root_file_name = 'original_51195.root'
     plot_lumi_decay(scan_path, root_file_name)
     plot_lumi_decay(scan_path, root_file_name, em_sqrt=True)
     print('donzo')

@@ -25,11 +25,12 @@ from vernier_z_vertex_fitting import read_cad_measurement_file
 
 def main():
     err_type = 'conservative'  # 'best'  ''
-    combined_lumi_path = f'run_rcf_jobs_lumi_calc_old/output/{err_type}_err_combined_lumis.csv'
+    # combined_lumi_path = f'run_rcf_jobs_lumi_calc_old/output/{err_type}_err_combined_lumis.csv'
+    combined_lumi_path = f'run_rcf_jobs_lumi_calc/output/{err_type}_err_combined_lumis.csv'
     combined_lumis = pd.read_csv(combined_lumi_path)
 
-    # save_path = None
-    save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/Cross_Section/'
+    save_path = None
+    # save_path = 'C:/Users/Dylan/OneDrive - UCLA IT Services/Research/Saclay/sPHENIX/Vernier_Scan/Analysis_Note/Cross_Section/'
 
     def_lumi_path = 'lumi_vs_beta_star.csv'
     def_lumis = pd.read_csv(def_lumi_path)

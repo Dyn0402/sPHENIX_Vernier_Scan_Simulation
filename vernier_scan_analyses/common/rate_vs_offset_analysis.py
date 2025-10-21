@@ -1169,7 +1169,7 @@ def bunch_by_bunch_cross_section(base_path):
     longitudinal_profiles_dir_path = f'{base_path}profiles/'
     combined_cad_step_data_csv_path = f'{base_path}combined_cad_step_data.csv'
     gl1p_rate_data_csv_path = f'{base_path}gl1p_bunch_by_bunch_step_rates.csv'
-    out_fig_path = f'{base_path}Figures/Beam_Param_Inferences/Beam_Width_Rate_Only_Fits/'
+    out_fig_path = f'{base_path}Figures/Beam_Param_Inferences/Bunch_By_Bunch_Rate_Only/'
     bunch_width_csv_path = f'{base_path}beam_widths_bunch_by_bunch_rate_only_fit_results.csv'
 
     bunches = np.arange(0, 111, 1)
@@ -1310,26 +1310,69 @@ def bunch_by_bunch_cross_section(base_path):
 
             cross_sections = np.array(rate_data) / np.array(lumis['lumi'])
 
+            # Write cross sections to CSV
+            out_csv_path = f'{out_fig_path}cross_sections_bunch_by_bunch_rate_only.csv'
+            df_cross_rows = []
+            for idx, bunch_num in enumerate(bunches):
+                try:
+                    cs = float(cross_sections[idx])
+                except (IndexError, ValueError):
+                    cs = np.nan
+                df_cross_rows.append({
+                    'cross_section': cs,
+                    'absolute_rate_name': absolute_rate_name,
+                    'bunch_number': int(bunch_num),
+                    'step': int(step)
+                })
+
+            df_cross = pd.DataFrame(df_cross_rows)
+            if os.path.exists(out_csv_path):
+                df_existing = pd.read_csv(out_csv_path)
+
+                # Remove existing rows that match any of the new absolute_rate_name + step + bunch_number combinations
+                mask = pd.Series([True] * len(df_existing))
+                for _, row in df_cross.iterrows():
+                    mask &= ~((df_existing['absolute_rate_name'] == row['absolute_rate_name']) &
+                              (df_existing['bunch_number'] == row['bunch_number']) &
+                              (df_existing['step'] == row['step']))
+                df_existing = df_existing[mask]
+
+                df_out = pd.concat([df_existing, df_cross], ignore_index=True)
+            else:
+                df_out = df_cross
+
+            df_out.to_csv(out_csv_path, index=False)
+
+            safe_name = ''.join([c if c.isalnum() else '_' for c in absolute_rate_name])
+            fname_prefix = f"{safe_name}_step_{step}"
+
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.plot(bunches, rate_data, marker='o', label=absolute_rate_name)
             ax_bw = ax.twinx()
-            ax_bw.plot(bunches, beam_widths['horizontal'], marker='s', linestyle='--', color='orange', label='Horizontal Beam Width')
-            ax_bw.plot(bunches, beam_widths['vertical'], marker='^', linestyle='--', color='green', label='Vertical Beam Width')
+            ax_bw.plot(bunches, beam_widths['horizontal'], marker='s', linestyle='--', color='orange',
+                       label='Horizontal Beam Width')
+            ax_bw.plot(bunches, beam_widths['vertical'], marker='^', linestyle='--', color='green',
+                       label='Vertical Beam Width')
             ax_bw.set_ylabel('Beam Width [μm]')
             ax.set_xlabel('Bunch Number')
             ax.set_ylabel('Rate')
-            ax.set_title(f'Absolute Rates for Step {step}')
-            ax.legend()
-            ax_bw.legend()
+            ax.set_title(f'{absolute_rate_name} Absolute Rates for Step {step}')
+            ax.legend(loc='lower right')
+            ax_bw.legend(loc='upper right')
             fig.tight_layout()
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_rates.png')
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_rates.pdf')
 
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.plot(bunches, n_protons['blue'], marker='o', color='blue', label='Blue Protons')
             ax.plot(bunches, n_protons['yellow'], marker='s', color='orange', label='Yellow Protons')
             ax.set_xlabel('Bunch Number')
             ax.set_ylabel('Number of Protons')
+            ax.set_title(f'{absolute_rate_name} Protons for Step {step}')
             ax.legend()
             fig.tight_layout()
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_protons.png')
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_protons.pdf')
 
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.plot(bunches, lumis['lumi'], marker='o', label='Lumi')
@@ -1337,8 +1380,11 @@ def bunch_by_bunch_cross_section(base_path):
             ax.plot(bunches, lumis['z_cut'], marker='^', linestyle='--', color='green', label='Lumi |z|<200')
             ax.set_xlabel('Bunch Number')
             ax.set_ylabel('Luminosity [cm⁻² s⁻¹]')
+            ax.set_title(f'Luminosities for {absolute_rate_name} at Step {step}')
             ax.legend()
             fig.tight_layout()
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_lumis.png')
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_lumis.pdf')
 
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.plot(bunches, cross_sections, marker='o', label=f'Cross Sections for {absolute_rate_name}')
@@ -1347,6 +1393,56 @@ def bunch_by_bunch_cross_section(base_path):
             ax.set_title(f'Cross Sections for {absolute_rate_name} at Step {step}')
             ax.legend()
             fig.tight_layout()
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_cross_sections.png')
+            fig.savefig(f'{out_fig_path}/{fname_prefix}_cross_sections.pdf')
+
+
+        # for absolute_rate_name, analysis_data_rate in analysis_data.items():
+        #     rate_data = analysis_data_rate['rate']
+        #     beam_widths = analysis_data_rate['beam_widths']
+        #     lumis = analysis_data_rate['lumis']
+        #
+        #     cross_sections = np.array(rate_data) / np.array(lumis['lumi'])
+        #
+        #     fig, ax = plt.subplots(figsize=(10, 6))
+        #     ax.plot(bunches, rate_data, marker='o', label=absolute_rate_name)
+        #     ax_bw = ax.twinx()
+        #     ax_bw.plot(bunches, beam_widths['horizontal'], marker='s', linestyle='--', color='orange', label='Horizontal Beam Width')
+        #     ax_bw.plot(bunches, beam_widths['vertical'], marker='^', linestyle='--', color='green', label='Vertical Beam Width')
+        #     ax_bw.set_ylabel('Beam Width [μm]')
+        #     ax.set_xlabel('Bunch Number')
+        #     ax.set_ylabel('Rate')
+        #     ax.set_title(f'{absolute_rate_name} Absolute Rates for Step {step}')
+        #     ax.legend(loc='lower right')
+        #     ax_bw.legend(loc='upper right')
+        #     fig.tight_layout()
+        #
+        #     fig, ax = plt.subplots(figsize=(10, 6))
+        #     ax.plot(bunches, n_protons['blue'], marker='o', color='blue', label='Blue Protons')
+        #     ax.plot(bunches, n_protons['yellow'], marker='s', color='orange', label='Yellow Protons')
+        #     ax.set_xlabel('Bunch Number')
+        #     ax.set_ylabel('Number of Protons')
+        #     ax.set_title(f'{absolute_rate_name} Protons for Step {step}')
+        #     ax.legend()
+        #     fig.tight_layout()
+        #
+        #     fig, ax = plt.subplots(figsize=(10, 6))
+        #     ax.plot(bunches, lumis['lumi'], marker='o', label='Lumi')
+        #     ax.plot(bunches, lumis['observed'], marker='s', linestyle='--', color='orange', label='Observed Lumi')
+        #     ax.plot(bunches, lumis['z_cut'], marker='^', linestyle='--', color='green', label='Lumi |z|<200')
+        #     ax.set_xlabel('Bunch Number')
+        #     ax.set_ylabel('Luminosity [cm⁻² s⁻¹]')
+        #     ax.set_title(f'Luminosities for {absolute_rate_name} at Step {step}')
+        #     ax.legend()
+        #     fig.tight_layout()
+        #
+        #     fig, ax = plt.subplots(figsize=(10, 6))
+        #     ax.plot(bunches, cross_sections, marker='o', label=f'Cross Sections for {absolute_rate_name}')
+        #     ax.set_xlabel('Bunch Number')
+        #     ax.set_ylabel('Cross Section [cm²]')
+        #     ax.set_title(f'Cross Sections for {absolute_rate_name} at Step {step}')
+        #     ax.legend()
+        #     fig.tight_layout()
     plt.show()
 
 

@@ -12,10 +12,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from common_logistics import set_base_path
+
 
 def main():
+    base_path = set_base_path()
     og_analysis_mbd_path = '../../mbd_cross_section_distribution.csv'
-    bunch_by_bunch_path = 'F:/Saclay/Vernier_scans/pp_aug_12_24/Figures/Beam_Param_Inferences/Bunch_By_Bunch_Rate_Only/cross_sections_bunch_by_bunch_rate_only.csv'
+    bunch_by_bunch_path = f'{base_path}Vernier_scans/pp_aug_12_24/Figures/Beam_Param_Inferences/Bunch_By_Bunch_Rate_Only/cross_sections_bunch_by_bunch_rate_only.csv'
 
     og_analysis_mbd_df = pd.read_csv(og_analysis_mbd_path)
     bunch_by_bunch_df = pd.read_csv(bunch_by_bunch_path)

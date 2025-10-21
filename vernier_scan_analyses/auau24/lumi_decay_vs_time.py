@@ -28,15 +28,20 @@ def main():
     base_path = set_base_path()
     scan_path = f'{base_path}Vernier_Scans/auau_oct_16_24/'
     root_file_name = 'calofit_54733.root'
-    # scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
-    # root_file_name = '69561.root'
-    # scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
-    # root_file_name = 'calofitting_51195.root'
     plot_lumi_decay(scan_path, root_file_name)
+    plot_lumi_decay(scan_path, root_file_name, em_sqrt=True)
+    scan_path = f'{base_path}Vernier_Scans/auau_july_17_25/'
+    root_file_name = '69561.root'
+    plot_lumi_decay(scan_path, root_file_name)
+    plot_lumi_decay(scan_path, root_file_name, em_sqrt=True)
+    scan_path = f'{base_path}Vernier_Scans/pp_aug_12_24/'
+    root_file_name = 'calofitting_51195.root'
+    plot_lumi_decay(scan_path, root_file_name)
+    plot_lumi_decay(scan_path, root_file_name, em_sqrt=True)
     print('donzo')
 
 
-def plot_lumi_decay(base_path, root_file_name='calofit_69561.root'):
+def plot_lumi_decay(base_path, root_file_name='calofit_69561.root', em_sqrt=False):
     """
     Plot the luminosity decay over time from the ions data.
     """
@@ -203,22 +208,24 @@ def plot_lumi_decay(base_path, root_file_name='calofit_69561.root'):
             em_blue_horiz, em_blue_vert = emittance_time['blue_horiz_emittance'], emittance_time['blue_vert_emittance']
             em_yel_horiz, em_yel_vert = emittance_time['yellow_horiz_emittance'], emittance_time['yellow_vert_emittance']
 
-            # blue_widths = np.array([
-            #     beam_width_x * (em_blue_horiz / em_blue_horiz_nom),
-            #     beam_width_y * (em_blue_vert / em_blue_vert_nom)
-            # ])
-            # yellow_widths = np.array([
-            #     beam_width_x * (em_yel_horiz / em_yel_horiz_nom),
-            #     beam_width_y * (em_yel_vert / em_yel_vert_nom)
-            # ])
-            blue_widths = np.array([
-                beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
-                beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
-            ])
-            yellow_widths = np.array([
-                beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
-                beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
-            ])
+            if not em_sqrt:
+                blue_widths = np.array([
+                    beam_width_x * (em_blue_horiz / em_blue_horiz_nom),
+                    beam_width_y * (em_blue_vert / em_blue_vert_nom)
+                ])
+                yellow_widths = np.array([
+                    beam_width_x * (em_yel_horiz / em_yel_horiz_nom),
+                    beam_width_y * (em_yel_vert / em_yel_vert_nom)
+                ])
+            else:
+                blue_widths = np.array([
+                    beam_width_x * np.sqrt(em_blue_horiz / em_blue_horiz_nom),
+                    beam_width_y * np.sqrt(em_blue_vert / em_blue_vert_nom)
+                ])
+                yellow_widths = np.array([
+                    beam_width_x * np.sqrt(em_yel_horiz / em_yel_horiz_nom),
+                    beam_width_y * np.sqrt(em_yel_vert / em_yel_vert_nom)
+                ])
 
             collider_sim.set_bunch_sigmas(blue_widths, yellow_widths)
 
@@ -298,7 +305,10 @@ def plot_lumi_decay(base_path, root_file_name='calofit_69561.root'):
     ax.xaxis.set_major_formatter(time_format)
     ax.grid(zorder=-1)
     fig.tight_layout()
-    plt.show()
+    em_str = '_em_sqrt' if em_sqrt else '_em'
+    fig.savefig(f'{base_path}lumi_decay_vs_time{em_str}.png', dpi=300)
+    fig.savefig(f'{base_path}lumi_decay_vs_time{em_str}.pdf')
+    # plt.show()
 
 
 if __name__ == '__main__':

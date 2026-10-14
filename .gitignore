@@ -3,3 +3,7 @@ __pycache__/
 .idea/
 build/
 run_rcf_jobs_lumi_calc/output/*.csv
+
+# Local virtualenv
+venv/
+.venv/
